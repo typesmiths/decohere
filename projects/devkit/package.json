@@ -1,0 +1,58 @@
+{
+  "name": "@decohere/devkit",
+  "version": "0.0.1-dev.5",
+  "description": "The shared base for Decohere's command-line tools: the command framework, git/npm/pnpm/docker wrappers, tracing, and file search and watch. Never needed in a production app.",
+  "keywords": [
+    "typescript",
+    "cli",
+    "commander",
+    "tooling",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/devkit#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/devkit"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    "./cli": {
+      "types": "./types/src/cli/index.d.ts",
+      "import": "./es6/src/cli/index.js",
+      "require": "./commonjs/src/cli/index.js"
+    },
+    "./diagnostics": {
+      "types": "./types/src/diagnostics/index.d.ts",
+      "import": "./es6/src/diagnostics/index.js",
+      "require": "./commonjs/src/diagnostics/index.js"
+    },
+    "./interop": {
+      "types": "./types/src/interop/index.d.ts",
+      "import": "./es6/src/interop/index.js",
+      "require": "./commonjs/src/interop/index.js"
+    },
+    "./io": {
+      "types": "./types/src/io/index.d.ts",
+      "import": "./es6/src/io/index.js",
+      "require": "./commonjs/src/io/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/core": "0.0.1-dev.5",
+    "@decohere/scribe": "0.0.1-dev.5",
+    "commander": "^13.1.0",
+    "glob": "^13.0.1",
+    "picomatch": "^4.0.4"
+  },
+  "devDependencies": {}
+}

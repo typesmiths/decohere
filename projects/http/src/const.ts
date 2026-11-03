@@ -1,0 +1,41 @@
+import type { Metadata } from "./routing/anvil.types.js";
+
+const Anvil = "anvil";
+const RoutingKey = `${Anvil}:Routing`;
+
+export const RouteRegistryToken = Symbol("RouteRegistryToken");
+export const HttpProviderToken = Symbol("HttpProviderToken");
+export const RouterToken = Symbol("RouterToken");
+export const PrincipalToken = Symbol("PrincipalToken");
+export const IPrincipalProviderToken = Symbol("IPrincipalProvider");
+export const TokenServiceToken = Symbol("TokenService");
+export const AuthorizationServiceToken = Symbol("AuthorizationService");
+export const HttpOptionsToken = Symbol("HttpOptions");
+export const ExceptionFilterHostToken = Symbol("ExceptionFilterHost");
+export const ReadinessCheckToken = Symbol("ReadinessCheck");
+export const ReadinessServiceToken = Symbol("ReadinessService");
+export const HostedServiceHostToken = Symbol("HostedServiceHost");
+export type HTTPMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
+export const HTTPMethods = {
+	GET: "GET",
+	PUT: "PUT",
+	POST: "POST",
+	PATCH: "PATCH",
+	DELETE: "DELETE",
+} satisfies Record<string, HTTPMethod>;
+
+type AuthMetadata = "authorize" | "allowAnonymous";
+type ResponseMetadata = "httpCode" | "headers" | "catch" | "sse";
+
+export const MetadataKeys = {
+	controller: `${RoutingKey}:controller`,
+	route: `${RoutingKey}:route`,
+	parameter: `${RoutingKey}:parameter`,
+	fieldMap: `${RoutingKey}:fieldMap`,
+	authorize: `${RoutingKey}:authorize`,
+	allowAnonymous: `${RoutingKey}:allowAnonymous`,
+	httpCode: `${RoutingKey}:httpCode`,
+	headers: `${RoutingKey}:headers`,
+	catch: `${RoutingKey}:catch`,
+	sse: `${RoutingKey}:sse`,
+} satisfies Record<Metadata | AuthMetadata | ResponseMetadata, string>;

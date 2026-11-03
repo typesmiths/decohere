@@ -1,0 +1,32 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it, vi } from "vitest";
+import { AppDevContainerBaseImage } from "../src/models/docker-image.model.js";
+
+const realFs = await vi.importActual<typeof import("node:fs")>("node:fs");
+
+const DOCKERFILE = join(
+	dirname(fileURLToPath(import.meta.url)),
+	"../../devcontainer/Dockerfile",
+);
+
+describe("published app Dev Container base image", () => {
+	it("keeps projects/devcontainer/Dockerfile in sync with AppDevContainerBaseImage", () => {
+		const expected = new AppDevContainerBaseImage("node:24").build();
+		const onDisk = realFs.readFileSync(DOCKERFILE, "utf8");
+		const fromIdx = onDisk.indexOf("\nFROM ");
+		const body = fromIdx >= 0 ? onDisk.slice(fromIdx + 1) : onDisk;
+		expect(body).toBe(expected);
+	});
+
+	it("includes writable bash history, pnpm, gh, and node user", () => {
+		const content = new AppDevContainerBaseImage("node:24").build();
+		expect(content).toContain("ENV HISTFILE=/commandhistory/.bash_history");
+		expect(content).toContain("chown -R node /commandhistory");
+		expect(content).toContain("PROMPT_COMMAND='history -a'");
+		expect(content).toContain("pnpm@10");
+		expect(content).toContain("apt-get install -y --no-install-recommends gh");
+		expect(content).toContain("USER ${USERNAME}");
+		expect(content).toContain("bootloader.js");
+	});
+});

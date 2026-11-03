@@ -1,0 +1,45 @@
+{
+  "name": "@decohere/crucible",
+  "version": "0.0.1-dev.5",
+  "description": "Lightweight dependency injection container with decorator-based wiring",
+  "keywords": [
+    "typescript",
+    "dependency-injection",
+    "di",
+    "ioc",
+    "decorators",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/crucible#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/crucible"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js",
+      "require": "./commonjs/src/index.js"
+    },
+    "./decorators": {
+      "types": "./types/src/decorators/index.d.ts",
+      "import": "./es6/src/decorators/index.js",
+      "require": "./commonjs/src/decorators/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/core": "0.0.1-dev.5"
+  },
+  "devDependencies": {}
+}

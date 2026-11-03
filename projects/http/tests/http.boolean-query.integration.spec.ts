@@ -1,0 +1,59 @@
+import axios from "axios";
+import { afterEach, describe, expect, it } from "vitest";
+import type { App } from "../src/app/app.js";
+import { Builder } from "../src/builder/builder.js";
+import "../src/http/http.extensions.js";
+import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { Controller, Get, Query } from "../src/routing/index.js";
+import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+
+@Controller({ prefix: "/flags" })
+class FlagController {
+	@Get()
+	public get(@Query("flag") flag: boolean) {
+		return { flag };
+	}
+}
+
+describe("BooleanPipe over HTTP query", () => {
+	let app: App;
+
+	afterEach(async () => {
+		await app?.dispose();
+	});
+
+	async function start() {
+		app = await Builder.create()
+			.withHttpProvider(FastifyProvider)
+			.withControllers(FlagController)
+			.build();
+		axios.defaults.baseURL = await listenEphemeral(app);
+	}
+
+	it.each([
+		["true", true],
+		["TRUE", true],
+		["1", true],
+		["false", false],
+		["FALSE", false],
+		["0", false],
+	] as const)("binds ?flag=%s to %s", async (raw, expected) => {
+		await start();
+		const res = await axios.get("/flags", { params: { flag: raw } });
+		expect(res.status).toBe(200);
+		expect(res.data).toEqual({ flag: expected });
+	});
+
+	it("rejects an unknown flag value with 400", async () => {
+		await start();
+		const res = await axios.get("/flags", {
+			params: { flag: "yes" },
+			validateStatus: () => true,
+		});
+		expect(res.status).toBe(400);
+		expect(res.data).toMatchObject({
+			statusCode: 400,
+			error: "Bad Request",
+		});
+	});
+});

@@ -1,0 +1,73 @@
+{
+  "name": "@decohere/http",
+  "version": "0.0.1-dev.5",
+  "description": "Web API and microservice platform built on Fastify with decorator-based routing",
+  "keywords": [
+    "typescript",
+    "http",
+    "fastify",
+    "rest",
+    "api",
+    "microservice",
+    "decorators",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/http#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/http"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js",
+      "require": "./commonjs/src/index.js"
+    },
+    "./providers": {
+      "types": "./types/src/providers/index.d.ts",
+      "import": "./es6/src/providers/index.js",
+      "require": "./commonjs/src/providers/index.js"
+    },
+    "./auth": {
+      "types": "./types/src/auth/auth.extensions.d.ts",
+      "import": "./es6/src/auth/auth.extensions.js",
+      "require": "./commonjs/src/auth/auth.extensions.js"
+    },
+    "./testing": {
+      "types": "./types/src/testing/index.d.ts",
+      "import": "./es6/src/testing/index.js",
+      "require": "./commonjs/src/testing/index.js"
+    },
+    "./http": {
+      "types": "./types/src/http/index.d.ts",
+      "import": "./es6/src/http/index.js",
+      "require": "./commonjs/src/http/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@casl/ability": "^6.8.1",
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/core": "0.0.1-dev.5",
+    "@decohere/scribe": "0.0.1-dev.5",
+    "@fastify/compress": "^9.2.1",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.0",
+    "@fastify/rate-limit": "^11.2.0",
+    "@fastify/static": "^10.1.6",
+    "ajv": "^8.18.0",
+    "fastify": "^5.8.5",
+    "jose": "^6.2.3",
+    "picomatch": "^4.0.4"
+  },
+  "devDependencies": {}
+}

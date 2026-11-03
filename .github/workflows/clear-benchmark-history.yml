@@ -1,0 +1,51 @@
+name: Clear Benchmark History
+
+# Empties the benchmark history on Pages, e.g. after a change that makes old runs incomparable.
+# The next nightly bench run starts the trend again.
+on:
+  workflow_dispatch:
+
+# Shared with bench.yml and pages.yml: all three deploy the whole site.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+  CI_TOOLS: projects/ci-tools/src
+
+jobs:
+  clear-benchmark-history:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          install: "false"
+      - name: Restore badges from Pages
+        run: node ${{ env.CI_TOOLS }}/pages/restore-badges.mjs
+      - name: Generate CI status badges
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ${{ env.CI_TOOLS }}/badges/ci-status.mjs
+      # No history file: artifact.mjs publishes an empty one.
+      - name: Generate Pages site artifact
+        env:
+          PAGES_OUTPUT_DIR: dist/site
+        run: node ${{ env.CI_TOOLS }}/pages/artifact.mjs
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/site
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

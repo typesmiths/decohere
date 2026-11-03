@@ -1,0 +1,7 @@
+{
+  "useTabs": true,
+  "printWidth": 95,
+  "overrides": [
+    { "files": ["*.json", "*.yml", "*.yaml"], "options": { "useTabs": false, "tabWidth": 2 } }
+  ]
+}

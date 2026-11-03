@@ -1,0 +1,20 @@
+{
+  "window.title": "decohere${separator}${activeEditorShort}",
+  "window.titleSeparator": " | ",
+  "editor.gotoLocation.multipleDefinitions": "goto",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "files.watcherExclude": {
+    "**/node_modules/*/**": true,
+    "**/coverage/**": true,
+    "**/dist/**": true,
+    "**/.cache/**": true
+  },
+  "search.exclude": {
+    "**/node_modules/*/**": true,
+    "**/coverage/**": true,
+    "**/dist/**": true,
+    "**/.cache/**": true
+  },
+  "js/ts.preferences.autoImportFileExcludePatterns": ["^node:test"]
+}

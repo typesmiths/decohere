@@ -1,0 +1,45 @@
+{
+  "name": "decohere",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    // The node:24 image is Debian trixie, which has no moby packages; use Docker's own CLI packages.
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "moby": false }
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/src,type=bind",
+  "workspaceFolder": "/src",
+  "mounts": [
+    // Per checkout: fast installs, and worktrees don't share node_modules.
+    "source=${localWorkspaceFolderBasename}-node_modules,target=/src/node_modules,type=volume",
+    // Shared by every checkout on this machine: log in once to gh and Claude, survive rebuilds.
+    "source=decohere-gh-config,target=/home/node/.config/gh,type=volume",
+    "source=decohere-claude,target=/home/node/.claude,type=volume"
+  ],
+  "remoteEnv": {
+    // Optional: export these on your machine to skip `gh auth login` / pass Bitwarden access through.
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
+    "BWS_ACCESS_TOKEN": "${localEnv:BWS_ACCESS_TOKEN}"
+  },
+  // Volumes are created root-owned; hand them to `node`, then install with the pnpm pinned in package.json.
+  "postCreateCommand": "sudo chown node node_modules /home/node/.config/gh /home/node/.claude && sudo corepack enable && pnpm install",
+  "remoteUser": "node",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "oxc.oxc-vscode",
+        "esbenp.prettier-vscode",
+        "vitest.explorer",
+        "anthropic.claude-code",
+        "ms-azuretools.vscode-docker",
+        "vscode-icons-team.vscode-icons",
+        "johnpapa.winteriscoming",
+        "Anthropic.claude-code"
+      ],
+      "settings": {
+        // Auto-attach injects a debugger bootloader into NODE_OPTIONS that can be missing in a
+        // fresh container and crash every `node` command. Debug with the launch configs instead.
+        "debug.javascript.autoAttachFilter": "disabled"
+      }
+    }
+  }
+}

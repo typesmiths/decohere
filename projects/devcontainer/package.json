@@ -1,0 +1,12 @@
+{
+  "name": "@decohere/devcontainer",
+  "version": "0.0.1-dev.18",
+  "private": true,
+  "decohere": {
+    "dockerImageRepository": "ghcr.io/typesmiths/decohere/devcontainer"
+  },
+  "description": "Published base image for Decohere-scaffolded app Dev Containers",
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module"
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@decohere/flux",
+  "version": "0.0.1-dev.5",
+  "description": "Hot module reload server for Node.js ESM applications",
+  "keywords": [
+    "typescript",
+    "hmr",
+    "hot-reload",
+    "esm",
+    "dev-server",
+    "watch",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/flux#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/flux"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js",
+      "require": "./commonjs/src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/core": "0.0.1-dev.5",
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/devkit": "0.0.1-dev.5",
+    "@decohere/forge": "0.0.1-dev.5",
+    "@decohere/scribe": "0.0.1-dev.5",
+    "@decohere/workspace": "0.0.1-dev.5",
+    "commander": "^13.1.0",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {}
+}

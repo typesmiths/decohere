@@ -1,0 +1,326 @@
+import { existsSync } from "node:fs";
+import { basename, join, resolve } from "node:path";
+import { DockerCompose } from "../models/compose.model.js";
+import { ConfigYaml } from "../models/config-yaml.model.js";
+import { WELL_KNOWN_FILES } from "../models/const.js";
+import { DevContainer } from "../models/dev-container.model.js";
+import {
+	commandHistory,
+	DockerfileModel,
+	withWorkspaceNodeModulesOwnership,
+} from "../models/docker-image.model.js";
+import { EnvFile } from "../models/env-file.model.js";
+import { Gitignore } from "../models/gitignore.model.js";
+import { LaunchJson } from "../models/launch-json.model.js";
+import { PackageJson, packageScript } from "../models/package-json.model.js";
+import { MonoRepoScaffold, ProjectScaffold } from "../models/project.model.js";
+import { TsConfig } from "../models/tsconfig.model.js";
+import { VitestConfig } from "../models/vitest-config.model.js";
+import { VSCodeSettings } from "../models/vscode-settings.model.js";
+import { ScaffoldService } from "../services/scaffold.service.js";
+import {
+	CreateCliError,
+	isDecohereWorkspace,
+	listExistingApiNames,
+	parseApiNames,
+} from "./api-name.js";
+import {
+	DEFAULT_WEBAPI_NAME,
+	webapiPackageName,
+	webapiPort,
+	webapiProjectDir,
+	webapiReleaseEntry,
+} from "./const.js";
+import { DevContainerHostScripts } from "./devcontainer/host-scripts.js";
+import { AuthFeature } from "./features/auth.feature.js";
+import { DatabaseFeature } from "./features/database.feature.js";
+import { FinalizeFeature } from "./features/finalize.feature.js";
+import { PostmanFeature } from "./features/postman.feature.js";
+import { ApiPackageJson } from "./models/api-package-json.model.js";
+import { ControllerSourceFile } from "./models/controller-source-file.model.js";
+import { GithubCiWorkflows } from "./models/github-ci.model.js";
+import { MainSourceFile } from "./models/main-source-file.model.js";
+import { WebapiProductionDockerfile } from "./models/production-dockerfile.model.js";
+import { SampleConfigModel, SampleServiceModel } from "./models/sample-files.model.js";
+import { WebapiDevContainer } from "./models/webapi-image.model.js";
+
+export { WEBAPI_PROJECT_DIR, WEBAPI_RELEASE_ENTRY } from "./const.js";
+
+export type ApiOptions = {
+	d?: string;
+	/** Host project name (directory basename). Required when scaffolding into the create-builder `/workspace` mount. */
+	projectName?: string;
+	/** API slugs under `projects/`. Default `["api"]`. Repeatable `--name`. */
+	names?: string[];
+	/** Add APIs to an existing Decohere workspace instead of creating a new one. */
+	add?: boolean;
+	authProvider?: "auth0" | "none";
+	databaseProvider?: "none" | "postgres/typeorm";
+	postmanProvider?: "api" | "local" | "none";
+	installDependencies?: "yes" | "no";
+};
+
+const features = [DatabaseFeature, AuthFeature, PostmanFeature, FinalizeFeature];
+
+export async function scaffoldApi(cliOptions: ApiOptions) {
+	const targetDir = resolve(cliOptions.d ?? ".");
+	const projectName =
+		cliOptions.projectName?.trim() ||
+		process.env.DECOHERE_PROJECT_NAME?.trim() ||
+		basename(targetDir);
+	const names = parseApiNames(cliOptions.names);
+	const workspace = cliOptions.add
+		? createAddWorkspace(targetDir, projectName, names)
+		: createWorkspace(targetDir, projectName, names);
+	await ScaffoldService.scaffold(workspace, { ...cliOptions, names }, features);
+}
+
+function createWorkspace(
+	targetDir: string,
+	projectName: string,
+	apiNames: readonly string[],
+): MonoRepoScaffold {
+	const monoRepo = new MonoRepoScaffold();
+	monoRepo.targetDir = targetDir;
+	monoRepo.setName(projectName);
+	const name = monoRepo.name;
+	// Project-named root so Cursor Agents (and other tools) label the workspace by name.
+	const workspaceRoot = `/${name}`;
+
+	const compose = new DockerCompose()
+		.setProjectName(name)
+		.addHeaderComment(
+			"Merge .cursor/mcp.json in the service command. postStartCommand runs after Cursor's first MCP snapshot.",
+		)
+		.addNetwork(name, { name: `samples-${name}` })
+		.addService("devcontainer", {
+			build: ".",
+			volumes: [
+				// Repo bind in Compose (survives CLI recreates; Cursor-only mounts do not).
+				`..:${workspaceRoot}`,
+				// Workspace-local (created by initialize.sh as the host user).
+				// Do NOT bind ${HOME}/.npm/... — Docker creates missing host paths as root.
+				"./npm-auth:/home/node/.npm-config",
+				"./gh-auth:/home/node/.config/gh",
+				`webapi-node-modules:${workspaceRoot}/node_modules`,
+				// Named volume (not a Cursor-only mount) so CLI recreates keep Up-arrow history.
+				`${commandHistory.volumeName}:${commandHistory.dir}`,
+			],
+			env_file: ["./gh.env"],
+			environment: { NPM_CONFIG_USERCONFIG: "/home/node/.npm-config/.npmrc" },
+			command: `'bash -c "CODEBASE_RAG_WORKSPACE=${workspaceRoot} node --experimental-strip-types ${workspaceRoot}/.devcontainer/codebase-rag-mcp.ts merge || true && exec sleep infinity"'`,
+			networks: [name],
+		})
+		.addVolume("webapi-node-modules")
+		.addVolume(commandHistory.volumeName);
+
+	const installCmd = "bash .devcontainer/post-create.sh";
+	const devContainer = new DevContainer()
+		.setWorkspaceFolder(workspaceRoot)
+		.addExtension("biomejs.biome", "vitest.explorer")
+		.setInitializeCommand("bash .devcontainer/initialize.sh")
+		.setPostCreateCommand(installCmd)
+		.setUpdateContentCommand(installCmd)
+		.setPostStartCommand("bash .devcontainer/post-start.sh")
+		.useCompose();
+
+	forwardApiPorts(devContainer, apiNames, 0);
+
+	// Workspace-level models (repo root)
+	monoRepo.addModel(compose);
+	monoRepo.addModel(devContainer);
+	const appDevImage = new WebapiDevContainer();
+	appDevImage.addLayer(withWorkspaceNodeModulesOwnership({ workspaceDir: workspaceRoot }));
+	monoRepo.addModel(appDevImage);
+	monoRepo.addModel(new WebapiProductionDockerfile(apiNames));
+	monoRepo.addModel(new GithubCiWorkflows());
+	monoRepo.addModel(new VSCodeSettings(name));
+	monoRepo.addModel(new LaunchJson(apiNames));
+	monoRepo.addModel(new TsConfig());
+	monoRepo.addModel(new VitestConfig());
+	monoRepo.addModel(new PackageJson(`${name}.api`, { apiNames, workspaceName: name }));
+	monoRepo.addModel(new ConfigYaml(WELL_KNOWN_FILES.CONFIG_YAML, "config/config.yaml", ""));
+	monoRepo.addModel(
+		new ConfigYaml(WELL_KNOWN_FILES.CONFIG_DEV_YAML, "config/config.dev.yaml", ""),
+	);
+	monoRepo.addModel(new Gitignore());
+	monoRepo.addModel(new EnvFile());
+	monoRepo.addFile(new DevContainerHostScripts());
+
+	// Biome formatter/linter config
+	monoRepo.addFile({
+		files: () => [
+			{
+				filePath: "biome.json",
+				content: JSON.stringify(
+					{
+						$schema: "https://biomejs.dev/schemas/2.0.0/schema.json",
+						files: {
+							includes: ["**/*.ts", "**/*.js", "**/*.json", "**/*.yml", "**/*.yaml"],
+						},
+						assist: { actions: { source: { organizeImports: "on" } } },
+						vcs: { enabled: true, clientKind: "git", useIgnoreFile: true },
+						formatter: {
+							enabled: true,
+							formatWithErrors: true,
+							indentStyle: "tab",
+							lineWidth: 95,
+						},
+						javascript: { parser: { unsafeParameterDecoratorsEnabled: true } },
+						linter: {
+							rules: {
+								style: {
+									useConsistentMemberAccessibility: {
+										level: "error",
+										options: { accessibility: "explicit" },
+									},
+								},
+							},
+						},
+						overrides: [
+							{
+								includes: ["**/*.json"],
+								formatter: { indentStyle: "space", indentWidth: 2 },
+							},
+						],
+					},
+					null,
+					2,
+				),
+			},
+		],
+	});
+
+	for (const apiName of apiNames) {
+		addApiProject(monoRepo, name, apiName);
+	}
+
+	return monoRepo;
+}
+
+function createAddWorkspace(
+	targetDir: string,
+	projectName: string,
+	apiNames: readonly string[],
+): MonoRepoScaffold {
+	if (!isDecohereWorkspace(targetDir)) {
+		throw new CreateCliError(
+			`Not a Decohere workspace: ${targetDir}. Scaffold one first with \`npx @decohere/create webapi\`.`,
+		);
+	}
+
+	const existing = listExistingApiNames(targetDir);
+	for (const apiName of apiNames) {
+		if (existing.includes(apiName)) {
+			throw new CreateCliError(
+				`API "${apiName}" already exists at ${webapiProjectDir(apiName)}.`,
+			);
+		}
+	}
+
+	const monoRepo = new MonoRepoScaffold();
+	monoRepo.targetDir = targetDir;
+	monoRepo.setName(projectName);
+	const name = monoRepo.name;
+
+	const pkg = PackageJson.fromFile(join(targetDir, "package.json"));
+	monoRepo.addModel(pkg);
+	monoRepo.addModel(
+		existsSync(join(targetDir, ".env"))
+			? EnvFile.fromFile(join(targetDir, ".env"))
+			: new EnvFile(),
+	);
+	monoRepo.addModel(
+		existsSync(join(targetDir, "config/config.yaml"))
+			? ConfigYaml.fromFile(
+					WELL_KNOWN_FILES.CONFIG_YAML,
+					"config/config.yaml",
+					join(targetDir, "config/config.yaml"),
+				)
+			: new ConfigYaml(WELL_KNOWN_FILES.CONFIG_YAML, "config/config.yaml", ""),
+	);
+	monoRepo.addModel(
+		existsSync(join(targetDir, "config/config.dev.yaml"))
+			? ConfigYaml.fromFile(
+					WELL_KNOWN_FILES.CONFIG_DEV_YAML,
+					"config/config.dev.yaml",
+					join(targetDir, "config/config.dev.yaml"),
+				)
+			: new ConfigYaml(WELL_KNOWN_FILES.CONFIG_DEV_YAML, "config/config.dev.yaml", ""),
+	);
+
+	// Load the workspace files features merge into, so e.g. --database on a workspace
+	// created without one adds the Postgres service instead of only the db:* scripts.
+	const compose = loadIfExists(targetDir, ".devcontainer/docker-compose.yml", (path) =>
+		DockerCompose.fromFile(path),
+	);
+	if (compose) monoRepo.addModel(compose);
+	const devContainer = loadIfExists(targetDir, ".devcontainer/devcontainer.json", (path) =>
+		DevContainer.fromFile(path),
+	);
+	if (devContainer) {
+		forwardApiPorts(devContainer, apiNames, existing.length);
+		monoRepo.addModel(devContainer);
+	}
+	const devImage = loadIfExists(targetDir, ".devcontainer/Dockerfile", (path) =>
+		DockerfileModel.fromFile(path, ".devcontainer/Dockerfile"),
+	);
+	if (devImage) monoRepo.addModel(devImage);
+	const gitignore = loadIfExists(targetDir, ".gitignore", (path) => Gitignore.fromFile(path));
+	if (gitignore) monoRepo.addModel(gitignore);
+
+	if (!pkg.hasScript("package")) {
+		pkg.addScript("package", "pnpm run build && forge package");
+	}
+	for (const [offset, apiName] of apiNames.entries()) {
+		const port = webapiPort(existing.length + offset);
+		pkg.addScript(`start:${apiName}`, `node ${webapiReleaseEntry(apiName)}`);
+		pkg.addScript(`package:${apiName}`, packageScript(name, apiName));
+		pkg.addScript(
+			`dev:${apiName}`,
+			`PORT=${port} flux serve --env-file-if-exists .env --project ${webapiPackageName(name, apiName)}`,
+		);
+		addApiProject(monoRepo, name, apiName);
+	}
+	monoRepo.addModel(new WebapiProductionDockerfile(apiNames));
+
+	return monoRepo;
+}
+
+function addApiProject(
+	monoRepo: MonoRepoScaffold,
+	workspaceName: string,
+	apiName: string,
+): void {
+	const apiProject = new ProjectScaffold(webapiProjectDir(apiName));
+	apiProject.addModel(new ApiPackageJson(workspaceName, apiName));
+	apiProject.addModel(new MainSourceFile(`${workspaceName}.${apiName}`));
+	apiProject.addModel(new ControllerSourceFile());
+	apiProject.addFile(new SampleConfigModel());
+	apiProject.addFile(new SampleServiceModel());
+	monoRepo.addProject(apiProject);
+}
+
+function forwardApiPorts(
+	devContainer: DevContainer,
+	apiNames: readonly string[],
+	firstIndex: number,
+): void {
+	for (const [offset, apiName] of apiNames.entries()) {
+		const port = webapiPort(firstIndex + offset);
+		devContainer.forwardPort(port);
+		devContainer.setPortAttributes(port, {
+			label: apiName === DEFAULT_WEBAPI_NAME ? "API" : apiName,
+			requireLocalPort: true,
+		});
+	}
+}
+
+function loadIfExists<T>(
+	targetDir: string,
+	relativePath: string,
+	load: (absolutePath: string) => T,
+): T | undefined {
+	const absolutePath = join(targetDir, relativePath);
+	return existsSync(absolutePath) ? load(absolutePath) : undefined;
+}

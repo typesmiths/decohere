@@ -1,0 +1,41 @@
+{
+  "name": "@decohere/scribe",
+  "version": "0.0.1-dev.5",
+  "description": "Structured logging interface with pluggable adapters",
+  "keywords": [
+    "typescript",
+    "logging",
+    "structured-logging",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/scribe/scribe#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/scribe/scribe"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js",
+      "require": "./commonjs/src/index.js"
+    },
+    "./testing": {
+      "types": "./types/src/testing/index.d.ts",
+      "import": "./es6/src/testing/index.js",
+      "require": "./commonjs/src/testing/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

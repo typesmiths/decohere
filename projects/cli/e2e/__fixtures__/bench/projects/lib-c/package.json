@@ -1,0 +1,8 @@
+{
+  "name": "@bench/lib-c",
+  "version": "0.0.0",
+  "type": "module",
+  "main": ".decohere.js",
+  "dependencies": {},
+  "devDependencies": {}
+}

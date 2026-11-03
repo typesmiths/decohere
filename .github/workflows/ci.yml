@@ -1,0 +1,299 @@
+name: CI
+# Pull requests (from this repo and from forks) run the suite before merge; pushes to
+# main and release run it again for Publish and Pages. A fork's run gets no secrets
+# and a read-only token: nothing here needs either.
+on:
+  pull_request:
+  push:
+    branches: [main, release]
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+  SCRIBE_LOG_LEVEL: info
+  CI_TOOLS: projects/ci-tools/src
+  RELEASE_SCRIPTS: projects/ci-tools/src/release
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ github.token }}
+          filters: .github/ci/code-paths-filter.yml
+
+      - id: gate
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ||
+                "${{ github.ref }}" == "refs/heads/release" ||
+                "${{ steps.filter.outputs.code }}" == "true" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No code paths changed — skipping CI suite (docs/meta only)"
+          fi
+
+  # Static gates — overlaps with test on wall clock.
+  lint:
+    name: lint/typecheck
+    needs: [changes]
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run linter and type check
+        run: |
+          set +e
+          pnpm run lint:check &
+          lint_pid=$!
+          pnpm run typecheck &
+          tsc_pid=$!
+          wait "$lint_pid"
+          lint_code=$?
+          wait "$tsc_pid"
+          tsc_code=$?
+          set -e
+          if [[ "$lint_code" -ne 0 || "$tsc_code" -ne 0 ]]; then
+            echo "lint exit=${lint_code} typecheck exit=${tsc_code}"
+            exit 1
+          fi
+
+      # Pinned download rather than a third-party action.
+      - name: Lint workflow files
+        env:
+          ACTIONLINT_VERSION: "1.7.7"
+        run: |
+          arch="$(dpkg --print-architecture)"
+          case "$arch" in
+            amd64 | arm64) ;;
+            *) echo "Unsupported architecture: $arch"; exit 1 ;;
+          esac
+          curl -fsSL \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${arch}.tar.gz" \
+            -o /tmp/actionlint.tar.gz
+          tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
+          /tmp/actionlint -color
+
+      - name: Run pnpm audit
+        run: |
+          set +e
+          pnpm audit --json > npm-audit.json
+          code=$?
+          set -e
+          if [[ ! -s npm-audit.json ]] || ! node -e "JSON.parse(require('fs').readFileSync('npm-audit.json','utf8'))"; then
+            echo "pnpm audit failed to produce JSON (exit ${code})"
+            exit 1
+          fi
+          echo "pnpm audit wrote report (exit ${code}; high/critical gated next)"
+
+      - name: Summarize npm audit
+        run: node ${{ env.CI_TOOLS }}/audit/summarize.mjs npm-audit.json
+
+      - name: Fail on high/critical vulnerabilities
+        run: node ${{ env.CI_TOOLS }}/audit/enforce.mjs npm-audit.json
+
+      - name: Upload npm audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: npm-audit.json
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Create/update npm audit issue
+        if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && env.ACT != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ${{ env.CI_TOOLS }}/audit/upsert-issue.mjs npm-audit.json
+
+  test:
+    needs: [changes]
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    # Units (feature) or coverage (main/release). Images + scaffold e2e are the sibling `docker` job.
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Fetch tags for versioning
+        if: github.ref == 'refs/heads/main'
+        run: git fetch --tags --force
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          configure-git: "${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}"
+          git-user-name: GitHub Actions
+          git-user-email: actions@github.com
+
+      # Feature: units. Main: coverage gates thresholds (too late if only on release).
+      # Release: coverage again for Pages badges (official published metrics).
+      - name: Run unit tests
+        if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/release'
+        run: pnpm test
+
+      - name: Run tests with coverage
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release'
+        run: pnpm run test:coverage
+
+      - name: Run Docker-backed tests
+        run: pnpm run test:docker
+
+      - name: Upload coverage data
+        if: github.ref == 'refs/heads/release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data
+          path: |
+            dist/coverage/coverage-summary.json
+            dist/coverage/lcov.info
+          retention-days: 1
+
+      - name: Compute next dev version from git tags
+        if: github.ref == 'refs/heads/main'
+        run: pnpm forge --log-level info version --release-type prerelease --channel dev
+
+      - name: Sync cross-library dependency versions
+        if: github.ref == 'refs/heads/main'
+        run: node ${{ env.RELEASE_SCRIPTS }}/sync-dependencies.mjs
+
+      - name: Build release artifacts
+        if: github.ref == 'refs/heads/main'
+        run: pnpm forge --log-level info build --configuration release
+
+      - name: Upload release build artifacts
+        if: github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-release-beta-${{ github.run_id }}
+          path: dist/release/
+          if-no-files-found: warn
+          retention-days: 14
+
+  # One release tree: npm dry-run (before pack mutates dist/release), then pack once,
+  # forge docker (create + devcontainer, extra :local tag), then scaffold e2e.
+  docker:
+    name: docker
+    needs: [changes]
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build release artifacts
+        run: pnpm forge --log-level info build --configuration release
+
+      - name: Verify release artifact dependency drift
+        run: |
+          pnpm forge --log-level info dependencies --configuration release report --fail-on-drift
+
+      - name: Dry-run npm publish
+        run: |
+          pnpm forge --log-level info publish --configuration release --channel dev --dry-run
+
+      - name: Resolve Docker image version
+        id: docker_meta
+        run: |
+          # forge docker tags with the workspace (root) version, not the create package version.
+          {
+            echo "image_tag=$(node -p 'require("./package.json").version')"
+            echo "create_version=$(node -p 'require("./projects/create/package.json").version')"
+            echo "repository=$(node -p 'require("./projects/create/package.json").decohere?.dockerImageRepository || "ghcr.io/typesmiths/decohere/create"')"
+            echo "devcontainer_repository=$(node -p 'require("./projects/devcontainer/package.json").decohere?.dockerImageRepository || "ghcr.io/typesmiths/decohere/devcontainer"')"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Pack create CLI into Docker build context
+        run: |
+          node projects/create/pack-builder-tgz.mjs \
+            --out-dir dist/release/projects/scaffold \
+            --workspace-out dist/release \
+            --dest projects/create/create.tgz
+          test -f projects/create/create.tgz
+
+      - name: Build Docker images without pushing
+        run: |
+          pnpm forge --log-level info docker --configuration release --dry-run
+        env:
+          FORGE_DOCKER_BUILD_ARGS_JSON: ${{ format('{{"CREATE_VERSION":"{0}"}}', steps.docker_meta.outputs.create_version) }}
+          FORGE_DOCKER_EXTRA_TAGS_JSON: '["${{ steps.docker_meta.outputs.repository }}:local"]'
+
+      - name: Run packed decohere
+        run: |
+          image="${{ steps.docker_meta.outputs.repository }}:${{ steps.docker_meta.outputs.image_tag }}"
+          docker image inspect "$image" >/dev/null
+          docker image inspect "${{ steps.docker_meta.outputs.repository }}:local" >/dev/null
+          docker run --rm --entrypoint decohere "$image" --help
+          docker image inspect "${{ steps.docker_meta.outputs.devcontainer_repository }}:${{ steps.docker_meta.outputs.image_tag }}" >/dev/null
+
+      - name: Run create scaffold Docker e2e
+        if: github.ref != 'refs/heads/release'
+        run: pnpm exec vitest run --project e2e --silent=passed-only projects/create/e2e
+
+      - name: Run e2e smoke tests
+        if: github.ref == 'refs/heads/release'
+        run: pnpm run test:e2e
+
+  # Required check name stays `ci` (branch protection). Succeeds on docs-only skips.
+  ci:
+    needs: [changes, lint, test, docker]
+    if: always() && needs.changes.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Aggregate lint + test + docker
+        run: |
+          if [[ "${{ needs.changes.outputs.run }}" != "true" ]]; then
+            echo "Docs/meta only — suite skipped"
+            exit 0
+          fi
+          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.test.result }}" != "success" || "${{ needs.docker.result }}" != "success" ]]; then
+            echo "lint=${{ needs.lint.result }} test=${{ needs.test.result }} docker=${{ needs.docker.result }}"
+            exit 1
+          fi
+          echo "lint + test + docker passed"
+
+  release:
+    if: github.ref == 'refs/heads/release'
+    needs: [ci]
+    uses: ./.github/workflows/release.yml
+    # Default GITHUB_TOKEN is read-only; the called workflow's jobs request contents: write.
+    permissions:
+      contents: write
+    with:
+      channel: stable
+    secrets: inherit

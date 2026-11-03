@@ -1,0 +1,31 @@
+node_modules
+dist
+.package
+out
+.DS_STORE
+.env
+dist/
+.decohere
+/coverage/
+site
+scratch.md
+npm-audit.json
+# Local scratch / issue exports (not source)
+/tmp/
+# Scaffold builder: compiled overlay for local Docker image (build output, not source)
+projects/create/es6/
+projects/create/*.tgz
+# Fixture dirs from flux.bin.spec.ts, left behind if a run is killed before cleanup
+projects/cli/tests/.flux-bin-*/
+
+# Credentials from the old Docker Compose dev container. Nothing creates
+# these now, but older checkouts still have them on disk; never commit them.
+.devcontainer/gh.env
+.devcontainer/gh-auth/
+.devcontainer/npm-auth/
+
+# pnpm store created inside the checkout when node_modules is a separate volume
+.pnpm-store/
+
+# Claude Code's agent worktrees (git worktree checkouts, never source)
+.claude/worktrees/

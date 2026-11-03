@@ -1,0 +1,56 @@
+{
+  "name": "@decohere/ci-tools",
+  "version": "0.0.1-dev.5",
+  "description": "CI utility scripts for badge generation, coverage reporting, pages artifact assembly, and GitHub API tooling",
+  "keywords": [
+    "typescript",
+    "ci",
+    "badges",
+    "coverage",
+    "github-actions",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/ci-tools#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/ci-tools"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    "./lib/svg": "./src/lib/svg.mjs",
+    "./lib/lcov": "./src/lib/lcov.mjs",
+    "./lib/github-issue": "./src/lib/github-issue.mjs",
+    "./coverage/badge": "./src/coverage/badge.mjs",
+    "./coverage/report": "./src/coverage/report.mjs",
+    "./badges/ci-status": "./src/badges/ci-status.mjs",
+    "./pages/artifact": "./src/pages/artifact.mjs",
+    "./pages/smoke": "./src/pages/smoke.mjs",
+    "./audit/format": "./src/audit/format.mjs",
+    "./audit/summarize": "./src/audit/summarize.mjs",
+    "./audit/enforce": "./src/audit/enforce.mjs",
+    "./audit/upsert-issue": "./src/audit/upsert-issue.mjs",
+    "./bench/bench": "./src/bench/bench.mjs",
+    "./bench/trace": "./src/bench/trace.mjs",
+    "./changeset/aggregate-changelog": "./src/changeset/aggregate-changelog.mjs",
+    "./changeset/check-status": "./src/changeset/check-status.mjs",
+    "./github/create-issue": "./src/github/create-issue.mjs",
+    "./github/ensure-metadata": "./src/github/ensure-metadata.mjs",
+    "./github/create-or-update-pr": "./src/github/create-or-update-pr.mjs",
+    "./github/publish-verify": "./src/github/publish-verify.mjs",
+    "./github/credential-nudge": "./src/github/credential-nudge.mjs",
+    "./github/oidc-bootstrap-nudge": "./src/github/oidc-bootstrap-nudge.mjs",
+    "./github/npm-bootstrap": "./src/github/npm-bootstrap.mjs",
+    "./github/smoke-create-launcher": "./src/github/smoke-create-launcher.mjs"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

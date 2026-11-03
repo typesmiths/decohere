@@ -1,0 +1,44 @@
+name: Prepare publish workspace
+description: Install, version (dev), download release artifacts (repo must already be checked out)
+inputs:
+  ci_run_id:
+    required: true
+  release_channel:
+    required: true
+  channel:
+    required: true
+  configure-git:
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-node-pnpm
+      with:
+        configure-git: ${{ inputs.configure-git }}
+
+    - name: Apply next dev version from git tags
+      if: ${{ inputs.channel == 'dev' }}
+      shell: bash
+      run: |
+        pnpm forge --log-level info version --release-type prerelease --channel dev
+
+    - name: Sync cross-library dependency versions
+      if: ${{ inputs.channel == 'dev' }}
+      shell: bash
+      run: |
+        pnpm forge --log-level info dependencies --configuration release sync
+
+    - name: Download release build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: forge-release-${{ inputs.release_channel }}-${{ inputs.ci_run_id }}
+        run-id: ${{ inputs.ci_run_id }}
+        github-token: ${{ github.token }}
+        path: dist/release/
+
+    - name: Verify release artifact dependency drift
+      shell: bash
+      run: |
+        pnpm forge --log-level info dependencies --configuration release report --fail-on-drift

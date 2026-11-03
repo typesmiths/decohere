@@ -1,0 +1,53 @@
+{
+  "name": "@decohere/forge",
+  "version": "0.0.1-dev.5",
+  "description": "TypeScript monorepo build system — zero config, fast compilation, streamlined developer workflow",
+  "keywords": [
+    "typescript",
+    "build",
+    "monorepo",
+    "bundler",
+    "swc",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/forge#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/forge"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js",
+      "require": "./commonjs/src/index.js"
+    },
+    "./vitest": {
+      "types": "./types/src/vitest/index.d.ts",
+      "import": "./es6/src/vitest/index.js",
+      "require": "./commonjs/src/vitest/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/core": "0.0.1-dev.5",
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/devkit": "0.0.1-dev.5",
+    "@decohere/scribe": "0.0.1-dev.5",
+    "@decohere/workspace": "0.0.1-dev.5",
+    "@swc/core": "^1.11.11",
+    "async": "^3.2.6",
+    "parse-imports": "^2.2.1",
+    "rxjs": "^7.8.2",
+    "typescript": "^6.0.3"
+  },
+  "devDependencies": {}
+}

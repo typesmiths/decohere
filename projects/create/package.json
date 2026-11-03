@@ -1,0 +1,40 @@
+{
+  "name": "@decohere/create",
+  "version": "0.0.1-dev.18",
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/create#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/create"
+  },
+  "decohere": {
+    "dockerImageRepository": "ghcr.io/typesmiths/decohere/create"
+  },
+  "description": "Download the Decohere scaffolder image and run it (npm create @decohere)",
+  "keywords": [
+    "decohere",
+    "create",
+    "scaffold",
+    "cli"
+  ],
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js"
+    }
+  },
+  "bin": {
+    "create-decohere": "./es6/src/cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

@@ -1,0 +1,18 @@
+name: Proposal
+description: A new feature or a change to how Decohere works.
+title: "proposal: "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is hard or impossible today, and who runs into it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What you'd like to change. Alternatives you considered help too.
+    validations:
+      required: true

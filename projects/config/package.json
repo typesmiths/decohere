@@ -1,0 +1,43 @@
+{
+  "name": "@decohere/config",
+  "version": "0.0.1-dev.5",
+  "description": "Database ORM abstractions and repository patterns built on TypeORM",
+  "keywords": [
+    "typescript",
+    "typeorm",
+    "orm",
+    "database",
+    "repository",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/config#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/config"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js",
+      "require": "./commonjs/src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/http": "0.0.1-dev.5",
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/core": "0.0.1-dev.5",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {}
+}

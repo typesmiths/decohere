@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in Decohere doesn't work as documented.
+title: "fix: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Security problem? Don't open an issue: [report it privately](https://github.com/typesmiths/decohere/security/advisories/new).
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The smallest steps, command or repository that shows it.
+    validations:
+      required: true
+  - type: input
+    id: packages
+    attributes:
+      label: Packages and versions
+      placeholder: "@decohere/forge 0.0.1-dev.120"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Node 24.1, Linux, pnpm 10"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Output or stack traces. Remove secrets first.
+      render: shell

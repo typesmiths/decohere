@@ -1,0 +1,6 @@
+{
+  "name": "slice-svc",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "src/main.ts"
+}

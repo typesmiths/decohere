@@ -1,0 +1,40 @@
+{
+  "name": "@decohere/data",
+  "version": "0.0.1-dev.5",
+  "description": "Data access for Decohere apps: repositories, request-scoped units of work and database bootstrap",
+  "keywords": [
+    "typescript",
+    "data-access",
+    "repository",
+    "unit-of-work",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/data/data#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/data/data"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js",
+      "require": "./commonjs/src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/core": "0.0.1-dev.5"
+  },
+  "devDependencies": {}
+}

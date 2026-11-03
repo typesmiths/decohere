@@ -1,0 +1,59 @@
+# Nightly npm audit against the current lockfile (no code-path gate).
+# Opens or updates a GitHub issue when findings exist. PR/main CI remains the high/critical gate.
+name: npm-audit
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: npm-audit
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Run pnpm audit
+        run: |
+          set +e
+          pnpm audit --json > npm-audit.json
+          code=$?
+          set -e
+          if [[ ! -s npm-audit.json ]] || ! node -e "JSON.parse(require('fs').readFileSync('npm-audit.json','utf8'))"; then
+            echo "pnpm audit failed to produce JSON (exit ${code})"
+            exit 1
+          fi
+          echo "pnpm audit wrote report (exit ${code})"
+
+      - name: Summarize npm audit
+        run: node projects/ci-tools/src/audit/summarize.mjs npm-audit.json
+
+      - name: Upload npm audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: npm-audit.json
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Create/update npm audit issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node projects/ci-tools/src/audit/upsert-issue.mjs npm-audit.json

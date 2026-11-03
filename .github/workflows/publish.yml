@@ -1,0 +1,373 @@
+name: Publish
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [main, release]
+    types: [completed]
+
+concurrency:
+  group: publish-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+  SCRIBE_LOG_LEVEL: info
+
+jobs:
+  guard:
+    # Only a push to this repo's main or release: a pull request's CI run also
+    # triggers workflow_run, and a fork's branch can be called main too.
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.head_branch == 'main' ||
+       github.event.workflow_run.head_branch == 'release')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      should_publish: ${{ steps.check.outputs.should_publish }}
+      channel: ${{ steps.meta.outputs.channel }}
+      release_channel: ${{ steps.meta.outputs.release_channel }}
+    steps:
+      # workflow_run has no push `before` SHA — fetch parent and pass it
+      # explicitly so paths-filter does not fall back to a whole-tree guess.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 2
+
+      - name: Resolve parent commit
+        id: parent
+        run: |
+          if ! parent="$(git rev-parse --verify HEAD^1)"; then
+            echo "No parent for ${{ github.event.workflow_run.head_sha }} — skip publish"
+            echo "sha=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "Parent $parent → ${{ github.event.workflow_run.head_sha }}"
+          echo "sha=$parent" >> "$GITHUB_OUTPUT"
+
+      - id: filter
+        if: steps.parent.outputs.sha != ''
+        uses: dorny/paths-filter@v3
+        with:
+          token: ${{ github.token }}
+          base: ${{ steps.parent.outputs.sha }}
+          ref: ${{ github.event.workflow_run.head_sha }}
+          filters: .github/ci/code-paths-filter.yml
+
+      - name: Resolve publish channel
+        id: meta
+        run: |
+          if [[ "${{ github.event.workflow_run.head_branch }}" == "main" ]]; then
+            echo "channel=dev" >> "$GITHUB_OUTPUT"
+            echo "release_channel=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=latest" >> "$GITHUB_OUTPUT"
+            echo "release_channel=stable" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip duplicate, stale, or docs-only publishes
+        id: check
+        run: |
+          BRANCH="${{ github.event.workflow_run.head_branch }}"
+          SHA="${{ github.event.workflow_run.head_sha }}"
+
+          if [[ -z "${{ steps.parent.outputs.sha }}" ]]; then
+            echo "Skipping: no parent commit for path comparison"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "${{ steps.filter.outputs.code }}" != "true" ]]; then
+            echo "Skipping: no code paths in this commit (docs/meta only)"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git fetch origin "$BRANCH" --tags --force
+          tip="$(git rev-parse "origin/$BRANCH")"
+
+          if [[ "$tip" != "$SHA" ]]; then
+            echo "Skipping: CI SHA ${SHA} is not current tip of ${BRANCH} (${tip})"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # A v* tag is pushed only after npm + Docker + create smoke succeed.
+          # Presence means this tip SHA already fully shipped — skip duplicates.
+          # Absence allows retries; verify skips npm and/or Docker when already shipped.
+          existing="$(git tag --points-at "$SHA" | grep -E '^v[0-9]' || true)"
+          if [[ -n "$existing" ]]; then
+            echo "Skipping: commit already tagged / fully shipped (${existing//$'\n'/, })"
+            echo "should_publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "should_publish=true" >> "$GITHUB_OUTPUT"
+
+  verify:
+    needs: [guard]
+    if: needs.guard.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      packages: read
+      deployments: read
+      issues: write
+    outputs:
+      unpublished: ${{ steps.probe.outputs.unpublished }}
+      bootstrap_issue_url: ${{ steps.bootstrap_nudge.outputs.issue_url }}
+      skip_npm: ${{ steps.probe.outputs.skip_npm }}
+      skip_docker: ${{ steps.probe.outputs.skip_docker }}
+      image_tag: ${{ steps.probe.outputs.image_tag }}
+      create_version: ${{ steps.probe.outputs.create_version }}
+      repository: ${{ steps.probe.outputs.repository }}
+      devcontainer_repository: ${{ steps.probe.outputs.devcontainer_repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/publish-prepare
+        with:
+          ci_run_id: ${{ github.event.workflow_run.id }}
+          release_channel: ${{ needs.guard.outputs.release_channel }}
+          channel: ${{ needs.guard.outputs.channel }}
+
+      - name: Check NODE_AUTH_TOKEN lifetime
+        env:
+          NUDGE_CREDENTIAL: npm
+          NODE_AUTH_TOKEN_EXPIRES_AT: ${{ vars.NODE_AUTH_TOKEN_EXPIRES_AT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node projects/ci-tools/src/github/credential-nudge.mjs
+
+      - name: Confirm npm auth
+        id: npm_whoami
+        run: npm whoami
+
+      - name: Report NODE_AUTH_TOKEN rejection
+        if: failure() && steps.npm_whoami.outcome == 'failure'
+        env:
+          NUDGE_CREDENTIAL: npm
+          NUDGE_REJECTED: "1"
+          NODE_AUTH_TOKEN_EXPIRES_AT: ${{ vars.NODE_AUTH_TOKEN_EXPIRES_AT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node projects/ci-tools/src/github/credential-nudge.mjs
+
+      - name: Probe npm and GHCR
+        id: probe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node projects/ci-tools/src/github/publish-verify.mjs
+
+      - name: OIDC bootstrap issue
+        if: steps.probe.outputs.unpublished != ''
+        id: bootstrap_nudge
+        env:
+          UNPUBLISHED: ${{ steps.probe.outputs.unpublished }}
+          PUBLISH_CHANNEL: ${{ needs.guard.outputs.channel }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node projects/ci-tools/src/github/oidc-bootstrap-nudge.mjs
+
+  oidc-bootstrap:
+    name: "First-publish ${{ needs.verify.outputs.unpublished }}"
+    needs: [guard, verify]
+    if: >
+      needs.guard.outputs.should_publish == 'true' &&
+      needs.verify.outputs.unpublished != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment:
+      name: npm-oidc-bootstrap
+      url: ${{ needs.verify.outputs.bootstrap_issue_url }}
+    permissions:
+      contents: read
+    steps:
+      - name: Wait for trusted publisher
+        run: |
+          {
+            echo "## npm OIDC bootstrap required"
+            echo
+            echo "Instructions: ${{ needs.verify.outputs.bootstrap_issue_url }}"
+            echo
+            echo "These package names are not on the registry yet:"
+            echo
+            echo "\`${{ needs.verify.outputs.unpublished }}\`"
+            echo
+            echo "For each name:"
+            echo "1. First-publish **public** (\`--access public\`; scoped names default to restricted)."
+            echo "2. npm package settings → Trusted Publisher → GitHub Actions:"
+            echo "   - Organization: \`typesmiths\`"
+            echo "   - Repository: \`decohere\`"
+            echo "   - Workflow filename: \`publish.yml\`"
+            echo "   - Environment: \`npm-publish\`"
+            echo "   - Allowed action: \`npm publish\` (not staged-only)"
+            echo "3. Approve this deployment."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Auth npm reads
+        run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
+
+      - name: Re-check package names exist
+        run: |
+          node projects/ci-tools/src/github/publish-verify.mjs
+          unpublished="$(grep '^unpublished=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)"
+          if [[ -n "$unpublished" ]]; then
+            echo "Still unpublished after approval: $unpublished"
+            exit 1
+          fi
+
+  npm:
+    needs: [guard, verify, oidc-bootstrap]
+    if: >
+      always() &&
+      needs.guard.outputs.should_publish == 'true' &&
+      needs.verify.result == 'success' &&
+      (needs.oidc-bootstrap.result == 'success' || needs.oidc-bootstrap.result == 'skipped')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: npm-publish
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/publish-prepare
+        with:
+          ci_run_id: ${{ github.event.workflow_run.id }}
+          release_channel: ${{ needs.guard.outputs.release_channel }}
+          channel: ${{ needs.guard.outputs.channel }}
+
+      - name: Publish packages
+        if: needs.verify.outputs.skip_npm != 'true'
+        run: |
+          pnpm forge --log-level info publish --configuration release --channel ${{ needs.guard.outputs.channel }}
+
+      - name: Skip npm (versions already on the registry)
+        if: needs.verify.outputs.skip_npm == 'true'
+        run: echo "skip_npm=true — forge publish not run"
+
+  docker:
+    needs: [guard, verify, npm]
+    if: >
+      always() &&
+      needs.guard.outputs.should_publish == 'true' &&
+      needs.verify.result == 'success' &&
+      needs.npm.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The only job anywhere that may push images: it runs after CI passes on main/release.
+    permissions:
+      contents: read
+      actions: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/publish-prepare
+        with:
+          ci_run_id: ${{ github.event.workflow_run.id }}
+          release_channel: ${{ needs.guard.outputs.release_channel }}
+          channel: ${{ needs.guard.outputs.channel }}
+
+      - name: Pack create CLI into Docker build context
+        if: needs.verify.outputs.skip_docker != 'true'
+        run: |
+          node projects/create/pack-builder-tgz.mjs \
+            --out-dir dist/release/projects/scaffold \
+            --workspace-out dist/release \
+            --dest projects/create/create.tgz
+          test -f projects/create/create.tgz
+
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: echo "${GH_TOKEN}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build Docker image
+        if: needs.verify.outputs.skip_docker != 'true'
+        run: |
+          pnpm forge --log-level info docker --configuration release
+        env:
+          FORGE_DOCKER_BUILD_ARGS_JSON: ${{ format('{{"CREATE_VERSION":"{0}"}}', needs.verify.outputs.create_version) }}
+          FORGE_DOCKER_EXTRA_TAGS_JSON: ${{ needs.guard.outputs.channel == 'latest' && needs.verify.outputs.repository != '' && format('["{0}:latest","{1}:latest"]', needs.verify.outputs.repository, needs.verify.outputs.devcontainer_repository) || '[]' }}
+
+      - name: Pull already-published images
+        if: needs.verify.outputs.skip_docker == 'true'
+        run: |
+          docker pull "${{ needs.verify.outputs.repository }}:${{ needs.verify.outputs.image_tag }}"
+          docker pull "${{ needs.verify.outputs.devcontainer_repository }}:${{ needs.verify.outputs.image_tag }}"
+
+      - name: Run packed decohere
+        run: |
+          image="${{ needs.verify.outputs.repository }}:${{ needs.verify.outputs.image_tag }}"
+          docker image inspect "$image" >/dev/null
+          docker run --rm --entrypoint decohere "$image" --help
+          docker image inspect "${{ needs.verify.outputs.devcontainer_repository }}:${{ needs.verify.outputs.image_tag }}" >/dev/null
+
+      - name: Push Docker image
+        if: needs.verify.outputs.skip_docker != 'true'
+        run: |
+          pnpm forge --log-level info docker --configuration release --push
+        env:
+          FORGE_DOCKER_BUILD_ARGS_JSON: ${{ format('{{"CREATE_VERSION":"{0}"}}', needs.verify.outputs.create_version) }}
+          FORGE_DOCKER_EXTRA_TAGS_JSON: ${{ needs.guard.outputs.channel == 'latest' && needs.verify.outputs.repository != '' && format('["{0}:latest","{1}:latest"]', needs.verify.outputs.repository, needs.verify.outputs.devcontainer_repository) || '[]' }}
+
+      - name: Smoke npm create launcher against the shipped image
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          CREATE_VERSION: ${{ needs.verify.outputs.create_version }}
+        run: node projects/ci-tools/src/github/smoke-create-launcher.mjs
+
+  tag:
+    needs: [guard, verify, docker]
+    if: >
+      always() &&
+      needs.guard.outputs.should_publish == 'true' &&
+      needs.verify.result == 'success' &&
+      needs.docker.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+
+      - uses: ./.github/actions/publish-prepare
+        with:
+          ci_run_id: ${{ github.event.workflow_run.id }}
+          release_channel: ${{ needs.guard.outputs.release_channel }}
+          channel: ${{ needs.guard.outputs.channel }}
+          configure-git: "true"
+
+      - name: Tag release
+        run: |
+          pnpm forge --log-level info tag --prefix v --push

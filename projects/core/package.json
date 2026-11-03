@@ -1,0 +1,81 @@
+{
+  "name": "@decohere/core",
+  "version": "0.0.1-dev.5",
+  "description": "The runtime base every Decohere package builds on: reflection, composition, configuration types, extensibility, collections, objects, caching on a Map, and basic file IO. No side effects on import.",
+  "keywords": [
+    "typescript",
+    "utilities",
+    "reflection",
+    "composition",
+    "caching",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/core#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/core"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    "./collections": {
+      "types": "./types/src/collections/index.d.ts",
+      "import": "./es6/src/collections/index.js",
+      "require": "./commonjs/src/collections/index.js"
+    },
+    "./caching": {
+      "types": "./types/src/caching/index.d.ts",
+      "import": "./es6/src/caching/index.js",
+      "require": "./commonjs/src/caching/index.js"
+    },
+    "./configuration": {
+      "types": "./types/src/configuration/index.d.ts",
+      "import": "./es6/src/configuration/index.js",
+      "require": "./commonjs/src/configuration/index.js"
+    },
+    "./extensibility": {
+      "types": "./types/src/extensibility/index.d.ts",
+      "import": "./es6/src/extensibility/index.js",
+      "require": "./commonjs/src/extensibility/index.js"
+    },
+    "./io": {
+      "types": "./types/src/io/index.d.ts",
+      "import": "./es6/src/io/index.js",
+      "require": "./commonjs/src/io/index.js"
+    },
+    "./objects": {
+      "types": "./types/src/objects/index.d.ts",
+      "import": "./es6/src/objects/index.js",
+      "require": "./commonjs/src/objects/index.js"
+    },
+    "./reflection": {
+      "types": "./types/src/reflection/index.d.ts",
+      "import": "./es6/src/reflection/index.js",
+      "require": "./commonjs/src/reflection/index.js"
+    },
+    "./system": {
+      "types": "./types/src/system/index.d.ts",
+      "import": "./es6/src/system/index.js",
+      "require": "./commonjs/src/system/index.js"
+    },
+    "./composition": {
+      "types": "./types/src/composition/index.d.ts",
+      "import": "./es6/src/composition/index.js",
+      "require": "./commonjs/src/composition/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/scribe": "0.0.1-dev.5",
+    "reflect-metadata": "^0.2.2"
+  },
+  "devDependencies": {}
+}

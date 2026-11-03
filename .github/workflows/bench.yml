@@ -1,0 +1,74 @@
+name: Bench
+
+# Nightly benchmarks on main, published to Pages as trend charts. Never blocks a merge.
+# Each night also benchmarks the commit the previous nightly measured, on the same runner, so a
+# benchmark slower in every round than that commit gets an issue.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+# Shared with pages.yml: both deploy the whole site, so they take turns instead of racing.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+  CI_TOOLS: projects/ci-tools/src
+
+jobs:
+  bench:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+      issues: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The previous nightly's commit is checked out alongside to compare with.
+          fetch-depth: 0
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Restore benchmark history from Pages
+        run: node ${{ env.CI_TOOLS }}/pages/restore-bench-history.mjs
+
+      - name: Restore badges from Pages
+        run: node ${{ env.CI_TOOLS }}/pages/restore-badges.mjs
+
+      - name: Benchmark tonight's commit and the previous nightly's, and save
+        run: BENCH_ENV=gh-actions node ${{ env.CI_TOOLS }}/bench/nightly.mjs
+
+      - name: Generate CI status badges
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ${{ env.CI_TOOLS }}/badges/ci-status.mjs
+
+      - name: Generate Pages site artifact
+        env:
+          PAGES_OUTPUT_DIR: dist/site
+        run: node ${{ env.CI_TOOLS }}/pages/artifact.mjs
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      # After the deploy, so the page the issue links to already shows the slow runs.
+      - name: File issues for slower benchmarks
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ${{ env.CI_TOOLS }}/bench/file-regressions.mjs

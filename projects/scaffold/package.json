@@ -1,0 +1,45 @@
+{
+  "name": "@decohere/scaffold",
+  "version": "0.0.1-dev.18",
+  "description": "Decohere project scaffolder (runs inside ghcr.io/typesmiths/decohere/create)",
+  "keywords": [
+    "decohere",
+    "scaffold"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/scaffold#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/scaffold"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js"
+    }
+  },
+  "bin": {
+    "decohere": "./es6/src/cli.js"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/devkit": "0.0.1-dev.5",
+    "commander": "^13.1.0",
+    "openapi-to-postmanv2": "^5.0.0",
+    "yaml": "^2.9.1"
+  },
+  "devDependencies": {},
+  "decohere": {
+    "dockerImageRepository": "ghcr.io/typesmiths/decohere/create",
+    "devcontainerImageRepository": "ghcr.io/typesmiths/decohere/devcontainer"
+  }
+}

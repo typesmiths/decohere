@@ -1,0 +1,14 @@
+{
+  "name": "@fixture/kernel",
+  "version": "1.2.3",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./clock": "./src/clock.ts",
+    "./testing": "./src/testing/index.ts"
+  },
+  "dependencies": {
+    "ms": "^2.1.3"
+  }
+}

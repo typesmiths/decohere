@@ -1,0 +1,69 @@
+name: Release Prep
+
+# Manually triggered stable release: computes version from changesets, commits
+# to a release-prep branch, and opens a PR targeting the release branch.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry-run mode: compute version but skip commit and PR"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: release-prep
+  cancel-in-progress: false
+
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+  SCRIBE_LOG_LEVEL: info
+  RELEASE_SCRIPTS: projects/ci-tools/src/release
+
+jobs:
+  stable-release-prep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_PUSH_TOKEN || github.token }}
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          configure-git: "true"
+      - name: Compute stable version from changesets
+        run: |
+          pnpm forge --log-level info version --from-changesets --dry-run "${{ inputs.dry_run }}"
+
+      - name: Aggregate and consume changeset entries
+        if: ${{ !inputs.dry_run }}
+        run: pnpm run version:aggregate
+
+      - name: Sync cross-library dependency versions
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: node ${{ env.RELEASE_SCRIPTS }}/sync-dependencies.mjs
+
+      - name: Capture stable version
+        id: version-meta
+        if: ${{ !inputs.dry_run }}
+        run: node ${{ env.RELEASE_SCRIPTS }}/capture-version.mjs >> "$GITHUB_OUTPUT"
+
+      - name: Commit release version changes
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git add -A
+          git commit -m "chore(release): stable ${{ steps.version-meta.outputs.version }}"
+
+      - name: Create or update release prep PR
+        if: ${{ !inputs.dry_run }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PUSH_TOKEN || github.token }}
+          RELEASE_CHANNEL: stable
+          RELEASE_BASE_BRANCH: release
+          RELEASE_VERSION: ${{ steps.version-meta.outputs.version }}
+        run: node ${{ env.RELEASE_SCRIPTS }}/push-prerelease-commit.mjs

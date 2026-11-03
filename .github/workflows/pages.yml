@@ -1,0 +1,75 @@
+name: Pages
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    branches: [release]
+    types: [completed]
+
+# Shared with bench.yml: both deploy the whole site, so they take turns instead of racing.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+  CI_TOOLS: projects/ci-tools/src
+
+jobs:
+  pages:
+    # Only a push to this repo's release branch, not a pull request from a fork's.
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'release'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download coverage data
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-data
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: dist/coverage
+
+      - name: Generate CI status badges
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node ${{ env.CI_TOOLS }}/badges/ci-status.mjs
+
+      - name: Generate coverage badges
+        run: node ${{ env.CI_TOOLS }}/coverage/badge.mjs
+
+      # Benchmarks run nightly in bench.yml; this deploy carries their history over unchanged.
+      - name: Restore benchmark history from Pages
+        run: node ${{ env.CI_TOOLS }}/pages/restore-bench-history.mjs
+
+      - name: Generate Pages site artifact
+        env:
+          PAGES_OUTPUT_DIR: dist/site
+        run: node ${{ env.CI_TOOLS }}/pages/artifact.mjs
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

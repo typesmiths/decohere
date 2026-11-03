@@ -1,0 +1,44 @@
+{
+  "name": "@decohere/workspace",
+  "version": "0.0.1-dev.5",
+  "description": "Workspace and project model primitives for monorepo tooling",
+  "keywords": [
+    "typescript",
+    "monorepo",
+    "workspace",
+    "project-model",
+    "tsconfig",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/workspace#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/workspace"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js",
+      "require": "./commonjs/src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/core": "0.0.1-dev.5",
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/devkit": "0.0.1-dev.5",
+    "picomatch": "^4.0.4",
+    "rxjs": "^7.8.2",
+    "typescript": "^6.0.3"
+  },
+  "devDependencies": {}
+}
