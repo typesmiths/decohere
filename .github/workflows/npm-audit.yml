@@ -15,9 +15,6 @@ permissions:
   contents: read
   issues: write
 
-env:
-  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-
 jobs:
   audit:
     runs-on: ubuntu-latest

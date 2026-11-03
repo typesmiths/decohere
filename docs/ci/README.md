@@ -35,7 +35,7 @@ A pull request's run, a fork's included, has no secrets and a read-only token, a
 
 After CI succeeds on tip of `main` / `release` (and the tip-SHA + code-path guard passes):
 
-1. **verify** — version bump (local only) + authenticated `npm view` + GHCR tag probe. Outputs skip-npm / skip-docker / unpublished names. No `packages: write`.
+1. **verify** — version bump (local only) + `npm view` + GHCR tag probe. Outputs skip-npm / skip-docker / unpublished names. No `packages: write`.
 2. **oidc-bootstrap** — only if unpublished names; waits on `npm-oidc-bootstrap` reviewers. Job title lists names; **View deployment** opens the GitHub issue (commands in the body).
 3. **npm** — `environment: npm-publish`, OIDC `npm publish` (or skip if versions exist).
 4. **docker** — the only job with `packages: write`; logs in to GHCR with the job's own `GITHUB_TOKEN` (or skips if images exist), smoke.
@@ -65,7 +65,7 @@ flowchart TD
         CI_main --> publish_beta
 
         subgraph publish_beta["Publish — publish.yml after CI success"]
-            pb0[guard: tip SHA + tag + code paths] --> pb1[verify: token npm view + GHCR tags]
+            pb0[guard: tip SHA + tag + code paths] --> pb1[verify: npm view + GHCR tags]
             pb1 --> pbBoot[oidc-bootstrap env if new names]
             pbBoot --> pb2[npm job OIDC / skip if published]
             pb2 --> pb3[docker job GITHUB_TOKEN push / skip if image exists]
@@ -177,7 +177,7 @@ The repo installs no published `@decohere/*` package. `tools/register.mjs` runs 
 
 ## New Package Bootstrap (OIDC pause)
 
-npm cannot attach a trusted publisher until the package **name** exists. Publish **verify** checks authenticated `npm view` of each non-private workspace package **name**. If any are missing, the **oidc-bootstrap** job runs on GitHub environment `npm-oidc-bootstrap` (deployment branches `main` / `release`). Required reviewers on that environment pause only this job (it is skipped when every name already exists). Do **not** put reviewers on `npm-publish` (that would pause every release).
+npm cannot attach a trusted publisher until the package **name** exists. Publish **verify** checks `npm view` of each non-private workspace package **name**. If any are missing, the **oidc-bootstrap** job runs on GitHub environment `npm-oidc-bootstrap` (deployment branches `main` / `release`). Required reviewers on that environment pause only this job (it is skipped when every name already exists). Do **not** put reviewers on `npm-publish` (that would pause every release).
 
 While it waits, the job title lists the missing names and **View deployment** opens the GitHub issue `deploy(publish): OIDC bootstrap unpublished packages` (opened or updated by verify, and reopened if it was closed). Its body has the exact `npm publish` / Trusted Publisher / Approve commands. It is assigned to the `npm-oidc-bootstrap` environment's required reviewers. The waiting job has not started yet, so there is no GitHub step summary until after you approve.
 
@@ -200,32 +200,19 @@ pnpm npm:bootstrap --otp <code> @decohere/scribe-console   # or no names: every 
 
 Retries of an untagged tip skip npm and/or Docker independently when that version is already on the registry / GHCR.
 
-## Registry credential nags
+## Registry credentials
 
-Publish uses one script (`credential-nudge.mjs`, `NUDGE_CREDENTIAL=npm`) for rotation reminders. Fourteen days before the stored expiry it opens or updates the GitHub issue `chore(security): rotate <secret> (expires …)` and continues. On the expiry day, or if the live check fails (`npm whoami`), it updates the same issue and **fails closed**. GitHub notifications on the issue are the reminder. Issue bodies have the `gh secret set` / `gh variable set` commands.
+CI stores no registry credential. npm packages are public, so reads (`npm view`, `npx @decohere/create`) need no token, and `npm publish` goes through Trusted Publishing (OIDC) from the `npm-publish` environment. A workflow that writes an npm token into `.npmrc` fails the ci-tools tests.
 
-| Credential | Secret | Expiry variable | Scope |
-|---|---|---|---|
-| `npm` | `NODE_AUTH_TOKEN` | `NODE_AUTH_TOKEN_EXPIRES_AT` | repository (verify has no `npm-publish` env) |
-
-Docker images need no stored credential. Publish's `docker` job logs in to GHCR with its own `GITHUB_TOKEN` and is the only job in any workflow that asks for `packages: write`; it runs only after CI passes on a push to `main` or `release`. Fork pull requests and Dependabot get a read-only token. GHCR accepts the token only for images whose **Manage Actions access** gives this repository the **Write** role (set once per image, under the package's settings). Anyone who could change the workflow to push from another branch already has write access to the repo.
+Docker images need no stored credential either. Publish's `docker` job logs in to GHCR with its own `GITHUB_TOKEN` and is the only job in any workflow that asks for `packages: write`; it runs only after CI passes on a push to `main` or `release`. Fork pull requests and Dependabot get a read-only token. GHCR accepts the token only for images whose **Manage Actions access** gives this repository the **Write** role (set once per image, under the package's settings). Anyone who could change the workflow to push from another branch already has write access to the repo.
 
 Repo **Actions default GITHUB_TOKEN is read**. Callers of reusable workflows must grant any write the callee requests (e.g. `ci.yml` → `release.yml` needs `permissions: contents: write` on that job). A job that omits `permissions` no longer gets write.
-
-```bash
-gh variable set NODE_AUTH_TOKEN_EXPIRES_AT --repo typesmiths/decohere --body YYYY-MM-DD
-```
-
-Notes:
-
-- Read operations (`npm view`, registry API GET) do not require OTP even when write operations do.
-- Write operations require OTP unless using trusted publishing from an approved workflow and environment.
 
 ## Emergency Manual Release
 
 > Only use when CI is unavailable or compromised.
 
-**Prerequisites:** npm account with `@typesmiths` publish access, `NODE_AUTH_TOKEN` set.
+**Prerequisites:** `npm login` as a member of the `@decohere` npm org with publish access.
 
 ```bash
 git checkout main && git pull

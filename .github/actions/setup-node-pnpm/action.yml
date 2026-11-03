@@ -40,10 +40,6 @@ runs:
         cache: pnpm
         cache-dependency-path: pnpm-lock.yaml
 
-    - name: Configure npm auth
-      shell: bash
-      run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
-
     - name: Install dependencies
       if: inputs.install == 'true'
       shell: bash

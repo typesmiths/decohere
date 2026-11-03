@@ -15,7 +15,6 @@ describe("runCreateLauncherSmoke", () => {
 
 		const result = runCreateLauncherSmoke({
 			createVersion: "0.0.1-dev.80",
-			authToken: "tok",
 			tmpdir: () => "/tmp",
 			mkdtempSync: (prefix) => `${prefix}abc`,
 			writeFileSync: (path, body) => {
@@ -38,18 +37,17 @@ describe("runCreateLauncherSmoke", () => {
 		expect(written).toEqual([
 			{
 				path: "/tmp/decohere-create-smoke-abc/.npmrc",
-				body: "@decohere:registry=https://registry.npmjs.org/\n//registry.npmjs.org/:_authToken=tok\n",
+				body: "@decohere:registry=https://registry.npmjs.org/\n",
 			},
 		]);
+		// The packages are public: the smoke installs them the way a user does, with no token.
+		expect(calls[0].opts.env.NODE_AUTH_TOKEN).toBeUndefined();
 	});
 
-	it("fails closed without version or token", () => {
-		expect(() => runCreateLauncherSmoke({ createVersion: "", authToken: "tok" })).toThrow(
+	it("fails closed without a version", () => {
+		expect(() => runCreateLauncherSmoke({ createVersion: "" })).toThrow(
 			"CREATE_VERSION is required",
 		);
-		expect(() =>
-			runCreateLauncherSmoke({ createVersion: "0.0.1-dev.80", authToken: "" }),
-		).toThrow("NODE_AUTH_TOKEN is required");
 	});
 });
 
@@ -60,6 +58,19 @@ describe("publish.yml create smoke + tag", () => {
 		expect(yml).toContain("node projects/ci-tools/src/github/smoke-create-launcher.mjs");
 		expect(yml).toContain("CREATE_VERSION:");
 		expect(yml).not.toContain("npx --yes");
+	});
+
+	it("reads npm without a token: the packages are public and publishing is OIDC", () => {
+		const workflows = fileURLToPath(new URL("../../../../.github/", import.meta.url));
+		const files = fs
+			.readdirSync(workflows, { recursive: true })
+			.filter((file) => /\.ya?ml$/.test(file));
+		expect(files.length).toBeGreaterThan(0);
+		for (const file of files) {
+			expect(fs.readFileSync(`${workflows}${file}`, "utf8"), file).not.toMatch(
+				/NODE_AUTH_TOKEN|_authToken/,
+			);
+		}
 	});
 
 	it("grants the tag job actions:read so publish-prepare can download CI artifacts", () => {

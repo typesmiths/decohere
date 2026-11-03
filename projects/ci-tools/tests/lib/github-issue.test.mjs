@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { pickIssue, upsertIssue } from "../../src/lib/github-issue.mjs";
 
-const TITLE = "chore(security): rotate NODE_AUTH_TOKEN (expires 2026-11-19)";
+const TITLE = "security(ci): high or critical npm audit findings";
 
 /** A fake `gh` that answers `issue list` with `issues` and records every call. */
 function fakeGh(issues) {

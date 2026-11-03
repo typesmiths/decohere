@@ -11,7 +11,6 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 env:
-  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
   SCRIBE_LOG_LEVEL: info
   CI_TOOLS: projects/ci-tools/src
   RELEASE_SCRIPTS: projects/ci-tools/src/release
