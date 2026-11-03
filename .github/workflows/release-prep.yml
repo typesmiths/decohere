@@ -16,7 +16,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
   SCRIBE_LOG_LEVEL: info
   RELEASE_SCRIPTS: projects/ci-tools/src/release
 

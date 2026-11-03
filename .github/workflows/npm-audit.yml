@@ -16,7 +16,6 @@ permissions:
   issues: write
 
 env:
-  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
 jobs:
   audit:

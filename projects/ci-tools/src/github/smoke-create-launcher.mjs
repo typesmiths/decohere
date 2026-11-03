@@ -9,10 +9,10 @@ import { pathToFileURL } from "node:url";
  * Run `npx @decohere/create@version --help` from an empty temp directory.
  * Must not use the repo cwd — after `@decohere/cli` is pinned, pnpm installs
  * `@decohere/create` into the workspace tree and npm's npx misses the bin.
+ * No token: the packages are public, so this installs the launcher the way a user does.
  *
  * @param {{
  *   createVersion: string,
- *   authToken: string,
  *   mkdtempSync?: typeof mkdtempSync,
  *   writeFileSync?: typeof writeFileSync,
  *   spawnSync?: typeof spawnSync,
@@ -22,12 +22,8 @@ import { pathToFileURL } from "node:url";
  */
 export function runCreateLauncherSmoke(options) {
 	const version = options.createVersion?.trim() ?? "";
-	const token = options.authToken?.trim() ?? "";
 	if (!version) {
 		throw new Error("CREATE_VERSION is required");
-	}
-	if (!token) {
-		throw new Error("NODE_AUTH_TOKEN is required");
 	}
 
 	const mkdtemp = options.mkdtempSync ?? mkdtempSync;
@@ -37,18 +33,11 @@ export function runCreateLauncherSmoke(options) {
 
 	const workDir = mkdtemp(join(tmp(), "decohere-create-smoke-"));
 	const npmrc = join(workDir, ".npmrc");
-	writeFile(
-		npmrc,
-		`@decohere:registry=https://registry.npmjs.org/\n//registry.npmjs.org/:_authToken=${token}\n`,
-	);
+	writeFile(npmrc, "@decohere:registry=https://registry.npmjs.org/\n");
 
 	const result = spawn("npx", ["--yes", `@decohere/create@${version}`, "--help"], {
 		cwd: workDir,
-		env: {
-			...process.env,
-			NPM_CONFIG_USERCONFIG: npmrc,
-			NODE_AUTH_TOKEN: token,
-		},
+		env: { ...process.env, NPM_CONFIG_USERCONFIG: npmrc },
 		stdio: options.stdio ?? "inherit",
 	});
 
@@ -64,7 +53,6 @@ const isCli =
 if (isCli) {
 	const { status } = runCreateLauncherSmoke({
 		createVersion: process.env.CREATE_VERSION ?? "",
-		authToken: process.env.NODE_AUTH_TOKEN ?? "",
 	});
 	process.exit(status);
 }

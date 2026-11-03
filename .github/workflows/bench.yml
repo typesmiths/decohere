@@ -14,7 +14,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
   CI_TOOLS: projects/ci-tools/src
 
 jobs:

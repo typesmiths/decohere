@@ -11,7 +11,6 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
   SCRIBE_LOG_LEVEL: info
 
 jobs:
@@ -140,26 +139,6 @@ jobs:
           release_channel: ${{ needs.guard.outputs.release_channel }}
           channel: ${{ needs.guard.outputs.channel }}
 
-      - name: Check NODE_AUTH_TOKEN lifetime
-        env:
-          NUDGE_CREDENTIAL: npm
-          NODE_AUTH_TOKEN_EXPIRES_AT: ${{ vars.NODE_AUTH_TOKEN_EXPIRES_AT }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node projects/ci-tools/src/github/credential-nudge.mjs
-
-      - name: Confirm npm auth
-        id: npm_whoami
-        run: npm whoami
-
-      - name: Report NODE_AUTH_TOKEN rejection
-        if: failure() && steps.npm_whoami.outcome == 'failure'
-        env:
-          NUDGE_CREDENTIAL: npm
-          NUDGE_REJECTED: "1"
-          NODE_AUTH_TOKEN_EXPIRES_AT: ${{ vars.NODE_AUTH_TOKEN_EXPIRES_AT }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node projects/ci-tools/src/github/credential-nudge.mjs
-
       - name: Probe npm and GHCR
         id: probe
         env:
@@ -220,9 +199,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-
-      - name: Auth npm reads
-        run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
 
       - name: Re-check package names exist
         run: |
@@ -339,7 +315,6 @@ jobs:
 
       - name: Smoke npm create launcher against the shipped image
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
           CREATE_VERSION: ${{ needs.verify.outputs.create_version }}
         run: node projects/ci-tools/src/github/smoke-create-launcher.mjs
 
