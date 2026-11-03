@@ -24,7 +24,7 @@
       "type": "node",
       "request": "launch",
       "runtimeExecutable": "pnpm",
-      "runtimeArgs": ["forge", "--config-file", ".decohere.js", "${input:forgeArgs}"],
+      "runtimeArgs": ["forge", "${input:forgeArgs}"],
       "skipFiles": ["<node_internals>/**"],
       "console": "integratedTerminal"
     }

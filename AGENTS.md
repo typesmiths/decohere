@@ -2,7 +2,7 @@
 
 TypeScript framework for Node.js backends: a fast SWC compiler (forge), a JIT runner with HMR (flux), dependency injection (crucible) and logging (scribe), on support libraries named for what they do: `core`, `http`, `config`, `data` and `workspace` ([ADR 0014](docs/adr/0014-package-names.md)), with `devkit` and `testing` for the tools and tests themselves ([ADR 0015](docs/adr/0015-core-devkit-testing.md)). Packages live in `projects/`.
 
-These are the instructions for every coding agent on this repo ([ADR 0009](docs/adr/0009-agent-instructions-in-agents-md.md)). `CLAUDE.md` only imports this file; keep agent-specific copies out.
+These are the instructions for every coding agent on this repo ([ADR 0009](docs/adr/0009-agent-instructions-in-agents-md.md)). `.claude/CLAUDE.md` only imports this file; keep agent-specific copies out.
 
 Read before changing code: [architecture](docs/architecture/), [style](docs/style/), [testing](docs/testing/). The plan is the GitHub milestones M0–M9.
 
