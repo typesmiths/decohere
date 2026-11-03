@@ -116,7 +116,7 @@ Mark it ready for review when CI is green.
 
 ### 5. Merge and clean up
 
-The `ci` check must pass before merging. Branches don't have to be up to date with `main`, so open PRs can be merged in any order. `main` runs CI again after every merge.
+Click merge; the queue handles the rest. When the PR's `ci` check has passed, merging adds it to `main`'s merge queue. GitHub tests it on top of `main` and of any PRs queued ahead of it, then squash-merges it if that run passes too. If it fails, the PR leaves the queue and `main` is untouched. Branches don't have to be updated by hand, so open PRs can be merged in any order.
 
 After merging:
 
