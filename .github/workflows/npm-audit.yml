@@ -15,8 +15,6 @@ permissions:
   contents: read
   issues: write
 
-env:
-
 jobs:
   audit:
     runs-on: ubuntu-latest
