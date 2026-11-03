@@ -10,7 +10,7 @@ Packages, layering, host decoupling, and how a project is laid out.
 
 ## Agents
 
-Every coding agent follows the same instructions, in [AGENTS.md](../AGENTS.md), so you can see what it will do. `CLAUDE.md` only imports that file.
+Every coding agent follows the same instructions, in [AGENTS.md](../AGENTS.md), so you can see what it will do. `.claude/CLAUDE.md` only imports that file.
 
 [Read more](../AGENTS.md)
 

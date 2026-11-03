@@ -1,5 +1,5 @@
 # Paths that require the full CI suite / npm publish.
-# Docs and other meta (docs/**, *.md outside these globs, AGENTS.md, CLAUDE.md) are
+# Docs and other meta (docs/**, *.md outside these globs, AGENTS.md, .claude/) are
 # intentionally omitted — those pushes short-circuit.
 code:
   - "projects/**"
@@ -12,7 +12,6 @@ code:
   - ".oxlintrc.json"
   - ".prettierrc.json"
   - ".prettierignore"
-  - ".decohere.js"
   - ".github/workflows/**"
   - ".github/actions/**"
   - ".github/ci/**"

@@ -47,10 +47,9 @@ Each entry has a reason to be here. If you add one, add its reason; if the reaso
 | `tools/register.mjs` | Lets Node run this repo's own TypeScript from source. Flux cannot load itself before it is compiled. |
 | `__mocks__/` | Vitest's automatic `fs`, `fs/promises` and `glob` mocks, picked up by `vi.mock` in `test/`. |
 | `.changeset/` | Pending release notes ([Changesets](https://github.com/changesets/changesets)). |
-| `.decohere.js` | Workspace options (a `WorkspaceOptions` from `@decohere/workspace`): the Docker image names for two packages. |
 | `.devcontainer/` | The optional Dev Container. |
-| `.github/` | CI workflows, composite actions, the PR template. |
-| `.claude/settings.json` | Commands Claude Code may run without asking. |
+| `.github/` | CI workflows, composite actions, the PR and issue templates, `CONTRIBUTING.md` (points here) and `SECURITY.md` (how to report a vulnerability). GitHub reads both from this folder. |
+| `.claude/` | `CLAUDE.md`, which imports `AGENTS.md` for Claude Code, and `settings.json`, the commands it may run without asking. |
 | `.vscode/` | Editor settings and three debug configurations. |
 | `.node-version` | The Node version CI and contributors run (24). `engines.node` in `package.json` is the oldest version the packages support. |
 | `.oxlintrc.json`, `.prettierrc.json`, `.prettierignore` | Lint and format rules ([ADR 0004](../adr/0004-oxlint-and-prettier.md)). |
@@ -58,8 +57,6 @@ Each entry has a reason to be here. If you add one, add its reason; if the reaso
 | `vitest.config.ts` | The only Vitest config: `unit`, `docker` and `e2e` projects. |
 | `package.json`, `pnpm-lock.yaml` | Root scripts, dev tools, dependency overrides. |
 | `AGENTS.md` | Instructions for coding agents ([ADR 0009](../adr/0009-agent-instructions-in-agents-md.md)). |
-| `CLAUDE.md` | Imports `AGENTS.md` for Claude Code. |
-| `CONTRIBUTING.md` | Points here, because GitHub looks for this filename. |
 
 ## How work flows
 
