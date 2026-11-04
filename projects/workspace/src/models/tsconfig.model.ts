@@ -1,21 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import { io } from "@decohere/core/io";
-import ts, { type CompilerOptions } from "typescript";
+import { parseTsconfig, type TsConfigJson } from "get-tsconfig";
 import { WorkspaceConfigurationError } from "../errors.js";
+import { parseJsonc } from "./jsonc.js";
 
-const host = ts.sys;
-
-host.readFile = (file) => {
-	return fs.readFileSync(file, { encoding: "utf8" }) as string;
-};
-
-host.readDirectory = (directoryName) => {
-	return fs
-		.readdirSync(directoryName, { withFileTypes: true })
-		.filter((entry) => entry.isDirectory())
-		.map((entry) => entry.name);
-};
+/** `compilerOptions` as written in `tsconfig.json`, after `extends`; `baseUrl` is absolute. */
+export type CompilerOptions = TsConfigJson.CompilerOptions;
 
 export const DEFAULT_COMPILER_OPTIONS: CompilerOptions = {
 	emitDeclarationOnly: true,
@@ -23,6 +14,10 @@ export const DEFAULT_COMPILER_OPTIONS: CompilerOptions = {
 	baseUrl: "./",
 };
 
+/**
+ * A `tsconfig.json`, read without the TypeScript compiler so running a file doesn't load it.
+ * Code that needs the compiler's own parse (type emission) parses `filePath` itself.
+ */
 export class Tsconfig {
 	public static default() {
 		return new Tsconfig();
@@ -32,35 +27,36 @@ export class Tsconfig {
 		if (!(await io.fileExists(filePath))) {
 			throw new WorkspaceConfigurationError(`TSConfig not found ${filePath}`);
 		}
-		const configFileText = await io.readFile(filePath);
-		const result = ts.parseConfigFileTextToJson(filePath, configFileText);
-		if (result.error) {
-			const errorMessage = result.error.messageText.toString();
-			throw new WorkspaceConfigurationError(`Error parsing ${filePath}. ${errorMessage}`);
-		}
-		const dirName = path.resolve(path.dirname(filePath));
-		const configParseResult = ts.parseJsonConfigFileContent(result.config, host, dirName);
-		return new Tsconfig({
-			compilerOptions: configParseResult.options,
-			errors: configParseResult.errors,
-		});
+		return Tsconfig.read(filePath);
 	}
 
 	public static parseSync(filePath: string) {
 		if (!Tsconfig.fileExistsSync(filePath)) {
 			throw new WorkspaceConfigurationError(`TSConfig not found ${filePath}`);
 		}
-		const configFileText = fs.readFileSync(filePath, "utf8");
-		const result = ts.parseConfigFileTextToJson(filePath, configFileText);
-		if (result.error) {
-			const errorMessage = result.error.messageText.toString();
-			throw new WorkspaceConfigurationError(`Error parsing ${filePath}. ${errorMessage}`);
+		return Tsconfig.read(filePath);
+	}
+
+	private static read(filePath: string): Tsconfig {
+		const fullPath = path.resolve(filePath);
+		let compilerOptions: CompilerOptions;
+		try {
+			// get-tsconfig reads broken JSON as `{}`; check the file itself first.
+			parseJsonc(fs.readFileSync(fullPath, "utf8"));
+			compilerOptions = parseTsconfig(fullPath).compilerOptions ?? {};
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			throw new WorkspaceConfigurationError(`Error parsing ${filePath}. ${message}`, {
+				cause: error,
+			});
 		}
-		const dirName = path.resolve(path.dirname(filePath));
-		const configParseResult = ts.parseJsonConfigFileContent(result.config, host, dirName);
+		const { baseUrl } = compilerOptions;
 		return new Tsconfig({
-			compilerOptions: configParseResult.options,
-			errors: configParseResult.errors,
+			filePath: fullPath,
+			compilerOptions:
+				baseUrl == null
+					? compilerOptions
+					: { ...compilerOptions, baseUrl: path.resolve(path.dirname(fullPath), baseUrl) },
 		});
 	}
 
@@ -76,6 +72,7 @@ export class Tsconfig {
 		Object.assign(this, data);
 	}
 
+	/** Absolute path of the file read; undefined for {@link Tsconfig.default}. */
+	public readonly filePath?: string;
 	public readonly compilerOptions: CompilerOptions;
-	public readonly errors: readonly ts.Diagnostic[];
 }

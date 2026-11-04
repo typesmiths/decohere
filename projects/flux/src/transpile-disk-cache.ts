@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { transpileCache } from "@decohere/forge";
+import { transpileCache } from "@decohere/forge/transpile";
 import { type Logger, scribe } from "@decohere/scribe";
 
 /** Bump when what flux stores changes, so older entries stop matching. */

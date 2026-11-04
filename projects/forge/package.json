@@ -28,6 +28,11 @@
       "import": "./es6/src/index.js",
       "require": "./commonjs/src/index.js"
     },
+    "./transpile": {
+      "types": "./types/src/transpile/index.d.ts",
+      "import": "./es6/src/transpile/index.js",
+      "require": "./commonjs/src/transpile/index.js"
+    },
     "./vitest": {
       "types": "./types/src/vitest/index.d.ts",
       "import": "./es6/src/vitest/index.js",
@@ -46,7 +51,6 @@
     "@swc/core": "^1.11.11",
     "async": "^3.2.6",
     "parse-imports": "^2.2.1",
-    "rxjs": "^7.8.2",
     "typescript": "^6.0.3"
   },
   "devDependencies": {}

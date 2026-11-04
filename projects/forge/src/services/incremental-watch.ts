@@ -1,6 +1,6 @@
 import type { ProjectFileEvent, Workspace } from "@decohere/workspace";
-import type { Observable } from "rxjs";
-import { Subject } from "rxjs";
+import type { Observable } from "@decohere/core/system";
+import { Subject } from "@decohere/core/system";
 import type { TransformResponse } from "../types/transform-response.model.js";
 
 /**

@@ -10,6 +10,8 @@ export default defineConfig({
 		// Run one with `--project <name>`. `pnpm test` runs "unit"; the scripts in package.json run the others.
 		server: {
 			deps: {
+				// Run through vitest so its fs reads reach the memfs mock.
+				inline: ["get-tsconfig"],
 				external: [
 					"glob",
 					/projects\/flux\/tests\/__fixtures__\/hmr/,

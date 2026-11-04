@@ -56,6 +56,8 @@ For each discovered project, the workspace package maps `package.json` `name` to
 
 Root `tsconfig.json` `paths` override the same keys. In this repo they come from `forge paths`, which writes this map to `tsconfig.paths.json` for `tsc`.
 
+`tsconfig.json` is read with [get-tsconfig](https://github.com/privatenumber/get-tsconfig), which follows `extends`, not with the TypeScript compiler: loading the compiler takes longer than the rest of a `flux run`. Transpiling uses only `paths` and `baseUrl` (made absolute). Forge's type emission, which needs every option as tsc sees it, parses `Tsconfig.filePath` with the compiler itself.
+
 Forge debug and Flux consume this map (SWC `jsc.paths` / resolve hooks). Why debug uses it instead of `node_modules` workspace links: [Forge — debug path aliases](../forge/README.md#debug-path-aliases-not-node_modules-links).
 
 ## When to use
