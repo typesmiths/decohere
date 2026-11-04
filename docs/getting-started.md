@@ -1,10 +1,8 @@
 # Getting started
 
-From an empty directory to a deployable API, and the tools that take you there.
+Two starting points: run a TypeScript file, or scaffold a whole API. Both use the same tools.
 
-## Example: from an empty directory to a deployable API
-
-For a one-off script, install the CLI and run the TypeScript file directly:
+## Run a TypeScript file
 
 ```bash
 pnpm init
@@ -12,9 +10,11 @@ pnpm add -D @decohere/cli
 pnpm exec flux run report.ts
 ```
 
-There is no module-format decision, build step, framework, or scaffold in that path.
+No build step, `tsconfig.json` or framework. [Flux](../projects/flux/README.md) compiles with Forge's SWC pipeline as Node loads each file.
 
-When the outcome is a production API instead, start there:
+## Scaffold an API
+
+Needs Docker: the scaffolder runs in a container.
 
 ```bash
 pnpm create @decohere webapi -d orders
@@ -22,20 +22,18 @@ cd orders
 pnpm dev
 ```
 
-That creates more than a controller skeleton. The result has a working package and source layout, configuration and environment conventions, structured logging, health and readiness routes, test setup, linting and typechecking, local HMR, CI, a production build, and Dockerfiles. The scaffolder can also wire Postgres/TypeORM, Auth0, and Postman while it creates the app.
+You get a working app with config and environment conventions, structured logging, health and readiness routes, tests, lint and typecheck, reload on save, CI, a production build and Dockerfiles, plus a Dev Container. The scaffolder can also wire Postgres/TypeORM, Auth0 and Postman. Options: [`@decohere/create`](../projects/create/README.md).
 
-Saving a source file reloads the affected API through [Flux](../projects/flux/README.md), including changes in workspace libraries, without prebuilding every dependency. `pnpm build` uses the same compiler pipeline through [Forge](../projects/forge/README.md) to emit the production layout consumed by `pnpm start` and the generated Dockerfile.
+Saving a file reloads the API through Flux, including changes in workspace libraries, without prebuilding them. `pnpm build` runs the same compiler through Forge and emits what `pnpm start` and the Dockerfile run.
 
-The acceleration is not one generated file. It is avoiding a separate round of tool selection, layout design, configuration, and integration at every step between the first TypeScript file and a deployable service.
-
-## How the pieces fit
+## The tools
 
 ```mermaid
 flowchart LR
   existing["Existing TypeScript workspace"] --> source["Your TypeScript source"]
-  create["Create<br/>optional complete app"] -.-> source
+  create["create<br/>optional complete app"] -.-> source
 
-  source --> flux["Flux<br/>run + HMR"]
+  source --> flux["Flux<br/>run + reload"]
   flux --> dev["Development"]
 
   source --> forge["Forge<br/>build + test + release"]
@@ -46,49 +44,9 @@ flowchart LR
   shared -.-> forge
 ```
 
-Install the CLI to make `forge`, `flux`, and `decohere` available to package scripts and `pnpm exec`:
+`pnpm add -D @decohere/cli` gives package scripts and `pnpm exec` the `forge`, `flux` and `decohere` commands. Use them in an existing workspace without the framework.
 
-```bash
-pnpm add -D @decohere/cli
-```
+- **[Flux](../projects/flux/README.md)** runs TypeScript from source: one file with `flux run`, or a long-running app with `flux serve`, reloading on save.
+- **[Forge](../projects/forge/README.md)** builds, typechecks, tests, versions, publishes and builds Docker images, workspace-aware: `forge build` resolves workspace imports to source; `forge build --configuration release` emits the published package shape.
 
-The [recipes and use cases](recipes/) start at the smallest useful outcome. If you only want to execute a TypeScript file, that is the first recipe and it needs no scaffold, no build step, and no `tsconfig.json` decisions. Publishing a package to npm is the next one. Scaffolding a full API is further down the same path, not a different product.
-
-## Forge
-
-Workspace-aware build and release workflows using [`@decohere/workspace`](../projects/workspace/README.md) and SWC. Debug resolves workspace imports to source; release emits the production package shape. Forge also provides typecheck, Vitest, version, publish, Docker, and link workflows.
-
-```bash
-pnpm exec forge build
-pnpm exec forge build --configuration release
-```
-
-Commands and build model: [`@decohere/forge`](../projects/forge/README.md).
-
-## Flux
-
-Run TypeScript directly through Forge's compiler—one file with `run`, or a long-lived Node app with `serve` and HMR. No pre-build or Decohere framework required.
-
-```bash
-pnpm exec flux run src/main.ts
-pnpm exec flux serve
-```
-
-Commands and runtime model: [`@decohere/flux`](../projects/flux/README.md).
-
-## Scaffold an API
-
-Scaffolding is the optional path to a complete Decohere app. It combines the framework and toolchain, then walks you through database, auth, Postman, and install. The result includes health checks, a Dev Container, production Dockerfiles, and CI. Docker is required to run the scaffolder.
-
-```bash
-pnpm create @decohere webapi -d my-app
-```
-
-```bash
-cd my-app
-code .
-pnpm build
-pnpm dev
-```
-
-Options and generated app: [`@decohere/create`](../projects/create/README.md).
+Next: [recipes](recipes/), from running a script to publishing a package.

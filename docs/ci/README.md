@@ -1,135 +1,77 @@
 # CI and release
 
-Two automated lanes: **beta** (every push to `main`) and **stable** (manually triggered).
+CI stores no secrets or variables. npm publishing uses Trusted Publishing (OIDC) from the `npm-publish` environment, GHCR pushes use the workflow's own `GITHUB_TOKEN`, and the packages are public on npm, so reading them needs no token. A ci-tools test fails if any file under `.github/` mentions `NODE_AUTH_TOKEN` or `_authToken`.
 
-Workflow files live under `.github/workflows/`. This page is the human map.
+## What runs when
+
+| Event | What runs |
+|---|---|
+| Pull request (this repo or a fork) | CI: lint, typecheck, unit and Docker-backed tests, image build, create scaffold e2e, installed CLI e2e. Read-only token, no secrets. |
+| Merge queue (`merge_group`) | CI again on the PR combined with `main` and the PRs ahead of it. Always the full suite, docs-only or not. |
+| Push to `main` | CI with a coverage gate and a beta release build, then Publish to the npm `dev` dist-tag. |
+| Push to `release` | CI with coverage, full e2e and a GitHub Release, then, in parallel, Publish to the npm `latest` dist-tag and Pages (badges). |
+| Nightly 03:17 UTC | Bench on `main`, then Pages (benchmark charts). |
+| Nightly 06:00 UTC | npm audit. |
+
+`main` accepts changes only through the merge queue, with squash merges, and requires the `ci` check. A branch without a pull request gets no CI; open a draft PR. Docs-only changes (nothing matching [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml)) skip the suite on pull requests and `main` pushes, and the `ci` check still passes. `release`, `workflow_dispatch` and the merge queue always run everything.
 
 ## Workflow files
 
-| Path | Role |
+| File | Role |
 |---|---|
-| `.github/workflows/ci.yml` | `changes` → parallel `lint` ∥ `test` ∥ `docker` (one forge release: `forge publish --dry-run`, pack, `forge docker --dry-run` with `create:local`, scaffold e2e, installed CLI e2e; no npm upload / GHCR push) → aggregate `ci` (required check). Feature: units + scaffold Docker e2e. `main`: coverage **gate** + scaffold Docker e2e + beta prep. `release`: coverage artifact + full e2e + stable `release.yml`. Docs/meta path short-circuit. Lint gates **high/critical** `pnpm audit`. |
-| `.github/workflows/npm-audit.yml` | Nightly (`0 6 * * *` UTC) + `workflow_dispatch`: `pnpm audit`, log/summary with advisory **severity**, opens or updates the GitHub issue `security(ci): npm audit vulnerabilities detected`. Not a merge gate. |
-| `.github/ci/code-paths-filter.yml` | Shared globs: which paths count as “code” for CI / publish |
-| `.github/workflows/pages.yml` | Coverage and CI status badges → GitHub Pages (**after successful `release` CI only**); carries the benchmark history over unchanged |
-| `.github/workflows/bench.yml` | Nightly (`17 3 * * *` UTC) + `workflow_dispatch` on `main`: benchmarks tonight's commit against the previous nightly's on the same runner (`nightly.mjs`), saves, then redeploys Pages with the trend charts ([Benchmarks](#benchmarks)). Report only, not a merge gate. |
-| `.github/workflows/clear-benchmark-history.yml` | Manual, on `main`: republishes Pages with an empty benchmark history |
-| `.github/actions/setup-node-pnpm` | Shared composite: pnpm + Node + auth + install |
-| `.github/workflows/publish.yml` | After successful CI on tip of `main` / `release`: npm + Docker + create smoke, then `v*` tag (tip / already-shipped tag / docs-only via parent→head path filter) |
-| `.github/workflows/release-prep.yml` | Manual stable release-prep PR into `release` |
-| `.github/workflows/release.yml` | Reusable stable build + GitHub Release |
+| [`ci.yml`](../../.github/workflows/ci.yml) | The suite; required check `ci`. Calls `release.yml` on `release`. |
+| [`publish.yml`](../../.github/workflows/publish.yml) | After CI succeeds on `main`/`release`: npm, Docker images, smoke test, `v*` tag. |
+| [`pages.yml`](../../.github/workflows/pages.yml) | After CI succeeds on `release`: coverage and CI badges to GitHub Pages. |
+| [`bench.yml`](../../.github/workflows/bench.yml) | Nightly benchmarks on `main`, deployed to Pages. |
+| [`clear-benchmark-history.yml`](../../.github/workflows/clear-benchmark-history.yml) | Manual: redeploys Pages with an empty benchmark history. |
+| [`npm-audit.yml`](../../.github/workflows/npm-audit.yml) | Nightly `pnpm audit` report. |
+| [`release-prep.yml`](../../.github/workflows/release-prep.yml) | Manual: versions from changesets and opens a PR into `release`. |
+| [`release.yml`](../../.github/workflows/release.yml) | Reusable: stable release build and GitHub Release. |
+| [`setup-node-pnpm`](../../.github/actions/setup-node-pnpm/action.yml) | Composite action: pnpm, Node, install, optional git identity. |
+| [`publish-prepare`](../../.github/actions/publish-prepare/action.yml) | Composite action: applies the dev version and downloads CI's release build for Publish. |
+| [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml) | Which paths count as code for CI and Publish. |
 
-## Lane summary
+## CI (`ci.yml`)
 
-| | Beta | Stable | Pull request |
-|---|---|---|---|
-| Trigger | push to `main` | `workflow_dispatch` → PR → push to `release` | a pull request opened or updated, from this repo or a fork |
-| Version source | latest git tag (no commit) | `.changeset` entries (commit to prep branch); dormant until the first public release ([ADR 0003](../adr/0003-no-changesets-until-public-release.md)) | n/a (dry-run) |
-| npm tag | `dev` | `latest` | n/a |
-| Git tag pushed | ✅ `v1.x.y-dev.N` (after smoke) | ✅ `v1.Y.Z` (after smoke) | ❌ |
-| PR created | ❌ | ✅ `release/stable-main-to-release → release` | ❌ |
+`changes` decides whether to run the suite; three jobs run in parallel and `ci` aggregates them:
 
-A pull request's run, a fork's included, has no secrets and a read-only token, and the suite needs neither. Publish and Pages start from CI's `workflow_run`, which pull requests trigger too, so both check that the run came from a **push** to this repository, not just from a branch called `main` or `release`: a fork can name its branch anything. A branch without a pull request gets no CI; open a draft PR to run it.
+- **lint/typecheck**: `lint:check`, `typecheck`, actionlint, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
+- **test**: unit tests (with coverage thresholds on `main` and `release`) and Docker-backed tests. On `main` it also computes the next dev version from git tags, syncs dependency versions and uploads the release build as `forge-release-beta-<run>`. On `release` it uploads coverage for Pages.
+- **docker**: one release build, dependency drift report, `forge publish --dry-run`, packs `create.tgz`, `forge docker --dry-run` (images built, not pushed), then the create scaffold e2e and the installed CLI e2e, or the full e2e suite on `release`.
 
-## Publish order (`publish.yml`)
+On `release`, the `release` job then calls `release.yml`, which builds the stable release tree and creates the GitHub Release.
 
-After CI succeeds on tip of `main` / `release` (and the tip-SHA + code-path guard passes):
+## Publish (`publish.yml`)
 
-1. **verify** — version bump (local only) + `npm view` + GHCR tag probe. Outputs skip-npm / skip-docker / unpublished names. No `packages: write`.
-2. **oidc-bootstrap** — only if unpublished names; waits on `npm-oidc-bootstrap` reviewers. Job title lists names; **View deployment** opens the GitHub issue (commands in the body).
-3. **npm** — `environment: npm-publish`, OIDC `npm publish` (or skip if versions exist).
-4. **docker** — the only job with `packages: write`; logs in to GHCR with the job's own `GITHUB_TOKEN` (or skips if images exist), smoke.
-5. **tag** — `forge tag --prefix v --push`
+Runs when CI succeeds on a **push** to this repository's `main` or `release`; pull request runs and forks are excluded.
 
-A `v*` tag means the tip SHA **fully shipped**. Failed smoke (or any earlier step) leaves no new tag, so a re-run of Publish for the same tip SHA is allowed. The guard still skips when a `v*` tag already points at that SHA (duplicate successful publish).
+1. **guard**: skips docs-only commits, commits that are no longer the branch tip, and commits that already have a `v*` tag.
+2. **verify**: probes npm and GHCR for this version; outputs which steps to skip and which package names are not on npm yet.
+3. **oidc-bootstrap**: only when a name is missing; waits for approval (see [Adding a new npm package](#adding-a-new-npm-package)).
+4. **npm**: `forge publish --channel dev` from `main`, `--channel latest` from `release`, over OIDC. Skipped if the version is already on npm.
+5. **docker**: the only job with `packages: write`. Builds and pushes the `create` and `devcontainer` images (plus `:latest` from `release`), then runs `npx @decohere/create@<version> --help`, first waiting for npm to serve the new version.
+6. **tag**: `forge tag --prefix v --push`.
 
-## Pipeline Diagram
+A `v*` tag means that commit fully shipped. If any step fails there is no tag, so re-running Publish is safe: npm and Docker each skip what is already published.
 
-```mermaid
-flowchart TD
-    subgraph BETA["🔵 BETA LANE (automatic)"]
-        direction TB
-        push_main[Push to main] --> CI_main
+GHCR accepts the `GITHUB_TOKEN` only for images whose **Manage Actions access** gives this repository the **Write** role (set once per image). The default `GITHUB_TOKEN` is read-only: jobs declare their own `permissions`, and a caller of a reusable workflow grants what the callee needs.
 
-        subgraph CI_main["CI — ci.yml cancel-in-progress"]
-            direction TB
-            t[unit tests + coverage gate]
-            lint[lint ∥ typecheck + audit]
-            docker[release tree + images + e2e]
-            t -.-> beta
-            lint -.-> beta
-            docker -.-> beta
-            beta[version + sync + release build → forge-release-beta ⬆]
-        end
+## Stable release
 
-        CI_main --> publish_beta
+Changesets stay off until the first public release ([ADR 0003](../adr/0003-no-changesets-until-public-release.md)), so this lane is dormant. When used:
 
-        subgraph publish_beta["Publish — publish.yml after CI success"]
-            pb0[guard: tip SHA + tag + code paths] --> pb1[verify: npm view + GHCR tags]
-            pb1 --> pbBoot[oidc-bootstrap env if new names]
-            pbBoot --> pb2[npm job OIDC / skip if published]
-            pb2 --> pb3[docker job GITHUB_TOKEN push / skip if image exists]
-            pb3 --> pb4[forge tag --prefix v --push]
-        end
-    end
+1. Run **Release Prep** (`release-prep.yml`, optional `dry_run`). It computes the version from changesets, syncs dependency versions, commits `chore(release): stable <version>` and opens a PR into `release`.
+2. Merge the PR. The push to `release` runs CI, `release.yml`, Publish (npm `latest`) and Pages.
 
-    subgraph STABLE["🟢 STABLE LANE (manual)"]
-        direction TB
-        manual["workflow_dispatch\nrelease-prep.yml"] --> rp
+## Pages
 
-        subgraph rp["stable-release-prep job"]
-            rp1[checkout main] --> rp2[flux run in-tree forge]
-            rp2 --> rp3["forge version --from-changesets"]
-            rp3 --> rp4[version:aggregate]
-            rp4 --> rp5[sync-dependencies]
-            rp5 --> rp6["git commit: chore: stable vX.Y.Z"]
-            rp6 --> rp7["PR → release"]
-        end
-
-        rp7 --> pr_merge[PR merged to release]
-        pr_merge --> push_release[Push to release]
-        push_release --> CI_release
-
-        subgraph CI_release["CI — ci.yml then release.yml"]
-            ci_r[ci: coverage + forge build + e2e] --> rel[release build + GitHub Release]
-        end
-
-        CI_release --> publish_stable
-        CI_release --> pages_stable
-
-        subgraph pages_stable["Pages — pages.yml after release CI"]
-            pg1[coverage + CI badges → GitHub Pages]
-        end
-
-        subgraph publish_stable["Publish — publish.yml after CI success"]
-            ps0[guard] --> ps1[verify then npm OIDC then Docker push]
-            ps1 --> ps2[forge tag --prefix v --push]
-        end
-    end
-
-    subgraph BRANCH["⚪ PULL REQUEST"]
-        push_branch[PR opened or updated] --> CI_branch
-        subgraph CI_branch["CI — ci.yml"]
-            dry[path filter → lint ∥ test ∥ docker → ci]
-        end
-    end
-```
-
-\* Suite runs when the change matches [`.github/ci/code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml) (or on `release` / `workflow_dispatch`, or in the merge queue). Otherwise CI exits success after the filter (docs/meta only) — no `[skip ci]` token. Merge queue (`merge_group`): `main` requires the queue, so every PR is tested again on top of `main` and the PRs ahead of it before it lands; that run always takes the whole suite, docs-only or not, so what lands is tested whole. Pull request: parallel **lint** (oxlint + Prettier ∥ tsc + audit) ∥ **test** (units) ∥ **docker** (one forge release: npm publish `--dry-run`, pack `create.tgz`, `forge docker --dry-run` tagging `create:local`, scaffold e2e). Dry-run means build-without-push, not skip-build. `main`: coverage **gates** thresholds + scaffold Docker e2e (no Pages refresh). `release`: coverage upload + full e2e + stable release; Pages badges refresh from `release` only; benchmarks refresh nightly from `main`. Publish refuses docs-only SHAs.
+GitHub Pages (<https://typesmiths.github.io/decohere/>) holds the badges and benchmark charts. `pages.yml` (after CI on `release`), `bench.yml` and `clear-benchmark-history.yml` each deploy the whole site and share one concurrency group. Each carries over what it does not regenerate: the coverage badge exists only after a `release` CI run.
 
 ## Benchmarks
 
-Results: <https://typesmiths.github.io/decohere/benchmark.html> (raw data in `data/bench-history.json`). `bench.yml` runs every suite nightly on `main` and appends the run to the history; each benchmark gets a chart of its median over time, one line per machine type.
+Results: <https://typesmiths.github.io/decohere/benchmark.html>. Report only, never a merge gate.
 
-| Suite | Benchmarks | Measures |
-|---|---|---|
-| `flux-serve` | `flux.serve.start`, `flux.serve.reload-root`, `flux.serve.reload-leaf` | Real `flux serve` process: spawn until the app is ready (CLI from source, so it includes compiling flux itself), and save until the rebooted app is ready, for a file everything imports and one only its barrel imports. Debounce 0. |
-| `flux-load` | `flux.load.cold`, `flux.load.cold-cached`, `flux.load.warm`, `flux.load.cold.*` | The load hook compiling and importing the app in process: what a user's app pays at startup, without the CLI. Cold is a fresh process and warm is a second import, as after a save, both with the disk cache off. Cold-cached is a fresh process whose disk cache an earlier run filled, as when an app restarts with nothing changed. The cold load is also split into SWC, resolving imports, the rest of the load hook, and Node linking and evaluating. |
-| `flux-transpile` | `flux.transpile.*` | SWC alone and warm, with flux's options: one file at a time with inline, separate or no source maps, and all files in parallel. For comparing strategies; a real cold start pays more (`flux.load.cold.swc`). |
-| `flux-run` | `flux.run.cold`, `flux.run.warm`, `flux.run.node` | Real `flux run` of a one-line script, with the CLI built, packed and installed as a user gets it: the other flux suites run from source, where the TypeScript compiler is always loaded. `flux.run.node` is plain `node`, to tell a slow runner from a slow flux. Builds into `dist/release`. |
-| `forge-build` | `forge.build.*` | `forge build` of the cli e2e fixtures, per configuration. |
-
-The flux suites generate a workspace of 8 libraries × 40 files (`BENCH_LIBS`, `BENCH_FILES`). Locally:
+Suites: `flux-serve` (a real `flux serve` process: start, and reboot after a save), `flux-load` (compiling and importing an app in process, cold and warm), `flux-transpile` (SWC alone), `flux-run` (`flux run` of a one-line script on the installed CLI, since running from source always loads the TypeScript compiler; it builds into `dist/release`) and `forge-build` (the cli e2e fixtures, per configuration).
 
 ```bash
 pnpm bench                       # every suite, compared with your last saved run
@@ -137,86 +79,46 @@ pnpm bench flux-serve flux-load  # some suites
 pnpm bench:save                  # also append to projects/ci-tools/dist/ci/bench/bench-history.json
 ```
 
-Runs are grouped by machine (platform, CPU model and cores, memory, Node version) and only compared within one. GitHub's shared runners vary from night to night, so read the trend rather than one point, and measure a change locally before and after with `pnpm bench`.
+`BENCH_SAMPLES` (default 10) sets samples per benchmark. Runs are compared only within one machine type, which keeps its last 30 runs. Shared runners vary, so read the trend and measure a change locally.
 
-Every benchmark takes the same number of samples, `BENCH_SAMPLES` (default 10): one per process for the process benchmarks, one per round for the in-process ones. Each machine type keeps its last 30 runs.
+Each night [`nightly.mjs`](../../projects/ci-tools/src/bench/nightly.mjs) runs tonight's commit and the previous nightly's on the same runner, 2 rounds each. A benchmark more than 20% slower in both rounds opens or updates the issue `perf(bench): <id> is slower`.
 
-**When a benchmark gets slower:** each night, `nightly.mjs` benchmarks tonight's commit and the commit the previous nightly measured, on the same runner, alternating them for 2 rounds. GitHub's runners vary in CPU model from night to night, so this keeps every comparison on one machine. If a benchmark's median is more than 20% slower on tonight's commit in both rounds, the job opens an issue titled `perf(bench): <id> is slower` with both rounds' numbers, the commit range and how to reproduce, or updates the open issue with that title. The next night compares against the slow commit, so the issue stays open until someone fixes the cause or closes it with a reason. Rule: `REGRESSION` in [`history.mjs`](../../projects/ci-tools/src/bench/history.mjs). Machine types with no run in 30 days are dropped from the history and the page.
+## npm audit
 
-## Nightly npm audit
+`npm-audit.yml` runs `pnpm audit` daily at 06:00 UTC and opens or updates the `security(ci): npm audit vulnerabilities detected` issue. It never fails on findings; the merge gate is the audit step in CI.
 
-[`.github/workflows/npm-audit.yml`](../../.github/workflows/npm-audit.yml) runs `pnpm audit` every day at 06:00 UTC (`workflow_dispatch` also). It prints each advisory (severity, GHSA, path) to the job log and GitHub step summary, then opens or updates the GitHub issue `security(ci): npm audit vulnerabilities detected` (the same issue `main` CI updates, edited in place rather than commented on). High/critical findings **do not** fail the nightly job; PR/`main` CI (`ci.yml` lint/typecheck) remains the merge gate.
+## Published packages
 
-## Published Packages
+All under `projects/`, all public on npm: `@decohere/` `core`, `http`, `config`, `data`, `data-typeorm`, `workspace`, `devkit`, `testing`, `crucible`, `scribe`, `scribe-pino`, `scribe-console`, `forge`, `flux`, `cli`, `create`, `scaffold`, `ci-tools`. The Vitest plugin is `@decohere/forge/vitest`. `devcontainer` is private and ships only as an image.
 
-Current `@decohere/*` packages under `projects/` (Vitest plugin is `@decohere/forge/vitest`, not a separate package):
+The repo installs no published `@decohere/*` package (`tools/register.mjs` runs everything from source), so a bad publish cannot break CI.
 
-- `@decohere/forge`
-- `@decohere/flux`
-- `@decohere/cli`
-- `@decohere/workspace`
-- `@decohere/core`
-- `@decohere/devkit`
-- `@decohere/testing`
-- `@decohere/crucible`
-- `@decohere/http`
-- `@decohere/config`
-- `@decohere/data`
-- `@decohere/data-typeorm`
-- `@decohere/scribe`
-- `@decohere/scribe-pino`
-- `@decohere/scribe-console`
-- `@decohere/create`
-- `@decohere/scaffold`
-- `@decohere/ci-tools`
+## Adding a new npm package
 
-## Building from source
+npm can attach a Trusted Publisher only to a name that exists. When Publish finds an unpublished name, **verify** opens the issue `deploy(publish): OIDC bootstrap unpublished packages` (assigned to the environment's reviewers) and **oidc-bootstrap** waits on the `npm-oidc-bootstrap` environment. Keep required reviewers on that environment only, not on `npm-publish`.
 
-The repo installs no published `@decohere/*` package. `tools/register.mjs` runs the repo's own TypeScript from source (`pnpm forge …`, `pnpm flux …`), and the Vitest configs load the `forgeBuild` plugin from source too. A fresh clone installs without an npm token, a bad publish can't break CI, and deprecating or unpublishing an npm name doesn't affect this repo.
+1. From the repo root, after `npm login` to the org:
 
-## New Package Bootstrap (OIDC pause)
+   ```bash
+   pnpm npm:bootstrap --otp <code> @decohere/<name>   # no names: every name not on npm yet
+   ```
 
-npm cannot attach a trusted publisher until the package **name** exists. Publish **verify** checks `npm view` of each non-private workspace package **name**. If any are missing, the **oidc-bootstrap** job runs on GitHub environment `npm-oidc-bootstrap` (deployment branches `main` / `release`). Required reviewers on that environment pause only this job (it is skipped when every name already exists). Do **not** put reviewers on `npm-publish` (that would pause every release).
+   [`npm-bootstrap.mjs`](../../projects/ci-tools/src/github/npm-bootstrap.mjs) first-publishes each name public and runs `npm trust github` for it, skipping what is done. `--otp` is optional (npm asks when needed); `--dry-run` prints the commands.
 
-While it waits, the job title lists the missing names and **View deployment** opens the GitHub issue `deploy(publish): OIDC bootstrap unpublished packages` (opened or updated by verify, and reopened if it was closed). Its body has the exact `npm publish` / Trusted Publisher / Approve commands. It is assigned to the `npm-oidc-bootstrap` environment's required reviewers. The waiting job has not started yet, so there is no GitHub step summary until after you approve.
+2. By hand instead: `npm publish ./projects/<dir> --access public --tag dev` (drop `--tag` for a stable version), then on npm: package settings, Trusted Publisher, GitHub Actions, with organization `typesmiths`, repository `decohere`, workflow `publish.yml`, environment `npm-publish`, allowed action `npm publish`.
+3. Approve the waiting deployment. The job checks the names exist and Publish continues. If it already failed, run `gh run rerun --failed`.
 
-Steps 1 and 2 are one command. From the **repo root**, after `npm login` to the org:
+## Emergency manual release
+
+Only when CI is unavailable. Needs `npm login` as a member of the `@decohere` org. Publishes npm packages only, no images.
 
 ```bash
-pnpm npm:bootstrap --otp <code> @decohere/scribe-console   # or no names: every name not on npm yet
-```
-
-[`npm-bootstrap.mjs`](../../projects/ci-tools/src/github/npm-bootstrap.mjs) first-publishes each name public, then runs `npm trust github` with the settings below. It skips a step that is already done. npm runs on your terminal and does its own 2FA: it asks for a code, or for the browser login, whenever it needs one, so `--otp` is optional and an expired code (they last about 30 seconds) just makes npm ask again. `npm trust` takes no `--otp` flag, so the script hands the code over as `NPM_CONFIG_OTP`. `--dry-run` prints the npm commands without running them. By hand:
-
-1. First-publish the package **public** from the **repo root** (`--access public`: scoped names default to restricted). Use `./projects/<dir>` so npm does not treat the path as a GitHub `owner/repo`. Prerelease versions (`x.y.z-dev.N`) need `--tag dev`. A stable `x.y.z` can omit `--tag`. Missing `bin`/`es6` is OK; this only creates the name. Example: `npm publish ./projects/scaffold --access public --tag dev`.
-2. npm → package settings → Trusted Publisher → GitHub Actions:
-      - Organization: `typesmiths`
-      - Repository: `decohere`
-      - Workflow filename: `publish.yml`
-      - Environment: `npm-publish`
-      - Allowed action: `npm publish` (not staged-only)
-3. Approve the waiting deployment. The job then re-checks that the names exist; **npm** (OIDC) + **docker** + **tag** continue in the same run. If reviewers were not configured and the job already failed, `gh run rerun --failed` instead.
-
-Retries of an untagged tip skip npm and/or Docker independently when that version is already on the registry / GHCR.
-
-## Registry credentials
-
-CI stores no registry credential. npm packages are public, so reads (`npm view`, `npx @decohere/create`) need no token, and `npm publish` goes through Trusted Publishing (OIDC) from the `npm-publish` environment. A workflow that writes an npm token into `.npmrc` fails the ci-tools tests.
-
-Docker images need no stored credential either. Publish's `docker` job logs in to GHCR with its own `GITHUB_TOKEN` and is the only job in any workflow that asks for `packages: write`; it runs only after CI passes on a push to `main` or `release`. Fork pull requests and Dependabot get a read-only token. GHCR accepts the token only for images whose **Manage Actions access** gives this repository the **Write** role (set once per image, under the package's settings). Anyone who could change the workflow to push from another branch already has write access to the repo.
-
-Repo **Actions default GITHUB_TOKEN is read**. Callers of reusable workflows must grant any write the callee requests (e.g. `ci.yml` → `release.yml` needs `permissions: contents: write` on that job). A job that omits `permissions` no longer gets write.
-
-## Emergency Manual Release
-
-> Only use when CI is unavailable or compromised.
-
-**Prerequisites:** `npm login` as a member of the `@decohere` npm org with publish access.
-
-```bash
-git checkout main && git pull
-npm run forge:release:dry            # Validate first
-npm run forge:release -- --preid dev --no-tag --log-level trace
-git push -u origin HEAD
-gh release create v<version> --generate-notes --title "v<version>"
+git checkout main && git pull --tags
+pnpm install
+pnpm forge version --release-type prerelease --channel dev
+pnpm forge dependencies --configuration release sync
+pnpm forge build --configuration release
+pnpm forge publish --channel dev --dry-run
+pnpm forge publish --channel dev --prompt-otp
+pnpm forge tag --prefix v --push
 ```
