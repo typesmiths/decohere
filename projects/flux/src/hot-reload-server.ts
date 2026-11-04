@@ -6,7 +6,7 @@ import { io } from "@decohere/core/io";
 import { WatchEvents } from "@decohere/devkit/io";
 import { debounce } from "@decohere/core/system";
 import { type Logger, scribe } from "@decohere/scribe";
-import type { Subscription } from "rxjs";
+import type { Subscription } from "@decohere/core/system";
 import { SourceModuleLoader } from "./source-module-loader.js";
 
 const currentFilePath = io.fileUrlToPath(import.meta.url);

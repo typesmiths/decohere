@@ -268,6 +268,10 @@ jobs:
         if: github.ref != 'refs/heads/release'
         run: pnpm exec vitest run --project e2e --silent=passed-only projects/create/e2e
 
+      - name: Run installed CLI e2e
+        if: github.ref != 'refs/heads/release'
+        run: pnpm exec vitest run --project e2e --silent=passed-only projects/cli/e2e/installed-cli
+
       - name: Run e2e smoke tests
         if: github.ref == 'refs/heads/release'
         run: pnpm run test:e2e

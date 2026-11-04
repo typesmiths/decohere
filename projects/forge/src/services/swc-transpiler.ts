@@ -11,7 +11,7 @@ import { Trace } from "@decohere/devkit/diagnostics";
 import type { FileEx } from "@decohere/core/io";
 import { WatchEvents } from "@decohere/devkit/io";
 import { type Options, transform, transformSync } from "@swc/core";
-import type { Observable } from "rxjs";
+import type { Observable } from "@decohere/core/system";
 import {
 	type BuildTarget,
 	BuildTargets,

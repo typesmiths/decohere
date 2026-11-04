@@ -10,6 +10,8 @@ export type TypeProgramProject = {
 	project: Project;
 	files: FileEx[];
 	tsconfig: Tsconfig;
+	/** The compiler's parse of `tsconfig`. */
+	compilerOptions: ts.CompilerOptions;
 };
 
 type EmissionTarget = {
@@ -43,7 +45,7 @@ export class TypeEmissionProgram {
 		this.#targetsByDtsPath = targets.byDtsPath;
 		this.#targetsByEmittedPath = targets.byEmittedPath;
 		this.#host = hostFactory;
-		this.#compilerOptions = group[0].tsconfig.compilerOptions;
+		this.#compilerOptions = group[0].compilerOptions;
 		this.#requiredOptions = requiredOptions;
 		this.#allFiles = group.flatMap(({ files }) => files);
 		this.#compilerHost = hostFactory.createHost(this.#compilerOptions);

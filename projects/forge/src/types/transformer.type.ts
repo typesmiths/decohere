@@ -1,6 +1,6 @@
 import type { Project, Workspace } from "@decohere/workspace";
 import type { FileEx } from "@decohere/core/io";
-import type { Observable } from "rxjs";
+import type { Observable } from "@decohere/core/system";
 import type { BuildTarget } from "../types/build-target.type.js";
 import type { TransformResponse } from "./transform-response.model.js";
 

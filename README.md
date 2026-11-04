@@ -29,7 +29,50 @@ cd orders
 pnpm dev
 ```
 
-Only want to run a TypeScript file? `pnpm add -D @decohere/cli`, then `pnpm exec flux run main.ts`. The [getting started guide](docs/getting-started.md) walks through both.
+### Or just run a file
+
+```bash
+npm init -y && npm pkg set type=module
+npm i -D @decohere/cli@dev
+```
+
+Save this as `app.ts`. Enums, decorators and parameter properties all need more than removing types:
+
+```ts
+enum Level {
+	Info = "info",
+}
+
+function log(_target: unknown, name: string, descriptor: PropertyDescriptor) {
+	const original = descriptor.value;
+	descriptor.value = function (...args: unknown[]) {
+		console.log(`[${Level.Info}] ${name}(${args.join(", ")})`);
+		return original.apply(this, args);
+	};
+}
+
+class Greeter {
+	constructor(private readonly greeting: string) {}
+
+	@log
+	greet(name: string) {
+		return `${this.greeting}, ${name}!`;
+	}
+}
+
+console.log(new Greeter("Hello").greet("Ada"));
+```
+
+```console
+$ node app.ts
+SyntaxError [ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX]: TypeScript enum is not supported in strip-only mode
+
+$ npx flux run app.ts
+[info] greet(Ada)
+Hello, Ada!
+```
+
+No `tsconfig.json`, no build step, and flux itself starts in about 150 ms. The [getting started guide](docs/getting-started.md) walks through both.
 
 ## Why Decohere?
 

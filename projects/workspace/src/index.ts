@@ -12,6 +12,7 @@ export type { ProjectConfig, ProjectSeed } from "./models/project.model.js";
 export { Project } from "./models/project.model.js";
 export { sourceExtensions } from "./models/source-extensions.js";
 export type { ProjectFileEvent } from "./models/project-file-event.js";
+export type { CompilerOptions } from "./models/tsconfig.model.js";
 export { DEFAULT_COMPILER_OPTIONS, Tsconfig } from "./models/tsconfig.model.js";
 export { Workspace } from "./models/workspace.model.js";
 export type {

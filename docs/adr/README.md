@@ -52,6 +52,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 | [0012](0012-workspace-package-resolution.md) | Workspace packages resolve to source from the workspace aliases; `forge paths` generates them for `tsc` | Proposed |
 | [0015](0015-core-devkit-testing.md) | `core` is the runtime base (only `reflect-metadata`, no import side effects); CLI base is `devkit`, test helpers are `testing` | Proposed |
 | [0017](0017-dependency-manifests-from-imports.md) | `forge dependencies sync` writes package manifests from imports; the root owns every version; peers are declared by name | Proposed |
+| [0018](0018-flux-run-loads-only-what-running-needs.md) | `flux run` loads only what running a file needs: no TypeScript compiler, no rxjs, `@decohere/forge/transpile` not the whole of forge; Node's compile cache on; no bundler yet | Accepted |
 
 ### Data
 

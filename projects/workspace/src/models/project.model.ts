@@ -10,7 +10,7 @@ import {
 	watch as watchDirectory,
 } from "@decohere/devkit/io";
 import picomatch from "picomatch";
-import { Subject } from "rxjs";
+import { Subject } from "@decohere/core/system";
 import { WorkspaceConfigurationError } from "../errors.js";
 import { HasPackageJson } from "./has-package-json.mixin.js";
 import { HasTsConfig } from "./has-tsconfig.mixin.js";

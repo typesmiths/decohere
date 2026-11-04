@@ -1,4 +1,4 @@
-import { createWorkspace } from "@decohere/forge";
+import { createWorkspace } from "@decohere/forge/transpile";
 import type { WorkspaceFactoryOptions } from "@decohere/devkit/cli";
 import { ModuleManifest } from "@decohere/devkit/cli";
 import type { ContainerBuilder } from "@decohere/core/composition";

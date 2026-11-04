@@ -3,11 +3,12 @@ import { invalidateCache } from "@decohere/core/caching";
 import { Trace } from "@decohere/devkit/diagnostics";
 import type { FileEx } from "@decohere/core/io";
 import { WatchEvents } from "@decohere/devkit/io";
-import type { Observable } from "rxjs";
+import type { Observable } from "@decohere/core/system";
 import type ts from "typescript";
 import "../extensions/project.extensions.js";
 import { IncrementalWatch } from "../services/incremental-watch.js";
 import { OutputCache } from "../services/output-cache.js";
+import { tsCompilerOptions } from "../services/ts-compiler-options.js";
 import { TsProgramHost } from "../services/ts-program-host.js";
 import {
 	TypeEmissionProgram,
@@ -148,11 +149,15 @@ export class TypeEmitter implements Transformer {
 
 		// Pre-fetch all files and tsconfigs in parallel across all projects
 		const projectData: TypeProgramProject[] = await Promise.all(
-			projects.map(async (proj) => ({
-				project: proj,
-				files: await proj.getAllFiles(),
-				tsconfig: await proj.getTsConfig(),
-			})),
+			projects.map(async (proj) => {
+				const tsconfig = await proj.getTsConfig();
+				return {
+					project: proj,
+					files: await proj.getAllFiles(),
+					tsconfig,
+					compilerOptions: tsCompilerOptions(tsconfig),
+				};
+			}),
 		);
 
 		// Group projects by the resolved compiler options that affect the compiler
@@ -160,8 +165,8 @@ export class TypeEmitter implements Transformer {
 		// same resolved values get one shared host AND one shared program — all their
 		// files are compiled together, matching v1's single-program approach which
 		// avoids re-parsing lib/node_modules .d.ts files per project.
-		const groups = Map.groupBy(projectData, ({ tsconfig }) =>
-			this.#host.hostKey(tsconfig.compilerOptions),
+		const groups = Map.groupBy(projectData, ({ compilerOptions }) =>
+			this.#host.hostKey(compilerOptions),
 		);
 
 		const requiredCompilerOptions =

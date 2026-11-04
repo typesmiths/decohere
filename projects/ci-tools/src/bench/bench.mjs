@@ -8,7 +8,7 @@
  *   pnpm bench flux-load flux-serve     — run only these suites
  *   pnpm bench:save                     — run, compare, and append to the history
  *
- * Suites: forge-build, flux-load, flux-transpile, flux-serve. Each prints a BENCH_RESULT line
+ * Suites: forge-build, flux-load, flux-transpile, flux-serve, flux-run. Each prints a BENCH_RESULT line
  * (see history.mjs). The history lives in projects/ci-tools/dist/ci/bench/bench-history.json;
  * the nightly bench workflow restores it from Pages, saves, and publishes the charts.
  *
@@ -108,6 +108,7 @@ const SUITES = {
 	"flux-load": fluxSuite("projects/flux/bench/load.bench.ts"),
 	"flux-transpile": fluxSuite("projects/flux/bench/transpile.bench.ts"),
 	"flux-serve": fluxSuite("projects/flux/bench/serve.bench.ts"),
+	"flux-run": fluxSuite("projects/flux/bench/run.bench.ts"),
 };
 
 function currentSha() {

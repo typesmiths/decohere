@@ -19,7 +19,7 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 | `@decohere/data-typeorm` | `projects/data/data-typeorm` | TypeORM adapter |
 | [`@decohere/devkit`](../../projects/devkit/README.md) | `projects/devkit` | Base for the CLIs: commands, `git`/`npm`/`docker` wrappers, file search and watch. Never in a production app |
 | [`@decohere/workspace`](../../projects/workspace/README.md) | `projects/workspace` | Workspace model: package discovery and aliases |
-| [`@decohere/forge`](../../projects/forge/README.md) | `projects/forge` | Build (SWC), typecheck, test, version, publish, Docker; Vitest plugin at `@decohere/forge/vitest` |
+| [`@decohere/forge`](../../projects/forge/README.md) | `projects/forge` | Build (SWC), typecheck, test, version, publish, Docker; Vitest plugin at `@decohere/forge/vitest`; `@decohere/forge/transpile` compiles a file without loading forge's commands (what flux uses) |
 | [`@decohere/flux`](../../projects/flux/README.md) | `projects/flux` | Runs TypeScript from source with in-process reload |
 | `@decohere/cli` | `projects/cli` | The CLI host: `decohere`, `forge` and `flux` bins |
 | [`@decohere/create`](../../projects/create/README.md) | `projects/create` | `npm create @decohere`: runs the scaffolder in Docker |

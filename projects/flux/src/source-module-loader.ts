@@ -9,7 +9,7 @@ import { registerHooks } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { injectable } from "@decohere/crucible/decorators";
-import { BuildTargets, createWorkspace, SwcTranspiler } from "@decohere/forge";
+import { BuildTargets, createWorkspace, SwcTranspiler } from "@decohere/forge/transpile";
 import type { Project, Workspace } from "@decohere/workspace";
 import { packageAliases, sourceExtensions } from "@decohere/workspace";
 import { FileEx, io } from "@decohere/core/io";

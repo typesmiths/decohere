@@ -6,7 +6,7 @@ CI stores no secrets or variables. npm publishing uses Trusted Publishing (OIDC)
 
 | Event | What runs |
 |---|---|
-| Pull request (this repo or a fork) | CI: lint, typecheck, unit and Docker-backed tests, image build, create scaffold e2e. Read-only token, no secrets. |
+| Pull request (this repo or a fork) | CI: lint, typecheck, unit and Docker-backed tests, image build, create scaffold e2e, installed CLI e2e. Read-only token, no secrets. |
 | Merge queue (`merge_group`) | CI again on the PR combined with `main` and the PRs ahead of it. Always the full suite, docs-only or not. |
 | Push to `main` | CI with a coverage gate and a beta release build, then Publish to the npm `dev` dist-tag. |
 | Push to `release` | CI with coverage, full e2e and a GitHub Release, then, in parallel, Publish to the npm `latest` dist-tag and Pages (badges). |
@@ -37,7 +37,7 @@ CI stores no secrets or variables. npm publishing uses Trusted Publishing (OIDC)
 
 - **lint/typecheck**: `lint:check`, `typecheck`, actionlint, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
 - **test**: unit tests (with coverage thresholds on `main` and `release`) and Docker-backed tests. On `main` it also computes the next dev version from git tags, syncs dependency versions and uploads the release build as `forge-release-beta-<run>`. On `release` it uploads coverage for Pages.
-- **docker**: one release build, dependency drift report, `forge publish --dry-run`, packs `create.tgz`, `forge docker --dry-run` (images built, not pushed), then the create scaffold e2e, or the full e2e suite on `release`.
+- **docker**: one release build, dependency drift report, `forge publish --dry-run`, packs `create.tgz`, `forge docker --dry-run` (images built, not pushed), then the create scaffold e2e and the installed CLI e2e, or the full e2e suite on `release`.
 
 On `release`, the `release` job then calls `release.yml`, which builds the stable release tree and creates the GitHub Release.
 
@@ -71,7 +71,7 @@ GitHub Pages (<https://typesmiths.github.io/decohere/>) holds the badges and ben
 
 Results: <https://typesmiths.github.io/decohere/benchmark.html>. Report only, never a merge gate.
 
-Suites: `flux-serve` (a real `flux serve` process: start, and reboot after a save), `flux-load` (compiling and importing an app in process, cold and warm), `flux-transpile` (SWC alone) and `forge-build` (the cli e2e fixtures, per configuration).
+Suites: `flux-serve` (a real `flux serve` process: start, and reboot after a save), `flux-load` (compiling and importing an app in process, cold and warm), `flux-transpile` (SWC alone), `flux-run` (`flux run` of a one-line script on the installed CLI, since running from source always loads the TypeScript compiler; it builds into `dist/release`) and `forge-build` (the cli e2e fixtures, per configuration).
 
 ```bash
 pnpm bench                       # every suite, compared with your last saved run
