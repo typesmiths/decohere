@@ -1,6 +1,6 @@
 import type { Constructable } from "@decohere/core/reflection";
 import type { OpenApiOptions } from "../openapi/openapi.types.js";
-import type { CorsOptions } from "../routing/anvil.types.js";
+import type { CorsOptions } from "../routing/http.types.js";
 import type { ExceptionFilter } from "../routing/filters/exception-filter.js";
 import type { Middleware } from "../routing/middleware/middleware.js";
 import type { CompressionOptions } from "./http.compression.js";

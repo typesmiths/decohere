@@ -4,7 +4,7 @@ import type { App } from "../app/app.js";
 import { Builder } from "../builder/builder.js";
 import "../http/http.extensions.js";
 import { FastifyProvider } from "../providers/fastify.provider.js";
-import type { HttpProvider } from "../routing/anvil.types.js";
+import type { HttpProvider } from "../routing/http.types.js";
 import {
 	type EventStreamRead,
 	type ReadEventsOptions,

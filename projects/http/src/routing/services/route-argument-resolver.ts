@@ -1,7 +1,7 @@
 import type { Constructable, Type } from "@decohere/core/reflection";
 import { isPrimitiveOrDateType } from "@decohere/core/reflection";
 import type { IPrincipalProvider } from "../../auth/principal-provider.js";
-import type { FieldMeta, HttpRequest, RouteArg } from "../anvil.types.js";
+import type { FieldMeta, HttpRequest, RouteArg } from "../http.types.js";
 import type { Pipe, PipeContext } from "../pipes/pipes.js";
 
 export class RouteArgumentResolve {

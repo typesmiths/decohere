@@ -1,7 +1,7 @@
 import type { Constructable, FunctionType } from "@decohere/core/reflection";
 import { defineArgumentMeta, defineMeta, getMeta } from "@decohere/core/reflection";
 import { MetadataKeys } from "../../const.js";
-import type { ArgumentMeta } from "../anvil.types.js";
+import type { ArgumentMeta } from "../http.types.js";
 
 export type AuthorizeOptions = {
 	action: string;

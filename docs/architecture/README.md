@@ -129,20 +129,3 @@ Install and everyday commands: [contributing](../contributing/#everyday-commands
 | oxlint, Prettier | Lint, format ([ADR 0004](../adr/0004-oxlint-and-prettier.md)) |
 | actionlint | Workflow lint (CI `lint` job) |
 | Changesets | Stable release versioning |
-
-## Appendix — retired names
-
-Do **not** use these in new docs, tasks, or public APIs.
-
-| Retired | Current |
-|---|---|
-| Ark (repo nickname) | Decohere |
-| `nexus` (earlier `hearth` / `stack`) | `@decohere/core` ([ADR 0014](../adr/0014-package-names.md)) |
-| `cortex` (earlier `anvil` / `ether`) | `@decohere/http` |
-| `protocol` (earlier `atlas`) | `@decohere/config` |
-| `codex` / `codex-typeorm` | `@decohere/data` / `@decohere/data-typeorm` |
-| `mesh` | `@decohere/workspace` (the name it had before `mesh`) |
-| `ember` | `flux` |
-| old toolchain host `cli` / later `terminal` | `@decohere/cli` |
-| leftover scaffolder `@decohere/cli` | `@decohere/scaffold` |
-| standalone `forge-vitest` | `@decohere/forge/vitest` |

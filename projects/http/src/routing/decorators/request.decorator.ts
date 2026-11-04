@@ -1,7 +1,7 @@
 import type { Constructable } from "@decohere/core/reflection";
 import { defineMeta, getFields, getFieldType, getMeta } from "@decohere/core/reflection";
 import { MetadataKeys } from "../../const.js";
-import type { FieldMeta, RequestPart } from "../anvil.types.js";
+import type { FieldMeta, RequestPart } from "../http.types.js";
 
 /**
  * Used to map a request object to route params

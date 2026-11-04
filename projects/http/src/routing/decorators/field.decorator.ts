@@ -1,6 +1,6 @@
 import { defineMeta, getFieldType, getMeta } from "@decohere/core/reflection";
 import { MetadataKeys } from "../../const.js";
-import type { FieldMeta, RequestPart } from "../anvil.types.js";
+import type { FieldMeta, RequestPart } from "../http.types.js";
 
 export function Field(fieldLocation?: RequestPart, mappingKey?: string) {
 	return (target: object, fieldName: string) => {

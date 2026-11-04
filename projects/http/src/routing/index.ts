@@ -1,4 +1,4 @@
-export * from "./anvil.types.js";
+export * from "./http.types.js";
 export * from "./decorators/index.js";
 export * from "./filters/exception-filter.js";
 export * from "./filters/exception-filter-host.js";

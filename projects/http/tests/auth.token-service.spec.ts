@@ -1,7 +1,7 @@
 import { exportJWK, exportSPKI, generateKeyPair, SignJWT } from "jose";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { TokenService } from "../src/auth/token-service.js";
-import { UnauthorizedError } from "../src/routing/anvil.types.js";
+import { UnauthorizedError } from "../src/routing/http.types.js";
 
 async function mintToken(
 	privateKey: Parameters<typeof SignJWT.prototype.sign>[0],

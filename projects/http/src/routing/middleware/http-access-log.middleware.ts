@@ -1,6 +1,6 @@
 import { injectable } from "@decohere/crucible/decorators";
 import { scribe } from "@decohere/scribe";
-import { HttpError } from "../anvil.types.js";
+import { HttpError } from "../http.types.js";
 import type { Middleware, MiddlewareContext } from "./middleware.js";
 import { REQUEST_ID_HEADER } from "./request-id.js";
 

@@ -7,7 +7,7 @@ import {
 import { scribe } from "@decohere/scribe";
 import { HostedServiceHostToken, HttpProviderToken } from "../const.js";
 import type { HostedServiceHost } from "../hosting/hosted-service-host.js";
-import type { HttpProvider, StartResponse } from "../routing/anvil.types.js";
+import type { HttpProvider, StartResponse } from "../routing/http.types.js";
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_SHUTDOWN_SIGNALS: readonly NodeJS.Signals[] = ["SIGTERM", "SIGINT"];

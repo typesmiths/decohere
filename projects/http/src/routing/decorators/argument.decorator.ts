@@ -1,7 +1,7 @@
 import type { Constructable } from "@decohere/core/reflection";
 import { defineArgumentMeta } from "@decohere/core/reflection";
 import { MetadataKeys } from "../../const.js";
-import { type ArgumentMeta, type RequestPart, RequestParts } from "../anvil.types.js";
+import { type ArgumentMeta, type RequestPart, RequestParts } from "../http.types.js";
 import type { Pipe } from "../pipes/pipes.js";
 
 export type ArgumentOptions = {

@@ -1,4 +1,4 @@
-export type { ValidationIssue } from "../routing/anvil.types.js";
+export type { ValidationIssue } from "../routing/http.types.js";
 export {
 	generateOpenApiDocument,
 	resolveOpenApiPath,

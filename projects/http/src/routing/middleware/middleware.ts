@@ -1,4 +1,4 @@
-import type { HttpRequest, MappedRoute } from "../anvil.types.js";
+import type { HttpRequest, MappedRoute } from "../http.types.js";
 
 export type MiddlewareContext = {
 	request: HttpRequest;

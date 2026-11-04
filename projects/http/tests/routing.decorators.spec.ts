@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RouteConfigurationError } from "../src/routing/anvil.types.js";
+import { RouteConfigurationError } from "../src/routing/http.types.js";
 import { Get } from "../src/routing/decorators/index.js";
 
 describe("routing decorators", () => {

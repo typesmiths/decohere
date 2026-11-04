@@ -1,7 +1,7 @@
 # 0014. Products keep their names; support libraries are named for what they do
 
 - **Status:** Proposed
-- **Date:** 2026-10-21 · updated 2026-10-22
+- **Date:** 2026-10-21 · updated 2026-11-04
 
 ## Context
 
@@ -25,12 +25,12 @@ Some of those names are products: people use them directly, type them as command
 
   Directories follow (`projects/core`, `projects/data/data`, …).
 - **Exported names say what a thing is**, inside a product too. Scribe keeps `scribe` and `ScribeOptions`, since the logger is the product. Crucible's container is a container: `Crucible` → `Container`, `CrucibleBuilder` → `ServiceContainerBuilder` (`ContainerBuilder` is already the interface in core), `CrucibleMeta` → `ContainerMeta`.
-- **New packages get plain names** (`@decohere/host` when hosting moves out of `http`; `@decohere/devkit` and `@decohere/testing`, [ADR 0015](0015-core-devkit-testing.md)). A new codename needs a product.
+- **New packages get plain names** (`@decohere/devkit` and `@decohere/testing`, [ADR 0015](0015-core-devkit-testing.md)). A new codename needs a product.
 
 Rejected:
 
 - **Dropping every codename, products included.** `forge` and `flux` are commands people type and tools they recognise; `decohere build` would lose that without making anything clearer. Scribe is a logging product with its own adapters.
-- **A plain name for crucible.** `di` and `ioc` are jargon, `container` reads as Docker in a project that ships images, `composition` is what `@decohere/host` does, and `inject` names one decorator rather than the library.
+- **A plain name for crucible.** `di` and `ioc` are jargon, `container` reads as Docker in a project that ships images, `composition` names the builder and app lifecycle in `core`, and `inject` names one decorator rather than the library.
 - **Keeping the codenames with a glossary.** It documents the cost instead of removing it, and every new package adds a word.
 
 ## Consequences
@@ -38,10 +38,10 @@ Rejected:
 - Reading a support library's import tells you what it does (`@decohere/http`, `@decohere/data`).
 - Every renamed package is a new name on npm: each needs a first publish and a Trusted Publisher before CI can publish it, and the old dev versions are deprecated.
 - Code written against the old names (apps generated earlier, Ledger) has to update its imports.
-- Older records, issues and commits still use the old names; the retired-names table in [docs/architecture](../architecture/README.md#appendix--retired-names) maps them.
 - The M7 glossary only needs the products.
 
 ## History
 
 - 2026-10-21: Decided. Crucible stays a product rather than becoming `@decohere/di`.
 - 2026-10-22: The CLI base split out of `core` is named `devkit`, not `tooling`, which read as a dumping ground ([ADR 0015](0015-core-devkit-testing.md)).
+- 2026-11-04: Hosting (`Builder`, `App`, lifecycle, readiness) moves out of `http` into `core`, not a new `@decohere/host` package: `core` already holds composition and `http` depends on it. The table of retired names in docs/architecture is gone; the code and issues use the current names.

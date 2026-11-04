@@ -7,8 +7,8 @@ import {
 	jwtVerify,
 	SignJWT,
 } from "jose";
-import type { HttpRequest } from "../routing/anvil.types.js";
-import { UnauthorizedError } from "../routing/anvil.types.js";
+import type { HttpRequest } from "../routing/http.types.js";
+import { UnauthorizedError } from "../routing/http.types.js";
 import { createPrincipalFromPayload } from "./ability.js";
 import type {
 	Principal,

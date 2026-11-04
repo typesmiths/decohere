@@ -4,7 +4,7 @@ import type { Constructable } from "@decohere/core/reflection";
 import { scribe } from "@decohere/scribe";
 import { HttpOptionsToken } from "../../const.js";
 import type { HttpOptions } from "../../http/http.options.js";
-import { HttpError, ValidationError } from "../anvil.types.js";
+import { HttpError, ValidationError } from "../http.types.js";
 import {
 	type ExceptionContext,
 	type ExceptionFilter,

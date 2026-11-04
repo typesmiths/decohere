@@ -1,7 +1,7 @@
 import type { Constructable } from "@decohere/core/reflection";
 import { defineMeta, getMeta } from "@decohere/core/reflection";
 import { MetadataKeys } from "../../const.js";
-import type { HttpRequest } from "../anvil.types.js";
+import type { HttpRequest } from "../http.types.js";
 
 export type ExceptionResult = {
 	status: number;

@@ -1,7 +1,7 @@
 import type { FunctionType } from "@decohere/core/reflection";
 import { defineArgumentMeta, defineMeta } from "@decohere/core/reflection";
 import { MetadataKeys } from "../const.js";
-import type { ArgumentMeta, RequestPart } from "../routing/anvil.types.js";
+import type { ArgumentMeta, RequestPart } from "../routing/http.types.js";
 import type { SseOptions } from "./sse.types.js";
 
 /**
