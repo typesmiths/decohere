@@ -9,6 +9,8 @@ const configIndex = process.argv.indexOf("--config-file");
 const configFile = configIndex !== -1 ? process.argv[configIndex + 1] : undefined;
 const logLevelIndex = process.argv.indexOf("--log-level");
 const logLevel = logLevelIndex !== -1 ? process.argv[logLevelIndex + 1] : undefined;
+const rootDirIndex = process.argv.indexOf("--root-dir");
+const rootDir = rootDirIndex !== -1 ? process.argv[rootDirIndex + 1] : undefined;
 
 scribe.withPinoPretty({
 	logLevel: cliLogLevel(logLevel),
@@ -16,7 +18,7 @@ scribe.withPinoPretty({
 });
 
 const logger = scribe.logger("@decohere/cli");
-const app = await RootModule.create([FluxModule], { configFile, logLevel });
+const app = await RootModule.create([FluxModule], { configFile, logLevel, rootDir });
 try {
 	// Route directly to the flux module — users invoke as `flux serve`, not `flux flux serve`
 	logger.trace("running flux");

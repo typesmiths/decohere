@@ -1,7 +1,6 @@
 export { WORKSPACE_CONFIG, WorkspaceDefaults } from "./const.js";
 export { WorkspaceConfigurationError } from "./errors.js";
 export { UserConfigFactory } from "./factories/config.factory.js";
-export { findWorkspaceRoot } from "./factories/find-workspace-root.js";
 export { ProjectFactory } from "./factories/project.factory.js";
 export { WorkspaceFactory } from "./factories/workspace.factory.js";
 export { HasPackageJson } from "./models/has-package-json.mixin.js";

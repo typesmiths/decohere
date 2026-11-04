@@ -41,6 +41,12 @@ export class ReportDependencies implements Action<ReportOptions> {
 
 	public async run(options: ReportOptions): Promise<ActionResponse<ProjectReport>> {
 		const { configuration, file, failOnDrift } = options;
+		if (this.workspace.isStandalone) {
+			this.#logger.info(
+				"Standalone project: its package.json is the root's; nothing to report",
+			);
+			return ActionResponse.Success(ReportDependencies.name, []);
+		}
 
 		try {
 			const projectDeps = await this.analyzeWorkspace(this.workspace, configuration);

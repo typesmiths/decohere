@@ -34,6 +34,12 @@ export class SyncDependencies implements Action<DependenciesOptions> {
 
 	public async run(options: DependenciesOptions): Promise<ActionResponse<SyncprojectResult>> {
 		const { configuration, logDiff } = options;
+		if (this.workspace.isStandalone) {
+			// The project's package.json is the root's: syncing it from itself would drop every
+			// dependency nothing imports (typescript, vitest, linters).
+			this.#logger.info("Standalone project: its package.json is the root's; nothing to sync");
+			return ActionResponse.Success(SyncDependencies.name, []);
+		}
 
 		const projects = this.workspace.getProjects(configuration);
 		const workspacePackages = await this.resolver.getWorkspacePackages(

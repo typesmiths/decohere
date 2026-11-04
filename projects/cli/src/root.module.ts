@@ -1,4 +1,5 @@
-import { UserConfigFactory } from "@decohere/workspace";
+import path from "node:path";
+import { UserConfigFactory, WORKSPACE_CONFIG } from "@decohere/workspace";
 import type { Actions, ApplicationModule, ModuleManifest } from "@decohere/devkit/cli";
 import { CommandResponse, DecohereCommand } from "@decohere/devkit/cli";
 import { Trace } from "@decohere/devkit/diagnostics";
@@ -14,10 +15,14 @@ export class RootModule {
 		moduleTypes: readonly Constructable<ModuleManifest>[],
 		options?: { configFile?: string; logLevel?: string; rootDir?: string },
 	): Promise<RootModule> {
-		const userConfig = await UserConfigFactory.getUserConfig(options?.configFile);
+		// With --root-dir, the root's .decohere.js, not the current folder's.
+		const configFile =
+			options?.configFile ??
+			(options?.rootDir ? path.join(options.rootDir, WORKSPACE_CONFIG) : undefined);
+		const userConfig = await UserConfigFactory.getUserConfig(configFile);
 		return new RootModule(moduleTypes, {
 			...userConfig,
-			configFile: options?.configFile,
+			configFile,
 			rootDir: options?.rootDir,
 		});
 	}
@@ -37,7 +42,11 @@ export class RootModule {
 		});
 
 		this.#modules = modules;
-		this.#command = new RootCommand(modules, config.configFile as string | undefined);
+		this.#command = new RootCommand(
+			modules,
+			config.configFile as string | undefined,
+			config.rootDir as string | undefined,
+		);
 		// Before the command runs, not after it returns: a stop signal while `flux serve` boots
 		// (`docker stop` during start-up) is held for the shutdown below instead of killing the
 		// process before anything is disposed.

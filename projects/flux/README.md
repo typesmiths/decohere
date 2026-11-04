@@ -49,7 +49,7 @@ Scaffolded apps already depend on `@decohere/cli` — use those scripts (`pnpm d
 
 ## CLI
 
-Host options (`--config-file`, `--log-level`) are parsed before the subcommand. `--config-file` (default `.decohere.js` if present) is optional workspace config for package discovery. Omit it to use [workspace defaults](../workspace/README.md#workspace-layout).
+Host options (`--root-dir`, `--config-file`, `--log-level`) are parsed before the subcommand. `--root-dir` (default: the current folder) is the workspace root. `--config-file` (default `.decohere.js` in the root, if present) is optional workspace config for package discovery. Omit it to use [workspace defaults](../workspace/README.md#workspace-layout).
 
 ### `flux run` — one-shot script
 

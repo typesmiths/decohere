@@ -1,6 +1,5 @@
 import path from "node:path";
 import {
-	findWorkspaceRoot,
 	UserConfigFactory,
 	WORKSPACE_CONFIG,
 	type Workspace,
@@ -11,12 +10,12 @@ import { DefaultConfigurations, WorkspaceDefaults } from "./workspace.config.js"
 
 /**
  * The workspace every Decohere tool sees (forge, the flux CLI and `flux.run`): forge's
- * defaults, the user's `.decohere.js`, and a root found by searching upward from cwd.
+ * defaults, the user's `.decohere.js`, and the root: `--root-dir`, else the current folder.
  */
 export async function createWorkspace(
 	options: WorkspaceFactoryOptions = {},
 ): Promise<Workspace> {
-	const rootDir = options.rootDir ?? defaultRootDir();
+	const rootDir = options.rootDir ?? WorkspaceDefaults.rootDir ?? "./";
 	const configFile =
 		options.configFile ??
 		(rootDir === WorkspaceDefaults.rootDir ? undefined : path.join(rootDir, WORKSPACE_CONFIG));
@@ -34,10 +33,4 @@ export async function createWorkspace(
 		configFile,
 		rootDir,
 	});
-}
-
-/** `./` when cwd is the root (keeps paths relative as before), else the root above it. */
-function defaultRootDir(): string {
-	const root = findWorkspaceRoot(process.cwd());
-	return root === process.cwd() ? (WorkspaceDefaults.rootDir ?? "./") : root;
 }

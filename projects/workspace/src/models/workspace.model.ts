@@ -71,6 +71,17 @@ export class Workspace extends mixwith(HasPackageJson, HasTsConfig) {
 		return this.#config.rootDir ?? "./";
 	}
 
+	/**
+	 * One project, whose `package.json` is the root's: a folder without `projects/`. Commands
+	 * that write a project's manifest from the root's (dependency sync) or map projects to each
+	 * other (paths) have nothing to do then.
+	 */
+	public get isStandalone(): boolean {
+		return (
+			this.#projectSeeds.length === 1 && this.#projectSeeds[0]?.config?.projectDir === "."
+		);
+	}
+
 	public get packageJsonDirectory(): string {
 		return this.rootDir;
 	}
