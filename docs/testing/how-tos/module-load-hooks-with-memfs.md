@@ -30,7 +30,7 @@ export default defineConfig(({ mode }) => ({
     {
       name: "unit",
       test: {
-        setupFiles: ["vitest.external-module.setup.ts"],
+        setupFiles: ["vitest.setup.ts"],
         // ...
       },
     },

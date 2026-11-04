@@ -43,9 +43,8 @@ Each entry has a reason to be here. If you add one, add its reason; if the reaso
 |---|---|
 | `projects/` | Every package and its tests. |
 | `docs/` | Architecture, style, testing, contributing, ADRs. |
-| `test/` | Vitest setup files that every test run loads (in-memory `fs`, module load hook). |
 | `tools/register.mjs` | Lets Node run this repo's own TypeScript from source. Flux cannot load itself before it is compiled. |
-| `__mocks__/` | Vitest's automatic `fs`, `fs/promises` and `glob` mocks, picked up by `vi.mock` in `test/`. |
+| `__mocks__/` | Vitest's automatic `fs`, `fs/promises` and `glob` mocks, picked up by `vi.mock` in `vitest.setup.ts`. |
 | `.changeset/` | Pending release notes ([Changesets](https://github.com/changesets/changesets)). |
 | `.devcontainer/` | The optional Dev Container. |
 | `.github/` | CI workflows, composite actions, the PR and issue templates, `CONTRIBUTING.md` (points here), `SECURITY.md` (how to report a vulnerability) and `CODE_OF_CONDUCT.md`. GitHub reads all three from this folder. |
@@ -55,6 +54,7 @@ Each entry has a reason to be here. If you add one, add its reason; if the reaso
 | `.oxlintrc.json`, `.prettierrc.json`, `.prettierignore` | Lint and format rules ([ADR 0004](../adr/0004-oxlint-and-prettier.md)). |
 | `tsconfig.json`, `tsconfig.paths.json` | One type-check config for the repo. It extends `tsconfig.paths.json`, which `pnpm forge paths` generates from the workspace packages so every `@decohere/*` import points at source; `pnpm run lint:check` fails if it is out of date. Don't edit it by hand. |
 | `vitest.config.ts` | The only Vitest config: `unit`, `docker` and `e2e` projects. |
+| `vitest.setup.ts` | Setup every test run loads: files in memory (memfs), and `import()` able to load them from there. |
 | `package.json`, `pnpm-lock.yaml` | Root scripts, dev tools, dependency overrides. |
 | `AGENTS.md` | Instructions for coding agents ([ADR 0009](../adr/0009-agent-instructions-in-agents-md.md)). |
 
