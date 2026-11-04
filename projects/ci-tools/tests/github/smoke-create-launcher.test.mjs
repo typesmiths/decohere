@@ -29,11 +29,11 @@ describe("runCreateLauncherSmoke", () => {
 
 		expect(result.workDir).toBe("/tmp/decohere-create-smoke-abc");
 		expect(result.workDir).not.toBe(process.cwd());
-		expect(calls).toHaveLength(1);
-		expect(calls[0].cmd).toBe("npx");
-		expect(calls[0].args).toEqual(["--yes", "@decohere/create@0.0.1-dev.80", "--help"]);
-		expect(calls[0].opts.cwd).toBe("/tmp/decohere-create-smoke-abc");
-		expect(calls[0].opts.cwd).not.toBe(process.cwd());
+		const npx = calls.at(-1);
+		expect(npx.cmd).toBe("npx");
+		expect(npx.args).toEqual(["--yes", "@decohere/create@0.0.1-dev.80", "--help"]);
+		expect(npx.opts.cwd).toBe("/tmp/decohere-create-smoke-abc");
+		expect(npx.opts.cwd).not.toBe(process.cwd());
 		expect(written).toEqual([
 			{
 				path: "/tmp/decohere-create-smoke-abc/.npmrc",
@@ -41,7 +41,57 @@ describe("runCreateLauncherSmoke", () => {
 			},
 		]);
 		// The packages are public: the smoke installs them the way a user does, with no token.
-		expect(calls[0].opts.env.NODE_AUTH_TOKEN).toBeUndefined();
+		expect(npx.opts.env.NODE_AUTH_TOKEN).toBeUndefined();
+	});
+
+	// npm's public cache can lag minutes behind a publish: the first token-free Publish ran npx
+	// 90 seconds after publishing and got ETARGET for a version the registry already had.
+	it("waits until npm serves the new version before running npx", () => {
+		/** @type {{ cmd: string, args: string[] }[]} */
+		const calls = [];
+		const sleeps = [];
+		let views = 0;
+
+		const result = runCreateLauncherSmoke({
+			createVersion: "0.0.1-dev.127",
+			tmpdir: () => "/tmp",
+			mkdtempSync: (prefix) => `${prefix}abc`,
+			writeFileSync: () => {},
+			spawnSync: (cmd, args) => {
+				calls.push({ cmd, args });
+				if (cmd === "npm") return { status: ++views < 3 ? 1 : 0 };
+				return { status: 0 };
+			},
+			sleep: (ms) => sleeps.push(ms),
+			stdio: "pipe",
+		});
+
+		expect(result.status).toBe(0);
+		expect(calls.map((call) => call.cmd)).toEqual(["npm", "npm", "npm", "npx"]);
+		expect(calls[0].args).toEqual(["view", "@decohere/create@0.0.1-dev.127", "version"]);
+		expect(sleeps).toHaveLength(2);
+	});
+
+	it("fails without running npx when npm never serves the version", () => {
+		/** @type {string[]} */
+		const commands = [];
+
+		const result = runCreateLauncherSmoke({
+			createVersion: "0.0.1-dev.127",
+			tmpdir: () => "/tmp",
+			mkdtempSync: (prefix) => `${prefix}abc`,
+			writeFileSync: () => {},
+			spawnSync: (cmd) => {
+				commands.push(cmd);
+				return { status: 1 };
+			},
+			sleep: () => {},
+			attempts: 3,
+			stdio: "pipe",
+		});
+
+		expect(result.status).toBe(1);
+		expect(commands).toEqual(["npm", "npm", "npm"]);
 	});
 
 	it("fails closed without a version", () => {
