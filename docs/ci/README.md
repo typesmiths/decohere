@@ -108,6 +108,25 @@ npm can attach a Trusted Publisher only to a name that exists. When Publish find
 2. By hand instead: `npm publish ./projects/<dir> --access public --tag dev` (drop `--tag` for a stable version), then on npm: package settings, Trusted Publisher, GitHub Actions, with organization `typesmiths`, repository `decohere`, workflow `publish.yml`, environment `npm-publish`, allowed action `npm publish`.
 3. Approve the waiting deployment. The job checks the names exist and Publish continues. If it already failed, run `gh run rerun --failed`.
 
+## Changing npm by hand
+
+CI can only publish: Trusted Publishing doesn't cover `dist-tag` or anything else an owner does on npm. Those run from an owner's machine, on the owner's npm login.
+
+- **Log in through the browser.** `npm whoami` shows whether you're logged in; if not, run `npm login`. The owner does this; agents don't.
+- **Use one OTP code, not access tokens.** Every npm write needs 2FA. With `--otp=<code>` npm uses the code; without it, npm asks you to log in again in the browser for each package. Agents ask the owner for a code and never ask them to create a token.
+- **Run all the packages in one command.** A code expires in about 30 seconds, so go in parallel, not one by one.
+
+To point `latest` at a version on every package:
+
+```bash
+VERSION=<version>   # must already be on npm for every package; check the dev tag
+read -rp "OTP code: " OTP
+printf '%s\n' core http config data data-typeorm workspace devkit testing crucible scribe scribe-pino scribe-console forge flux cli create scaffold ci-tools |
+  xargs -P 18 -I{} npm dist-tag add "@decohere/{}@$VERSION" latest --otp="$OTP"
+```
+
+If some fail because the code expired, run it again with a new code; repeating a package that already moved does no harm. A `+latest: ...` line means that package moved. `npm view` can show the old tag for a minute or so afterwards, so don't take that as a failure or retry because of it; `npm dist-tag add` warning `already set` confirms the move. Then check with `npm view @decohere/<name> dist-tags`.
+
 ## Emergency manual release
 
 Only when CI is unavailable. Needs `npm login` as a member of the `@decohere` org. Publishes npm packages only, no images.

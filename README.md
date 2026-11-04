@@ -33,7 +33,7 @@ pnpm dev
 
 ```bash
 npm init -y && npm pkg set type=module
-npm i -D @decohere/cli@dev
+npm i -D @decohere/cli
 ```
 
 Save this as `app.ts`. Enums, decorators and parameter properties all need more than removing types:
