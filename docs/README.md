@@ -2,6 +2,12 @@
 
 The repo [README](../README.md) is the product landing. This folder is the handbook.
 
+## Why Decohere
+
+The problem it takes on, what it is, and how it compares with NestJS and Nx.
+
+[Read more](why-decohere.md)
+
 ## Architecture
 
 Packages, layering, host decoupling, and how a project is laid out.
