@@ -4,7 +4,7 @@ import { afterEach, expect, it } from "vitest";
 import { UserConfigFactory } from "../../../workspace/src/factories/config.factory.js";
 
 // Each fixture file must exist on disk so vitest marks them as "external" and the
-// module load hook (tests/external-module.setup.ts) can intercept the import and
+// module load hook (vitest.setup.ts) can intercept the import and
 // serve memfs content. One fixture file per test — ESM caches by URL so two tests
 // importing the same path would get stale content.
 const fixtureDir = new URL("../__fixtures__", import.meta.url).pathname;

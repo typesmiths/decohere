@@ -10,7 +10,7 @@ Vitest helpers for testing Decohere code ([ADR 0015](../../docs/adr/0015-core-de
 | `spyOnConstructor` | Spies on a class constructor without losing `design:paramtypes`, so crucible can still inject it ([how-to](../../docs/testing/how-tos/vitest-constructor-spy-with-di.md)) |
 | `flushPromises` | Waits until pending promise callbacks have run |
 
-This repo routes file access to memfs in a Vitest setup file ([`tests/fs.setup.ts`](../../tests/fs.setup.ts)), with `__mocks__/fs.ts` re-exporting memfs:
+This repo routes file access to memfs in a Vitest setup file ([`vitest.setup.ts`](../../vitest.setup.ts)), with `__mocks__/fs.ts` re-exporting memfs:
 
 ```ts
 // vitest setup file

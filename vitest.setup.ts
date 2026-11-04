@@ -1,5 +1,8 @@
+// Vitest setup for every test run (vitest.config.ts): files live in memory (memfs), and
+// import() can load them from there.
 import { registerHooks } from "node:module";
 import { vol } from "memfs";
+import { vi } from "vitest";
 
 // Module load hook: intercept ES module imports and serve content from memfs if present.
 //
@@ -14,7 +17,7 @@ import { vol } from "memfs";
 // - Forge config loading tests (projects/forge/tests/integration/commands/build.integration.spec.ts)
 //   Tests dynamic import of .decohere.js configuration files from memfs
 //
-// For details and patterns, see: kb/module-load-hooks-with-memfs.md
+// For details and patterns, see: docs/testing/how-tos/module-load-hooks-with-memfs.md
 registerHooks({
 	load: (url, context, next) => {
 		try {
@@ -29,4 +32,17 @@ registerHooks({
 		}
 		return next(url, context);
 	},
+});
+
+// node:fs and glob read and write memfs. realFs is the real disk, for the tests that need it.
+export const realFs = await vi.importActual<typeof import("node:fs")>("node:fs");
+
+vi.mock("fs");
+vi.mock("fs/promises");
+vi.mock("node:fs");
+vi.mock("node:fs/promises");
+vi.mock("glob", async () => {
+	const actual = await vi.importActual<typeof import("glob")>("glob");
+	const { withMemfsFsForGlob } = await import("@decohere/testing");
+	return withMemfsFsForGlob(actual);
 });

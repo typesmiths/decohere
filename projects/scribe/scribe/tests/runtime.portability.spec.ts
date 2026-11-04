@@ -5,7 +5,7 @@
  */
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { realFs } from "../../../../tests/fs.setup.js";
+import { realFs } from "../../../../vitest.setup.js";
 
 const packages = [
 	join(import.meta.dirname, "../src"),

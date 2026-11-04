@@ -10,7 +10,7 @@ import "@decohere/scribe-pino";
 import { scribe } from "@decohere/scribe";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
-import { realFs } from "../../../tests/fs.setup.js";
+import { realFs } from "../../../vitest.setup.js";
 import type { App } from "../src/app/app.js";
 import { Builder } from "../src/builder/builder.js";
 import "../src/http/http.extensions.js";
