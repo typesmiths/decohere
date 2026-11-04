@@ -5,43 +5,33 @@
 
 ## Context
 
-Every package had a codename: `nexus`, `crucible`, `cortex`, `protocol`, `codex`, `mesh`, `forge`, `flux`, `scribe`. A newcomer had to learn nine words before reading any code ("crucible" is dependency injection, "cortex" is HTTP), and M7 planned a glossary to translate them. Nothing is published publicly yet, so renaming a package costs nothing now and is a breaking change for every user after 0.1.0.
+Every package had a codename. A newcomer had to learn a word per package before reading any code, and a glossary was planned to translate them. Nothing has had a public release, so a rename is free now and a breaking change for every user after 0.1.0.
 
-Some of those names are products: people use them directly, type them as commands and talk about them. The rest are libraries underneath them that nobody chooses on their own.
+Some of the names are products: people use them directly, type them as commands and talk about them. The rest are libraries underneath that nobody chooses on their own.
 
 ## Decision
 
-- **Products keep their names:** `@decohere/forge` (compiler and build CLI), `@decohere/flux` (JIT runner and hot reload), `@decohere/crucible` (dependency injection) and `@decohere/scribe` with `@decohere/scribe-pino` (logging).
-- **A product** is something people use directly and could use without the rest of Decohere, depending on core for primitives only. Crucible qualifies: every service uses its `@injectable()` / `@inject()`, and from core it takes only the metadata helpers and the container interfaces.
-- **Support libraries are named for what they do:**
-
-  | Was | Is |
-  |---|---|
-  | `@decohere/nexus` | `@decohere/core` |
-  | `@decohere/cortex` | `@decohere/http` |
-  | `@decohere/protocol` | `@decohere/config` |
-  | `@decohere/codex`, `@decohere/codex-typeorm` | `@decohere/data`, `@decohere/data-typeorm` |
-  | `@decohere/mesh` | `@decohere/workspace` |
-
-  Directories follow (`projects/core`, `projects/data/data`, …).
-- **Exported names say what a thing is**, inside a product too. Scribe keeps `scribe` and `ScribeOptions`, since the logger is the product. Crucible's container is a container: `Crucible` → `Container`, `CrucibleBuilder` → `ServiceContainerBuilder` (`ContainerBuilder` is already the interface in core), `CrucibleMeta` → `ContainerMeta`.
-- **New packages get plain names** (`@decohere/devkit` and `@decohere/testing`, [ADR 0015](0015-core-devkit-testing.md)). A new codename needs a product.
+- **Products keep their names:** `@decohere/forge` (compiler and build CLI), `@decohere/flux` (JIT runner and hot reload), `@decohere/crucible` (dependency injection) and `@decohere/scribe` with its adapters `scribe-pino` and `scribe-console` (logging).
+- **A product** is something people use directly and could use without the rest of Decohere, taking only primitives from `core`. Crucible qualifies: every service uses its `@injectable()` / `@inject()`, and from `core` it takes only the metadata helpers and container interfaces.
+- **Support libraries are named for what they do:** `@decohere/core`, `@decohere/http`, `@decohere/config`, `@decohere/data` with `@decohere/data-typeorm`, and `@decohere/workspace`. Directories follow (`projects/core`, `projects/data/data`, …).
+- **Hosting** (`Builder`, `App`, lifecycle, readiness, hosted services) moves from `http` into `core`, not into a new `@decohere/host` package: `core` already holds composition, and `http` depends on it. Hosting there may use only `core`'s container interfaces; Crucible implements them, since Crucible depends on `core`.
+- **Exported names say what a thing is**, inside a product too. Scribe keeps `scribe` and `ScribeOptions`, since the logger is the product. Crucible's container is `Container`, its builder `ServiceContainerBuilder` (`ContainerBuilder` is the interface in `core`), its metadata `ContainerMeta`.
+- **New packages get plain names** (`devkit`, `testing`: [ADR 0015](0015-core-devkit-testing.md)). A new codename needs a product.
 
 Rejected:
 
-- **Dropping every codename, products included.** `forge` and `flux` are commands people type and tools they recognise; `decohere build` would lose that without making anything clearer. Scribe is a logging product with its own adapters.
-- **A plain name for crucible.** `di` and `ioc` are jargon, `container` reads as Docker in a project that ships images, `composition` names the builder and app lifecycle in `core`, and `inject` names one decorator rather than the library.
-- **Keeping the codenames with a glossary.** It documents the cost instead of removing it, and every new package adds a word.
+- **Dropping every codename, products included.** `forge` and `flux` are commands people type and recognise; `decohere build` would lose that without being clearer. Scribe is a logging product with its own adapters.
+- **A plain name for crucible.** `di` and `ioc` are jargon, `container` reads as Docker in a project that ships images, `composition` names the builder and app lifecycle in `core`, and `inject` names one decorator, not the library.
+- **Keeping codenames with a glossary.** It documents the cost instead of removing it, and every new package adds a word.
 
 ## Consequences
 
-- Reading a support library's import tells you what it does (`@decohere/http`, `@decohere/data`).
-- Every renamed package is a new name on npm: each needs a first publish and a Trusted Publisher before CI can publish it, and the old dev versions are deprecated.
-- Code written against the old names (apps generated earlier, Ledger) has to update its imports.
-- The M7 glossary only needs the products.
+- A support library's import says what it does (`@decohere/http`, `@decohere/data`).
+- A new package name on npm needs a first publish and a Trusted Publisher before CI can publish it.
+- A glossary, if any, only needs the products.
 
 ## History
 
 - 2026-10-21: Decided. Crucible stays a product rather than becoming `@decohere/di`.
 - 2026-10-22: The CLI base split out of `core` is named `devkit`, not `tooling`, which read as a dumping ground ([ADR 0015](0015-core-devkit-testing.md)).
-- 2026-11-04: Hosting (`Builder`, `App`, lifecycle, readiness) moves out of `http` into `core`, not a new `@decohere/host` package: `core` already holds composition and `http` depends on it. The table of retired names in docs/architecture is gone; the code and issues use the current names.
+- 2026-11-04: Hosting (`Builder`, `App`, lifecycle, readiness) moves out of `http` into `core`, not a new `@decohere/host` package: `core` already holds composition and `http` depends on it. The retired names are gone from the docs and code, this record included.

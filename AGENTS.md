@@ -4,7 +4,7 @@ TypeScript framework for Node.js backends: a fast SWC compiler (forge), a JIT ru
 
 These are the instructions for every coding agent on this repo ([ADR 0009](docs/adr/0009-agent-instructions-in-agents-md.md)). `.claude/CLAUDE.md` only imports this file; keep agent-specific copies out.
 
-Read before changing code: [architecture](docs/architecture/), [style](docs/style/), [testing](docs/testing/). The plan is the GitHub milestones M0–M9.
+Start at [docs/](docs/README.md): a map of the handbook and where every file goes. Read [architecture](docs/architecture/), [style](docs/style/) and [testing](docs/testing/) before changing code. The plan is the GitHub milestones.
 
 ## Commands
 
@@ -25,12 +25,12 @@ pnpm flux run <file.ts>            # run TypeScript from source
 Each links to the record that says why. Read it before changing the area.
 
 - **Secrets come only from the process environment** ([ADR 0002](docs/adr/0002-secrets-from-the-environment.md)). No package reads a `.env` file on its own; loading one is an explicit `--env-file` flag on a CLI. Never print secret values or commit them.
-- **Keep the product pure of its host** ([architecture §1](docs/architecture/README.md#1-host-decoupling--keep-the-product-pure)). No `process.env.VITEST`, `NODE_ENV === "test"` or `CI` branches in library or domain code, and library modules have no side effects on import.
+- **Keep the product pure of its host** ([architecture §1](docs/architecture/README.md#1-keep-the-product-pure-of-its-host)). No `process.env.VITEST`, `NODE_ENV === "test"` or `CI` branches in library or domain code, and library modules have no side effects on import.
 - **A changed decision updates its ADR in the same PR** ([ADR 0001](docs/adr/0001-record-architecture-decisions.md)): rewrite what no longer holds and add a dated History line, never a quiet edit.
 
 ## Workflow
 
-GitHub issues and milestones are the only tracker (no ClickUp).
+GitHub issues and milestones are the only tracker. The full flow: [contributing](docs/contributing/#how-work-flows).
 
 - One issue → one branch `<type>/<issue#>-<slug>` → one PR whose body says `Closes #N`.
 - PR descriptions follow `.github/pull_request_template.md`: the problem, what changed, how we know it works, in plain language for someone new to the code.

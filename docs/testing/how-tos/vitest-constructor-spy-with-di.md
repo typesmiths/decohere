@@ -1,80 +1,41 @@
-# Asserting DI Constructor Arguments with `spyOnConstructor`
+# Constructor spy under DI
 
-Usage of the container itself: [`@decohere/crucible` README](../../../projects/crucible/README.md).
+To assert what crucible injected into a constructor, a bare `vi.fn` or `vi.spyOn` on the class does not work: crucible reads `design:paramtypes` from `reflect-metadata`, the spy has none, and the constructor gets no arguments. Container usage: [crucible README](../../../projects/crucible/README.md).
 
-## Problem
+## Pattern
 
-When testing Crucible DI wiring you sometimes need to assert **what was injected into a constructor** — not just that the class ran, but that it received the right dependency instance.
+`spyOnConstructor` from `@decohere/testing` returns a `Proxy` that records constructor arguments, builds the real instance, and copies the class's metadata so the container can still resolve it. Register the proxy where the class would go.
 
-Naively spying on a constructor via `vi.spyOn` or `vi.fn` breaks because:
-- The container reads `design:paramtypes` metadata from `reflect-metadata` to resolve deps
-- A bare spy/mock object has no metadata, so the container resolves zero args
-- The constructor is called with `undefined` instead of the real dependency
-
-## Solution — `spyOnConstructor` from `@decohere/testing`
-
-```typescript
+```ts
 import { spyOnConstructor } from "@decohere/testing";
 
-const { spy, Proxy: SpiedService } = spyOnConstructor(MyService);
-```
+it("injects the workspace into the action", async () => {
+	const { spy, Proxy: SpiedAction } = spyOnConstructor(WorkspaceDependentAction);
 
-- Creates a `Proxy` that intercepts `new MyService(...)` calls and records args via `spy`
-- Delegates to `Reflect.construct(MyService, args)` so the real instance is returned
-- Copies all `reflect-metadata` keys from the original class onto the proxy so the container can still resolve dependencies
+	class SpiedModule extends ModuleManifest {
+		public readonly id = "test";
+		public readonly command = TestCommand;
+		public readonly actions = { action: SpiedAction };
+		public override createWorkspace() {
+			return Promise.resolve(new FakeWorkspace());
+		}
+	}
 
-Use `SpiedService` in place of `MyService` wherever the class is registered in the DI container.
+	const mod = ModuleFactory.create(new SpiedModule(), () => {});
+	await mod.command.parseAsync([], { from: "user" });
 
-## When to Use
-
-- Asserting that the DI container wired the correct dependency instance into a constructor
-- Verifying constructor arguments when `@injectable()` + `reflect-metadata` is involved
-
-## Example
-
-```typescript
-it("should inject the workspace into the action constructor", async () => {
-    const { spy: ctorSpy, Proxy: SpiedAction } = spyOnConstructor(WorkspaceDependentAction);
-
-    class SpiedModule extends ModuleManifest {
-        public readonly id = "test";
-        public readonly command = TestCommand;
-        public readonly actions = { action: SpiedAction };
-        public override createWorkspace() {
-            return Promise.resolve(new FakeWorkspace());
-        }
-    }
-
-    const mod = ModuleFactory.create(new SpiedModule(), () => {});
-    await mod.command.parseAsync([], { from: "user" });
-
-    expect(ctorSpy).toHaveBeenCalledWith(expect.any(FakeWorkspace));
+	expect(spy).toHaveBeenCalledWith(expect.any(FakeWorkspace));
 });
 ```
 
-## Simpler Alternative — Prototype Method Spy
+From `projects/cli/tests/module.factory.spec.ts`.
 
-If you only need to verify _what was injected_ (not intercept the constructor itself), spy on a prototype method and read the dependency from `this`:
+## Simpler, when it is enough
 
-```typescript
+If you only need the injected value, spy on a prototype method and read it from the instance:
+
+```ts
 const runSpy = vi.spyOn(MyService.prototype, "run");
-// ... trigger execution ...
-const instance = runSpy.mock.instances[0] as unknown as MyService;
-expect(instance.dependency).toBeInstanceOf(ExpectedDep);
+// ... run the code ...
+expect((runSpy.mock.instances[0] as MyService).dependency).toBeInstanceOf(ExpectedDep);
 ```
-
-Prefer this when constructor interception is not strictly necessary — it requires no proxy setup and no metadata copying.
-
-## Why the Metadata Copy Is Required
-
-`reflect-metadata` stores type info in a `WeakMap` keyed by the **original constructor object**. A `Proxy` is a distinct object, so `Reflect.getMetadata("design:paramtypes", proxy)` returns `undefined`. The container sees no params and calls the constructor with zero arguments.
-
-Copying metadata keys from the original to the proxy bridges this gap:
-
-```typescript
-for (const key of Reflect.getMetadataKeys(Target)) {
-    Reflect.defineMetadata(key, Reflect.getMetadata(key, Target), ProxiedTarget);
-}
-```
-
-This is handled internally by `spyOnConstructor` — you do not need to do it manually.

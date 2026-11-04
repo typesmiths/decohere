@@ -1,60 +1,61 @@
 # Testing
 
-Normative principles first. How-tos under [how-tos/](how-tos/). How to run a file and validate a fix: [../contributing/](../contributing/).
+The rules for tests in this repo. Commands for running them: [contributing](../contributing/). Patterns: [how-tos](#how-tos).
 
 ## Behavior over internals
 
-Prove **what the program does for users**, not that a collaborator was called.
+Test what the program does for its users (files written, HTTP responses, exit codes), not that a collaborator was called.
 
-- Primary use cases first (files, HTTP, exit codes).
-- Unit tests are for **edges the behavior suite cannot see**. They come after, never instead of, the behavior suite.
-- `toHaveBeenCalled` / `vi.mock` belong on those edges.
-- Do not maintain two suites that assert the same behavior.
+- Each concern has one canonical behavior suite (table below). Write it first.
+- Unit tests cover only edges that suite cannot see. That is where `vi.mock` and `toHaveBeenCalled` belong.
+- Never keep two suites that assert the same behavior.
 
 ## Executable behavior before type contracts
 
-Decohere does not make a whole-workspace typecheck the price of building or booting. [Forge](../../projects/forge/README.md) transpiles with SWC and [Flux](../../projects/flux/README.md) runs that output path immediately; typechecking is a separate workflow that can run in the background.
+[Forge](../../projects/forge/README.md) transpiles with SWC and [Flux](../../projects/flux/README.md) runs the output without waiting for a typecheck. A green typecheck does not prove the process starts or a route responds; a test does. So:
 
-Executable tests are the primary evidence that a program functions as intended. Fast unit tests provide inner-loop feedback; behavior and integration suites own user-visible outcomes. A green typecheck proves that declarations satisfy a static contract—it does not prove that the process starts, a route responds, or a use case works.
+1. Run the program and exercise the behavior.
+2. Prove it with the smallest executable test: a behavior suite for user-visible results, a unit for an isolated edge.
+3. Fix types and run `pnpm run typecheck` before review. Type errors are deferred from the inner loop, never accepted.
 
-Work in this order:
-
-1. Build or boot the program and exercise the behavior.
-2. Prove the outcome with the smallest useful executable test: behavior/integration for user-visible results, focused units for isolated edges.
-3. Polish the type contract and run typecheck before review and release.
-
-Type errors are not ignored or accepted release output. They are deferred from the inner run/test loop so they do not block executable feedback. Better surfacing of background type diagnostics is planned.
-
-### Canonical suite ownership
+## Canonical suite ownership
 
 | Concern | Canonical behavior suite | Units only for |
 |---|---|---|
-| scaffolder tree | `projects/scaffold/tests/cli.integration.spec.ts` | model/contract edges |
-| create Docker host | `projects/create/e2e/scaffold-docker.e2e.spec.ts` | `runInBuilder` / argv in `projects/create/tests/runner.spec.ts` |
-| product CLI shape | `projects/cli/tests/product.integration.spec.ts` | per-module forge/flux/create suites |
-| forge CLI | `projects/cli/tests/forge.integration.spec.ts` | action edges CLI cannot see |
-| flux CLI | `projects/cli/tests/flux.integration.spec.ts` | HotReloadServer edges (`projects/flux/tests/hmr.server.spec.ts`) |
-| HTTP | `projects/http/tests/*.integration.spec.ts` | crypto/SSRF/pentest edges |
-| scribe facade | `projects/scribe/scribe/tests/scribe.integration.spec.ts` | env argv helpers, console edge cases |
+| scaffolder tree | `projects/scaffold/tests/cli.integration.spec.ts` | model and contract edges |
+| create Docker host | `projects/create/e2e/scaffold-docker.e2e.spec.ts` | `runInBuilder` and argv in `projects/create/tests/runner.spec.ts` |
+| product CLI shape | `projects/cli/tests/product.integration.spec.ts` | per-module forge, flux and create suites |
+| forge CLI | `projects/cli/tests/forge.integration.spec.ts` | action edges the CLI cannot see |
+| flux CLI | `projects/cli/tests/flux.integration.spec.ts` | HotReloadServer edges in `projects/flux/tests/hmr.server.spec.ts` |
+| HTTP | `projects/http/tests/*.integration.spec.ts` | crypto, SSRF and `*.pentest.spec.ts` edges |
+| scribe facade | `projects/scribe/scribe/tests/scribe.integration.spec.ts` | env helpers, console edge cases |
 | scribe + pino | `projects/scribe/scribe-pino/tests/scribe-pino.integration.spec.ts` | `pinoRecipe.transport` plan shapes, transport guard |
 | scribe + JSON console | `projects/scribe/scribe-console/tests/json-console.adapter.integration.spec.ts` | none |
 
-CLI behavior tests launch as Node does: `argv` shaped like `node node_modules/.bin/<name> …`, in-process, **memfs**.
+CLI behavior suites run in-process against memfs: `RootModule.create([...])`, then `app.run(["forge", "build"])`.
 
-## Where tests run
+## Where tests go and where they run
 
-- `pnpm test` must pass on a fresh clone with no Docker, no network, and no tokens. Use loopback servers, memfs, or IP literals rather than real hosts.
-- A suite that needs a Docker daemon (for example a real Postgres) is named `*.docker.spec.ts`. `pnpm test` skips it; `pnpm test:docker` runs it, and so does CI.
+Projects are defined in the root `vitest.config.ts`.
+
+| File | Place | Run by |
+|---|---|---|
+| `*.spec.ts` | `tests/` beside the package's `src/` | `pnpm test` (project `unit`) |
+| `*.integration.spec.ts` | `tests/`; a behavior suite, same runner | `pnpm test` |
+| `*.docker.spec.ts` | `tests/`; needs a Docker daemon (for example real Postgres) | `pnpm test:docker` (project `docker`), and CI |
+| `*.spec.ts` under `e2e/` | `e2e/` beside `src/`; drives built CLIs or images, real disk | `pnpm run test:e2e` (project `e2e`), and CI |
+| fixtures | `tests/__fixtures__/` (or `e2e/__fixtures__/`) | |
+
+- `pnpm test` must pass on a fresh clone with no Docker, network or tokens. Use loopback servers, memfs or IP literals, not real hosts.
+- `unit` and `docker` load `vitest.setup.ts`, so `fs`, `glob` and `import()` read memfs. Tests stay in memory; the real disk is for what a test can't keep in memory, such as a child process or worker thread ([when, and how](how-tos/module-load-hooks-with-memfs.md)). `e2e` uses the real disk.
 
 ## How-tos
 
-| Article | Description |
+| Article | Use it to |
 |---|---|
-| [Vitest mocking with type safety](how-tos/vitest-mocking-with-type-safety.md) | Minimal dependency mocks |
-| [Vitest constructor spy with Crucible DI](how-tos/vitest-constructor-spy-with-di.md) | Spy on constructors without breaking DI |
-| [Vitest glob automock fail-fast](how-tos/vitest-glob-automock-fail-fast.md) | Safe-by-default glob mocking |
-| [Spying on Scribe loggers](how-tos/spying-on-scribe-loggers.md) | Assert logger calls without fighting pino |
-| [Testing chokidar with memfs](how-tos/testing-chokidar-with-memfs.md) | Watch events against memfs |
-| [Module load hooks with memfs](how-tos/module-load-hooks-with-memfs.md) | Dynamic imports against memfs |
-| [Testing environment variables with decorators](how-tos/testing-environment-variables-with-decorators.md) | Decorator tests with cache busting |
-| [Unit test design principles](how-tos/unit-test-design-principles.md) | Test the code, not the mock |
+| [Files in memory (memfs)](how-tos/module-load-hooks-with-memfs.md) | Work with the default memfs `fs`, `glob` and `import()`, or opt out |
+| [Fail-fast glob mock](how-tos/vitest-glob-automock-fail-fast.md) | Stub `glob` per test in a pure unit |
+| [Mocking a collaborator](how-tos/vitest-mocking-with-type-safety.md) | Mock with real types, and assert your code rather than the mock |
+| [Constructor spy under DI](how-tos/vitest-constructor-spy-with-di.md) | Assert what crucible injected into a constructor |
+| [Asserting Scribe logs](how-tos/spying-on-scribe-loggers.md) | Check what was logged |
+| [Env-dependent decorators](how-tos/testing-environment-variables-with-decorators.md) | Test a decorator that reads the environment at import time |
