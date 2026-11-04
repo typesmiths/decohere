@@ -1,3 +1,4 @@
+import path from "node:path";
 import { InteropError } from "../errors/interop.error.js";
 import { Shell } from "../shell/shell.js";
 import type { PackageManager } from "../types/package-manager.js";
@@ -14,6 +15,15 @@ export class Npm extends Shell implements PackageManager {
 	public readonly name = "npm" as const;
 	protected program: string = "npm";
 
+	/**
+	 * A folder as npm reads it: a relative `dist/release` looks like the GitHub repository
+	 * `dist/release` to npm, so it gets a leading `./`.
+	 */
+	private static folderSpec(directory: string): string {
+		if (path.isAbsolute(directory) || /^\.\.?([/\\]|$)/.test(directory)) return directory;
+		return `./${directory}`;
+	}
+
 	public async publish(directory: string, options: PublishOptions = { channel: "beta" }) {
 		const { cwd, dryRun, skipIfPublished, channel, authToken, otp, provenance } = options;
 		if (directory == null) {
@@ -27,7 +37,7 @@ export class Npm extends Shell implements PackageManager {
 			}
 		}
 
-		const args = [Commands.publish, directory];
+		const args = [Commands.publish, Npm.folderSpec(directory)];
 		let tmpUserConfigPath: string | undefined;
 
 		args.push("--tag", channel ?? "beta");

@@ -6,16 +6,20 @@ import {
 	EnvFileIfExistsOption,
 	EnvFileOption,
 	LogLevelOption,
+	RootDirOption,
 } from "@decohere/devkit/cli";
 import { CommanderError, type ParseOptions } from "commander";
 
 export class RootCommand extends DecohereCommand {
 	readonly #configFile?: string;
+	readonly #rootDir?: string;
 
-	public constructor(modules: ApplicationModule[], configFile?: string) {
+	public constructor(modules: ApplicationModule[], configFile?: string, rootDir?: string) {
 		super();
 		this.#configFile = configFile;
+		this.#rootDir = rootDir;
 		this.addOption(new ConfigFileOption());
+		this.addOption(new RootDirOption());
 		this.addOption(new LogLevelOption());
 		this.addOption(new EnvFileOption());
 		this.addOption(new EnvFileIfExistsOption());
@@ -39,7 +43,10 @@ export class RootCommand extends DecohereCommand {
 		options?: ParseOptions,
 	): Promise<this> {
 		if (argv?.includes("--version") || argv?.includes("-V")) {
-			const workspace = await WorkspaceFactory.create({ configFile: this.#configFile });
+			const workspace = await WorkspaceFactory.create({
+				configFile: this.#configFile,
+				rootDir: this.#rootDir,
+			});
 			const version = (await workspace.getVersion()) ?? "unknown";
 			process.stdout.write(`${version}\n`);
 			throw new CommanderError(0, "commander.version", version);

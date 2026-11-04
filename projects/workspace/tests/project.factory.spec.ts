@@ -1,7 +1,7 @@
-import { ProjectFactory, type WorkspaceOptions } from "@decohere/workspace";
+import { ProjectFactory, WorkspaceDefaults, type WorkspaceOptions } from "@decohere/workspace";
 import { resetMemfs } from "@decohere/testing";
 import { vol } from "memfs";
-import { afterEach, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 const baseOptions: WorkspaceOptions = {
 	rootDir: ".",
@@ -97,4 +97,49 @@ it("excludes package.json nested under another package.json", async () => {
 	const projects = await ProjectFactory.getProjects(config, "debug");
 
 	expect(projects.map((p) => p.name)).toEqual(["ROOT", "STANDALONE"]);
+});
+
+describe("a folder without projects/ (standalone)", () => {
+	const defaults: WorkspaceOptions = { ...WorkspaceDefaults, rootDir: "." };
+
+	it("makes the root package.json the one project, at the root", async () => {
+		vol.fromJSON({
+			"package.json": JSON.stringify({ name: "solo", main: "src/main.ts" }),
+			"src/main.ts": "export {};",
+		});
+
+		const projects = await ProjectFactory.getProjects(defaults, "debug");
+
+		expect(projects.map((p) => [p.name, p.projectDirectory])).toEqual([["solo", "."]]);
+	});
+
+	it("leaves build output, .git and node_modules out of its sources", async () => {
+		vol.fromJSON({
+			"package.json": JSON.stringify({ name: "solo" }),
+			"src/main.ts": "export {};",
+			"dist/debug/src/main.ts": "export {};",
+			".git/hooks/x.ts": "export {};",
+			"node_modules/dep/index.ts": "export {};",
+		});
+
+		const [project] = await ProjectFactory.getProjects(defaults, "debug");
+		const files = (await project?.getAllFiles())?.map((f) =>
+			f.relativePath.replaceAll("\\", "/"),
+		);
+
+		expect(files).toEqual(["src/main.ts"]);
+	});
+
+	it("stays a monorepo, with no projects, when a projects/ folder exists", async () => {
+		vol.fromJSON({ "package.json": JSON.stringify({ name: "root" }), "projects/.keep": "" });
+
+		expect(await ProjectFactory.getProjects(defaults, "debug")).toEqual([]);
+	});
+
+	it("respects an includeProjects of the user's own that finds nothing", async () => {
+		vol.fromJSON({ "package.json": JSON.stringify({ name: "root" }) });
+
+		const custom = { ...defaults, includeProjects: ["packages/**/package.json"] };
+		expect(await ProjectFactory.getProjects(custom, "debug")).toEqual([]);
+	});
 });
