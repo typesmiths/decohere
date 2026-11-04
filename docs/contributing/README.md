@@ -43,9 +43,9 @@ Each entry has a reason to be here. If you add one, add its reason; if the reaso
 |---|---|
 | `projects/` | Every package and its tests. |
 | `docs/` | Architecture, style, testing, contributing, ADRs. |
-| `test/` | Vitest setup files that every test run loads (in-memory `fs`, module load hook). |
+| `tests/` | Vitest setup files that every test run loads (in-memory `fs`, module load hook). |
 | `tools/register.mjs` | Lets Node run this repo's own TypeScript from source. Flux cannot load itself before it is compiled. |
-| `__mocks__/` | Vitest's automatic `fs`, `fs/promises` and `glob` mocks, picked up by `vi.mock` in `test/`. |
+| `__mocks__/` | Vitest's automatic `fs`, `fs/promises` and `glob` mocks, picked up by `vi.mock` in `tests/`. |
 | `.changeset/` | Pending release notes ([Changesets](https://github.com/changesets/changesets)). |
 | `.devcontainer/` | The optional Dev Container. |
 | `.github/` | CI workflows, composite actions, the PR and issue templates, `CONTRIBUTING.md` (points here), `SECURITY.md` (how to report a vulnerability) and `CODE_OF_CONDUCT.md`. GitHub reads all three from this folder. |

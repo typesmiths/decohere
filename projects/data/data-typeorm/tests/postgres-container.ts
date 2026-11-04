@@ -4,7 +4,7 @@ import { createConnection } from "node:net";
 import { Pool } from "pg";
 import { vi } from "vitest";
 
-// test/fs.setup.ts swaps node:fs for memfs; /.dockerenv is on the real disk.
+// tests/fs.setup.ts swaps node:fs for memfs; /.dockerenv is on the real disk.
 const { existsSync } = await vi.importActual<typeof import("node:fs")>("node:fs");
 
 /** A throwaway postgres:16 container for `*.docker.spec.ts` suites. */

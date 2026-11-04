@@ -10,7 +10,7 @@ import { Writable } from "node:stream";
 import { Shell } from "@decohere/devkit/interop";
 import { ConsoleAdapter, scribe } from "@decohere/scribe";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { realFs } from "../../../../test/fs.setup.js";
+import { realFs } from "../../../../tests/fs.setup.js";
 import { PinoAdapter } from "../src/pino.adapater.js";
 
 afterEach(async () => {

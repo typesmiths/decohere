@@ -5,7 +5,7 @@ import { Caching } from "@decohere/core/caching";
 import { resetMemfs } from "@decohere/testing";
 import { vol } from "memfs";
 import { afterEach, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
-import { realFs } from "../../../test/fs.setup.js";
+import { realFs } from "../../../tests/fs.setup.js";
 import { RootModule } from "../src/root.module.js";
 
 const fixtureDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "__fixtures__/hmr");

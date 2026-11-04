@@ -27,7 +27,7 @@ export default defineConfig({
 					include: ["projects/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
 					// *.docker.spec.ts need a Docker daemon: the "docker" project (`pnpm test:docker`).
 					exclude: ["**/node_modules/**", "**/e2e/**", "**/*.docker.spec.ts"],
-					setupFiles: ["test/external-module.setup.ts", "test/fs.setup.ts"],
+					setupFiles: ["tests/external-module.setup.ts", "tests/fs.setup.ts"],
 				},
 			},
 			{
@@ -37,7 +37,7 @@ export default defineConfig({
 					name: "docker",
 					include: ["projects/**/*.docker.spec.ts"],
 					exclude: ["**/node_modules/**"],
-					setupFiles: ["test/external-module.setup.ts", "test/fs.setup.ts"],
+					setupFiles: ["tests/external-module.setup.ts", "tests/fs.setup.ts"],
 					testTimeout: 120_000,
 					hookTimeout: 120_000,
 				},
