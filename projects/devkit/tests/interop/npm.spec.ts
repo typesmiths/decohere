@@ -63,7 +63,7 @@ describe("Npm", () => {
 		expect(run).toHaveBeenCalledWith(
 			expect.objectContaining({ cwd: undefined, env: expect.any(Object) }),
 			"publish",
-			"dist/release/pkg",
+			"./dist/release/pkg",
 			"--tag",
 			"dev",
 			"--dry-run",
@@ -71,6 +71,20 @@ describe("Npm", () => {
 		const env = run.mock.calls[0][0].env as NodeJS.ProcessEnv;
 		expect(env.NODE_AUTH_TOKEN).toBeUndefined();
 		expect(env.NPM_CONFIG_USERCONFIG).toBe("/dev/null");
+	});
+
+	it("publishes a relative folder as a path, not as GitHub shorthand", async () => {
+		// A standalone project's release tree is `dist/release`, which npm would read as the
+		// GitHub repository `dist/release` and try to clone.
+		await new Npm().publish("dist/release", { channel: "dev", dryRun: true });
+		expect(run).toHaveBeenCalledWith(
+			expect.any(Object),
+			"publish",
+			"./dist/release",
+			"--tag",
+			"dev",
+			"--dry-run",
+		);
 	});
 
 	it("skipIfPublished uses ambient npm view (no token on argv)", async () => {
@@ -113,7 +127,7 @@ describe("Npm", () => {
 		expect(run).toHaveBeenCalledWith(
 			expect.objectContaining({ cwd: undefined, env: expect.any(Object) }),
 			"publish",
-			"dist/release/pkg",
+			"./dist/release/pkg",
 			"--tag",
 			"beta",
 			"--dry-run",

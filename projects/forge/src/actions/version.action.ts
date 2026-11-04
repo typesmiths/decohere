@@ -78,9 +78,13 @@ export class Version implements Action<VersionOptions> {
 			(await workspace.getPackageJson()).withVersion(nextVersion.toString()),
 		);
 
+		// Standalone, the project's package.json is the root's: write it once.
+		const projectsToWrite = workspace.isStandalone ? [] : projects;
 		const responses = await Promise.all([
 			this.updatePackageJson(workspace.name, workspace, nextVersion),
-			...projects.map((project) => this.updatePackageJson(project.name, project, nextVersion)),
+			...projectsToWrite.map((project) =>
+				this.updatePackageJson(project.name, project, nextVersion),
+			),
 		]);
 		const failed = responses.filter((r) => !r.succeeded);
 		if (failed.length) {
@@ -88,7 +92,10 @@ export class Version implements Action<VersionOptions> {
 		}
 
 		if (options.commit) {
-			const files = [workspace.packageJsonPath, ...projects.map((p) => p.packageJsonPath)];
+			const files = [
+				workspace.packageJsonPath,
+				...projectsToWrite.map((p) => p.packageJsonPath),
+			];
 			const message = options.message ?? `chore: version packages ${nextVersion}`;
 			this.#logger.info(`Committing: ${message}`);
 			await new Git().commit(message, { files });

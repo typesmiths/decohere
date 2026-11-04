@@ -4,7 +4,7 @@ import type {
 	ResolveFnOutput,
 	ResolveHookContext,
 } from "node:module";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -18,7 +18,8 @@ import { rewriteServeSpecifier } from "./rewrite-serve-specifier.js";
 import { staticImports } from "./static-imports.js";
 import { TranspileDiskCache } from "./transpile-disk-cache.js";
 
-type FileInfo = { project: Project };
+/** A source file flux compiles; `project` is undefined for a file outside every workspace package. */
+type FileInfo = { project?: Project };
 type SwcOptions = ReturnType<SwcTranspiler["createBaseConfig"]>;
 
 export interface SourceModuleLoaderOptions {
@@ -39,8 +40,9 @@ export interface SourceModuleLoaderOptions {
 }
 
 /**
- * Registers Node ESM resolve/load hooks and SWC-transpiles workspace `.ts`
- * on the fly. No file watching and no entry reboot — that belongs to
+ * Registers Node ESM resolve/load hooks and SWC-transpiles TypeScript on the fly: workspace
+ * packages' files with their package's options, and any other source outside `node_modules`
+ * (a script in a plain folder) with Forge's defaults. No file watching and no entry reboot — that belongs to
  * {@link HotReloadServer}.
  */
 @injectable()
@@ -62,8 +64,8 @@ export class SourceModuleLoader {
 	/** Up-front compiles in flight, shared by entries booting at the same time. */
 	private compilingAhead = new Map<string, Promise<string | undefined>>();
 	/** SWC options per project, built on first use and kept until the next `configure()`. */
-	private swcConfigs = new Map<Project, SwcOptions>();
-	private commonJsConfigs = new Map<Project, SwcOptions>();
+	private swcConfigs = new Map<Project | undefined, SwcOptions>();
+	private commonJsConfigs = new Map<Project | undefined, SwcOptions>();
 	private aliasPaths: Record<string, string[]> = {};
 	private aliasBaseUrl = path.resolve(".");
 	private versionFileUrl: (fileUrl: string) => string = (fileUrl) => fileUrl;
@@ -123,7 +125,7 @@ export class SourceModuleLoader {
 					rewriteServeSpecifier({
 						specifier,
 						parentUrl,
-						isWatchedTs: (filePath) => this.fileInfoMap.has(filePath),
+						isWatchedTs: (filePath) => this.sourceInfo(filePath) != null,
 						resolveBare: (bare) =>
 							packageAliases.resolvePath(bare, this.aliasPaths, this.aliasBaseUrl),
 						versionFileUrl: this.versionFileUrl,
@@ -169,6 +171,21 @@ export class SourceModuleLoader {
 		this.fileInfoMap.clear();
 		this.workspace?.[Symbol.dispose]();
 		this.workspace = undefined;
+	}
+
+	/**
+	 * The file as a source flux compiles: a workspace package's file, or any other TypeScript
+	 * source on disk outside `node_modules`, which Node would otherwise only strip of types, failing
+	 * on enums, decorators and parameter properties. Null for everything else.
+	 */
+	private sourceInfo(fullPath: string): FileInfo | null {
+		const fileInfo = this.fileInfoMap.get(fullPath);
+		if (fileInfo != null) return fileInfo;
+		const outsidePackages =
+			sourceExtensions.isSource(fullPath) &&
+			!fullPath.split(/[/\\]/).includes("node_modules") &&
+			existsSync(fullPath);
+		return outsidePackages ? {} : null;
 	}
 
 	private async buildFileInfoMap(buildConfig: string): Promise<Map<string, FileInfo>> {
@@ -221,7 +238,7 @@ export class SourceModuleLoader {
 
 	/** The file's compiled code, from the cache or compiled now; undefined if it isn't a source. */
 	private compiledAhead(fullPath: string): Promise<string | undefined> {
-		const fileInfo = this.fileInfoMap.get(fullPath);
+		const fileInfo = this.sourceInfo(fullPath);
 		if (fileInfo == null) return Promise.resolve(undefined);
 		const cached = this.transpileCache.get(fullPath);
 		if (cached != null) return Promise.resolve(cached);
@@ -251,7 +268,7 @@ export class SourceModuleLoader {
 		const url = rewriteServeSpecifier({
 			specifier,
 			parentUrl,
-			isWatchedTs: (filePath) => this.fileInfoMap.has(filePath),
+			isWatchedTs: (filePath) => this.sourceInfo(filePath) != null,
 			resolveBare: (bare) =>
 				packageAliases.resolvePath(bare, this.aliasPaths, this.aliasBaseUrl),
 			versionFileUrl: (fileUrl) => fileUrl,
@@ -265,7 +282,7 @@ export class SourceModuleLoader {
 		// fileURLToPath, not URL.pathname: decodes %20 and gives Windows paths, so files
 		// whose path has a space still match the workspace's package list.
 		const cleanPath = fileURLToPath(url);
-		const fileInfo = this.fileInfoMap.get(cleanPath);
+		const fileInfo = this.sourceInfo(cleanPath);
 		if (fileInfo == null) return null;
 
 		const format = sourceExtensions.isCommonJs(cleanPath) ? "commonjs" : "module";
@@ -281,7 +298,7 @@ export class SourceModuleLoader {
 	 * Compiles a file for the load hook, through the disk cache. Throws, naming the file,
 	 * when it can't be read or doesn't compile.
 	 */
-	private compileSync(fullPath: string, project: Project): string {
+	private compileSync(fullPath: string, project: Project | undefined): string {
 		const file = new FileEx({ fullPath });
 		const baseConfig = this.swcConfigFor(project, fullPath);
 		let source: string;
@@ -315,7 +332,10 @@ export class SourceModuleLoader {
 	 * synchronously: for small files that is far cheaper than a trip through libuv's thread pool,
 	 * which async SWC needs for the compiles that miss.
 	 */
-	private async compileAsync(fullPath: string, project: Project): Promise<string | undefined> {
+	private async compileAsync(
+		fullPath: string,
+		project: Project | undefined,
+	): Promise<string | undefined> {
 		const file = new FileEx({ fullPath });
 		const baseConfig = this.swcConfigFor(project, fullPath);
 		let source: string;
@@ -347,7 +367,7 @@ export class SourceModuleLoader {
 	 * `resolveFully`: the resolve hook maps them to source files (aliases, `.js` to `.ts`,
 	 * directory indexes), so SWC does not resolve them a second time against the disk.
 	 */
-	private swcConfigFor(project: Project, fullPath: string): SwcOptions {
+	private swcConfigFor(project: Project | undefined, fullPath: string): SwcOptions {
 		const config = this.esModuleConfigFor(project);
 		if (!sourceExtensions.isCommonJs(fullPath)) return config;
 		// `.cts` is CommonJS: Node loads it with `require` semantics, so SWC emits CommonJS.
@@ -359,12 +379,13 @@ export class SourceModuleLoader {
 		return commonJs;
 	}
 
-	private esModuleConfigFor(project: Project): SwcOptions {
+	/** Forge's defaults when there is no project: decorators and their metadata on. */
+	private esModuleConfigFor(project: Project | undefined): SwcOptions {
 		const cached = this.swcConfigs.get(project);
 		if (cached != null) return cached;
 		const base = this.transpiler.createBaseConfig(BuildTargets.es6, {
-			tsConfig: project.getTsConfigSync(),
-			userConfig: project.getSwcConfigSync(),
+			tsConfig: project?.getTsConfigSync(),
+			userConfig: project?.getSwcConfigSync(),
 			aliasPaths: false,
 			workspace: this.workspace,
 		});

@@ -4,7 +4,7 @@ TypeScript framework for Node.js backends: a fast SWC compiler (forge), a JIT ru
 
 These are the instructions for every coding agent on this repo ([ADR 0009](docs/adr/0009-agent-instructions-in-agents-md.md)). `.claude/CLAUDE.md` only imports this file; keep agent-specific copies out.
 
-Read before changing code: [architecture](docs/architecture/), [style](docs/style/), [testing](docs/testing/). The plan is the GitHub milestones M0–M9.
+Read before changing code: [architecture](docs/architecture/), [style](docs/style/), [testing](docs/testing/), and the `README.md` of each package you change: it says how that package behaves, and a change must keep to it or update it in the same PR. The plan is the GitHub milestones M0–M9.
 
 ## Commands
 

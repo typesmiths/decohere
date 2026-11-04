@@ -4,9 +4,11 @@ Workspace and project model for Decohere tooling. Forge and Flux call it to find
 
 ## Workspace layout
 
-A **project** is a directory whose root contains a `package.json`. The workspace package discovers those files with `includeProjects` globs (cwd = the workspace root, usually `process.cwd()`).
+A **project** is a directory whose root contains a `package.json`. The workspace package discovers those files with `includeProjects` globs from the workspace root: the folder the tool runs in. Nothing searches the folders above it; to run from elsewhere, pass `--root-dir <dir>` to `forge` or `flux`.
 
 The workspace root may also have a `package.json`. That file is workspace metadata (name/version). It is **not** a project unless it also matches `includeProjects`.
+
+**Standalone projects.** A folder with a `package.json` and no `projects/` folder, and no `includeProjects` of your own, is one project: its root `package.json` is the package, with its sources at the root (build output, `node_modules` and `.git` excluded). Every tool works on that one package; `forge dependencies sync`, `dependencies report` and `paths` have nothing to do, since there is no other package. Adding a `projects/` folder turns it into a monorepo: move the sources into `projects/<name>/` with their own `package.json`.
 
 ### Defaults
 
@@ -42,7 +44,7 @@ export default {
 
 Per-project settings go under `projects`, keyed by package name: `docker` (image, Dockerfile, tags, build args) and `ui` (the UI project a deployable ships, see [forge](../forge/README.md#shipping-the-ui-with-the-api)).
 
-`--config-file` on `forge` / `flux` selects a different config path. The default filename is still `.decohere.js`.
+`--config-file` on `forge` / `flux` selects a different config path. The default is `.decohere.js` in the workspace root (`--root-dir`, else the current folder).
 
 ### Package aliases
 

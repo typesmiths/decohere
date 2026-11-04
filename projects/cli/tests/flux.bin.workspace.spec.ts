@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 // Flux compiles the files the workspace package discovers. A path with a space never matched the workspace's
-// list, and a run from a package directory discovered from the wrong root, so those files
+// list, and a run from a package directory (given --root-dir) discovered from the wrong root, so those files
 // fell through to Node's type stripping, which can't handle decorators.
 const realFs = await vi.importActual<typeof import("node:fs")>("node:fs");
 const { tmpdir } = await vi.importActual<typeof import("node:os")>("node:os");
@@ -83,8 +83,8 @@ describe("flux run compiles the files the workspace package discovers (real proc
 		expect(result.status).toBe(0);
 	});
 
-	it("run from inside a package directory", () => {
-		const result = fluxRun(join(ws, "projects/app"), "src/main.ts");
+	it("run from inside a package directory, with --root-dir naming the workspace", () => {
+		const result = fluxRun(join(ws, "projects/app"), "src/main.ts", "--root-dir", "../..");
 		expect(result.stderr).not.toContain("Invalid or unexpected token");
 		expect(result.stdout).toContain("hello app hello local");
 		expect(result.status).toBe(0);

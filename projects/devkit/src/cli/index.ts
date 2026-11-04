@@ -27,4 +27,5 @@ export {
 	NoBuildOptions,
 	NoCleanOptions,
 	ProjectOption,
+	RootDirOption,
 } from "./options.js";

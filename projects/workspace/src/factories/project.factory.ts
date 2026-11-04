@@ -2,6 +2,7 @@ import path from "node:path";
 import { type FileEx, io } from "@decohere/core/io";
 import { findFiles } from "@decohere/devkit/io";
 import { merge } from "@decohere/core/objects";
+import { PACKAGE_JSON, PROJECTS_DIR, WorkspaceDefaults } from "../const.js";
 import { WorkspaceConfigurationError } from "../errors.js";
 import { PackageJson } from "../models/package-json.model.js";
 import { Project, type ProjectConfig, type ProjectSeed } from "../models/project.model.js";
@@ -19,11 +20,38 @@ export class ProjectFactory {
 		const packageJsonFiles = ProjectFactory.filterNestedPackageJsonFiles(
 			discoveredPackageJsonFiles,
 		);
+		if (packageJsonFiles.length === 0 && (await ProjectFactory.isStandalone(config))) {
+			return [await ProjectFactory.standaloneProject(config)];
+		}
 		const projects = await Promise.all(
 			packageJsonFiles.map((file) => ProjectFactory.projectFrom(file, config)),
 		);
 
 		return projects.sort((a, b) => a.name.localeCompare(b.name));
+	}
+
+	/**
+	 * A standalone project: no `projects/` folder and no `includeProjects` of the user's own, but
+	 * a root `package.json`. That `package.json` is then the one project, at the root.
+	 */
+	private static async isStandalone(config: WorkspaceOptions): Promise<boolean> {
+		const rootDir = config.rootDir ?? "./";
+		const defaultInclude =
+			JSON.stringify(config.includeProjects) ===
+			JSON.stringify(WorkspaceDefaults.includeProjects);
+		return (
+			defaultInclude &&
+			!(await io.directoryExists(path.join(rootDir, PROJECTS_DIR))) &&
+			(await io.fileExists(path.join(rootDir, PACKAGE_JSON)))
+		);
+	}
+
+	/** The root `package.json` as the one project. Build output and `.git` aren't its sources. */
+	private static async standaloneProject(config: WorkspaceOptions): Promise<ProjectSeed> {
+		const [packageJsonFile] = await findFiles([PACKAGE_JSON], { cwd: config.rootDir ?? "./" });
+		const outDir = (config.outDir ?? WorkspaceDefaults.outDir).replace(/[/\\]+$/, "");
+		const ignore = [...(config.ignore ?? []), `${outDir}/**`, ".git/**"];
+		return ProjectFactory.projectFrom(packageJsonFile as FileEx, { ...config, ignore });
 	}
 
 	private static filterNestedPackageJsonFiles(files: readonly FileEx[]) {

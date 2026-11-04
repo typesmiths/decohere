@@ -30,6 +30,12 @@ export class ConfigFileOption extends Option {
 	}
 }
 
+export class RootDirOption extends Option {
+	public constructor() {
+		super("--root-dir <dir>", "Workspace root (default: the current folder)");
+	}
+}
+
 export class LogLevelOption extends Option {
 	public constructor() {
 		super("--log-level <level>", "Log level (trace, debug, info, warn, error)");

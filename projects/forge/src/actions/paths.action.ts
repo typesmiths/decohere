@@ -34,6 +34,13 @@ export class Paths implements Action<PathsOptions> {
 
 	public async run(options: PathsOptions): Promise<ActionResponse<PathsResponse>> {
 		const file = path.join(this.workspace.rootDir, PATHS_FILE);
+		if (this.workspace.isStandalone) {
+			// One project has no other projects to import from source.
+			this.#logger.info(`Standalone project: no ${PATHS_FILE} needed`);
+			return ActionResponse.Success<PathsResponse>(Paths.name, [
+				{ file, changed: false, succeeded: true },
+			]);
+		}
 		const content = Paths.render(this.workspace);
 		const current = existsSync(file) ? await readFile(file, "utf8") : null;
 		const changed = current !== content;
