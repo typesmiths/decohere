@@ -45,6 +45,8 @@ On `release`, the `release` job then calls `release.yml`, which builds the stabl
 
 Runs when CI succeeds on a **push** to this repository's `main` or `release`; pull request runs and forks are excluded.
 
+CI chooses a dev version once, before its release build: `0.0.1-dev.20261104.512` is the commit's UTC date and CI's run number. Publish reads that version from the build and never works it out again ([ADR 0019](../adr/0019-dev-versions-from-the-ci-run.md)).
+
 1. **guard**: skips docs-only commits, commits that are no longer the branch tip, and commits that already have a `v*` tag.
 2. **verify**: probes npm and GHCR for this version; outputs which steps to skip and which package names are not on npm yet.
 3. **oidc-bootstrap**: only when a name is missing; waits for approval (see [Adding a new npm package](#adding-a-new-npm-package)).
@@ -134,7 +136,7 @@ Only when CI is unavailable. Needs `npm login` as a member of the `@decohere` or
 ```bash
 git checkout main && git pull --tags
 pnpm install
-pnpm forge version --release-type prerelease --channel dev
+pnpm forge version --channel dev --build-number 1000000   # above any CI run that day; add one for a second release
 pnpm forge dependencies --configuration release sync
 pnpm forge build --configuration release
 pnpm forge publish --channel dev --dry-run

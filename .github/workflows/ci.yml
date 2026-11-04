@@ -148,10 +148,6 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Fetch tags for versioning
-        if: github.ref == 'refs/heads/main'
-        run: git fetch --tags --force
-
       - uses: ./.github/actions/setup-node-pnpm
         with:
           configure-git: "${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}"
@@ -181,9 +177,10 @@ jobs:
             dist/coverage/lcov.info
           retention-days: 1
 
-      - name: Compute next dev version from git tags
+      # The one place a dev version is chosen; Publish reads it from this build.
+      - name: Stamp the dev version
         if: github.ref == 'refs/heads/main'
-        run: pnpm forge --log-level info version --release-type prerelease --channel dev
+        run: pnpm forge --log-level info version --channel dev --build-number ${{ github.run_number }}
 
       - name: Sync cross-library dependency versions
         if: github.ref == 'refs/heads/main'
