@@ -1,9 +1,11 @@
 name: CI
-# Pull requests (from this repo and from forks) run the suite before merge; pushes to
-# main and release run it again for Publish and Pages. A fork's run gets no secrets
-# and a read-only token: nothing here needs either.
+# Pull requests (from this repo and from forks) run the suite before merge; the merge
+# queue runs it again on the PR combined with main; pushes to main and release run it
+# again for Publish and Pages. A fork's run gets no secrets and a read-only token:
+# nothing here needs either.
 on:
   pull_request:
+  merge_group:
   push:
     branches: [main, release]
   workflow_dispatch:
@@ -29,7 +31,9 @@ jobs:
         with:
           fetch-depth: 1
 
+      # Queue runs skip the filter and the gate runs everything: what lands on main is tested whole.
       - id: filter
+        if: github.event_name != 'merge_group'
         uses: dorny/paths-filter@v3
         with:
           token: ${{ github.token }}
@@ -38,6 +42,7 @@ jobs:
       - id: gate
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ||
+                "${{ github.event_name }}" == "merge_group" ||
                 "${{ github.ref }}" == "refs/heads/release" ||
                 "${{ steps.filter.outputs.code }}" == "true" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
