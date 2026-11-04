@@ -19,13 +19,33 @@ class Db {
 	}
 }
 
+/**
+ * The test decides when a request is in flight: `arrived` resolves once the handler has it, and
+ * the handler answers when the test calls `release`. A fixed sleep before SIGTERM let a loaded
+ * machine start shutting down before the request arrived, and it got a 503.
+ */
+let slow = gate();
+
+function gate() {
+	let release = () => {};
+	let arrive = () => {};
+	const released = new Promise<void>((resolve) => {
+		release = resolve;
+	});
+	const arrived = new Promise<void>((resolve) => {
+		arrive = resolve;
+	});
+	return { arrive, arrived, release, released };
+}
+
 @Controller({ prefix: "/slow" })
 class SlowController {
 	public constructor(@inject(DbToken) private readonly db: Db) {}
 
 	@Get("/wait")
 	public async slow() {
-		await new Promise((resolve) => setTimeout(resolve, 150));
+		slow.arrive();
+		await slow.released;
 		return { dbClosedDuringRequest: this.db.closed };
 	}
 }
@@ -70,6 +90,7 @@ describe("graceful shutdown on SIGTERM / SIGINT", () => {
 
 	beforeEach(() => {
 		hung = new AbortController();
+		slow = gate();
 	});
 
 	afterEach(async () => {
@@ -84,8 +105,14 @@ describe("graceful shutdown on SIGTERM / SIGINT", () => {
 		const { baseURL, handler } = await startCapturing(app, "SIGTERM");
 
 		const inFlight = axios.get(`${baseURL}/slow/wait`);
-		await new Promise((resolve) => setTimeout(resolve, 30));
+		await slow.arrived;
 		handler("SIGTERM");
+		// Shutdown is under way while the request is still in the handler: the port refuses
+		// new connections before the request is allowed to answer.
+		await vi.waitFor(() =>
+			expect(connect(baseURL)).rejects.toMatchObject({ code: "ECONNREFUSED" }),
+		);
+		slow.release();
 
 		const res = await inFlight;
 		expect(res.status).toBe(200);
