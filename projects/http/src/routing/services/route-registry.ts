@@ -19,8 +19,8 @@ import type {
 	MappedRoute,
 	RouteArg,
 	RouteMetadata,
-} from "../anvil.types.js";
-import { InjectedParts, RouteConfigurationError, type RequestPart } from "../anvil.types.js";
+} from "../http.types.js";
+import { InjectedParts, RouteConfigurationError, type RequestPart } from "../http.types.js";
 import { applyGlobalPrefix, joinRoutePath, normalizePrefix } from "../path.util.js";
 import { BooleanPipe, DatePipe, JsonPipe, NumberPipe, type Pipe } from "../pipes/pipes.js";
 

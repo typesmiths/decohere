@@ -13,7 +13,7 @@ import {
 	RouterToken,
 } from "../const.js";
 import type { OpenApiOptions } from "../openapi/openapi.types.js";
-import type { CorsOptions, HttpProvider } from "../routing/anvil.types.js";
+import type { CorsOptions, HttpProvider } from "../routing/http.types.js";
 import type { ExceptionFilter } from "../routing/filters/exception-filter.js";
 import { ExceptionFilterHost } from "../routing/filters/exception-filter-host.js";
 import { HttpAccessLogMiddleware } from "../routing/middleware/http-access-log.middleware.js";

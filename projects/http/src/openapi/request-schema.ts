@@ -1,5 +1,5 @@
 import { isPrimitiveOrDateType } from "@decohere/core/reflection";
-import { InjectedParts, type MappedRoute, type RouteArg } from "../routing/anvil.types.js";
+import { InjectedParts, type MappedRoute, type RouteArg } from "../routing/http.types.js";
 import type { JsonSchema, OpenApiParameter } from "./openapi.types.js";
 
 /**

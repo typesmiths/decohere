@@ -1,7 +1,7 @@
 import { defineMeta } from "@decohere/core/reflection";
 import { type HTTPMethod, HTTPMethods, MetadataKeys } from "../../const.js";
-import type { RouteMetadata } from "../anvil.types.js";
-import { RouteConfigurationError } from "../anvil.types.js";
+import type { RouteMetadata } from "../http.types.js";
+import { RouteConfigurationError } from "../http.types.js";
 
 export function Get(path?: string) {
 	return routeDecorator(HTTPMethods.GET, path);

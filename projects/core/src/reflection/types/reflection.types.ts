@@ -13,7 +13,6 @@ export type FunctionType = (
 export type ReflectMeta = "paramtypes" | "type";
 
 export const MetaDataOwners = {
-	Hearth: "hearth",
 	Reflect: "design",
 } satisfies Record<string, string>;
 

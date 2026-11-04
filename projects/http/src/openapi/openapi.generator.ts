@@ -1,4 +1,4 @@
-import type { MappedRoute } from "../routing/anvil.types.js";
+import type { MappedRoute } from "../routing/http.types.js";
 import type { RouteRegistry } from "../routing/services/route-registry.js";
 import type { OpenApiDocument, OpenApiOperation, OpenApiOptions } from "./openapi.types.js";
 import { buildRouteRequestSchemas } from "./request-schema.js";

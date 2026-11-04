@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RouteConfigurationError } from "../src/routing/anvil.types.js";
+import { RouteConfigurationError } from "../src/routing/http.types.js";
 import { Argument, Controller, Field, Get } from "../src/routing/index.js";
 import { RouteRegistry } from "../src/routing/services/route-registry.js";
 

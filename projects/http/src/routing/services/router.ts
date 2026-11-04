@@ -13,8 +13,8 @@ import {
 import type { HttpOptions } from "../../http/http.options.js";
 import { validateRequest } from "../../openapi/request-validator.js";
 import { SseResponse } from "../../sse/sse.types.js";
-import type { HttpRequest } from "../anvil.types.js";
-import { RoutingError } from "../anvil.types.js";
+import type { HttpRequest } from "../http.types.js";
+import { RoutingError } from "../http.types.js";
 import { getAuthorizeOptions, isAllowAnonymous } from "../decorators/auth.decorator.js";
 import { composeMiddleware, type Middleware } from "../middleware/middleware.js";
 import { RouteArgumentResolve } from "./route-argument-resolver.js";

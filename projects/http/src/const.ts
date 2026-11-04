@@ -1,7 +1,6 @@
-import type { Metadata } from "./routing/anvil.types.js";
+import type { Metadata } from "./routing/http.types.js";
 
-const Anvil = "anvil";
-const RoutingKey = `${Anvil}:Routing`;
+const RoutingKey = "http:Routing";
 
 export const RouteRegistryToken = Symbol("RouteRegistryToken");
 export const HttpProviderToken = Symbol("HttpProviderToken");

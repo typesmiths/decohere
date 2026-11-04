@@ -1,6 +1,6 @@
 import { Ajv, type ErrorObject, type ValidateFunction } from "ajv";
-import type { HttpRequest, MappedRoute, ValidationIssue } from "../routing/anvil.types.js";
-import { ValidationError } from "../routing/anvil.types.js";
+import type { HttpRequest, MappedRoute, ValidationIssue } from "../routing/http.types.js";
+import { ValidationError } from "../routing/http.types.js";
 import { buildRouteRequestSchemas, pathParamsToSchema } from "./request-schema.js";
 
 export type { ValidationIssue };

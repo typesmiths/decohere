@@ -13,7 +13,7 @@ function normalizePath(filePath) {
 
 /**
  * Extracts the top-level project name from a source path like
- * `/workspace/projects/hearth/src/foo.ts` → `"hearth"`.
+ * `/workspace/projects/core/src/foo.ts` → `"core"`.
  * @param {string} sourcePath
  * @returns {string | undefined}
  */

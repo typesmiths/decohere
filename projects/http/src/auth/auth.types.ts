@@ -53,7 +53,7 @@ export type DiscoveryConfig = {
  */
 export interface IAuthorizationService {
 	authorizeRequest(
-		request: import("../routing/anvil.types.js").HttpRequest,
+		request: import("../routing/http.types.js").HttpRequest,
 		action: string,
 		subject: string,
 	): Promise<Principal>;
@@ -62,7 +62,7 @@ export interface IAuthorizationService {
 	 * Used when auth is enabled but the route has no `@Authorize` metadata.
 	 */
 	authenticateRequest(
-		request: import("../routing/anvil.types.js").HttpRequest,
+		request: import("../routing/http.types.js").HttpRequest,
 	): Promise<Principal>;
 	authorize(principal: Principal, action: string, subject: string): Promise<void>;
 }

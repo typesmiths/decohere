@@ -19,7 +19,7 @@ LH:5
 end_of_record
 `;
 
-const sampleLcovWithLines = `SF:projects/anvil/src/index.ts
+const sampleLcovWithLines = `SF:projects/http/src/index.ts
 DA:1,1
 DA:2,1
 DA:3,0
@@ -61,7 +61,7 @@ describe("parseLcovByProject", () => {
 describe("parseLcovFiles", () => {
 	it("returns per-file coverage with uncovered line numbers", () => {
 		const result = parseLcovFiles(sampleLcovWithLines);
-		const file = result.find((f) => f.sourcePath === "projects/anvil/src/index.ts");
+		const file = result.find((f) => f.sourcePath === "projects/http/src/index.ts");
 		expect(file).toBeDefined();
 		expect(file.totalLines).toBe(5);
 		expect(file.coveredLines).toBe(3);
@@ -70,14 +70,14 @@ describe("parseLcovFiles", () => {
 	});
 
 	it("includes files with 100% coverage", () => {
-		const lcov = `SF:projects/anvil/src/full.ts\nDA:1,1\nDA:2,1\nLF:2\nLH:2\nend_of_record\n`;
+		const lcov = `SF:projects/http/src/full.ts\nDA:1,1\nDA:2,1\nLF:2\nLH:2\nend_of_record\n`;
 		const result = parseLcovFiles(lcov);
 		expect(result).toHaveLength(1);
 		expect(result[0].uncoveredLineNumbers).toEqual([]);
 	});
 
 	it("excludes files with LF:0", () => {
-		const lcov = `SF:projects/anvil/src/empty.ts\nLF:0\nLH:0\nend_of_record\n`;
+		const lcov = `SF:projects/http/src/empty.ts\nLF:0\nLH:0\nend_of_record\n`;
 		const result = parseLcovFiles(lcov);
 		expect(result).toHaveLength(0);
 	});

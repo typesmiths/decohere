@@ -1,7 +1,7 @@
 # 0010. Background work runs as hosted services, stopped before the container
 
 - **Status:** Proposed
-- **Date:** 2026-10-14 · updated 2026-10-21
+- **Date:** 2026-10-14 · updated 2026-11-04
 
 ## Context
 
@@ -14,7 +14,7 @@ Apps need work that runs for the life of the app outside a request: ledger's pos
 - **Warm-up is readiness**: a started service that can't serve yet throws from `check()`, and `GET /ready` answers 503. No separate "starting" state.
 - **Stopping is one path** (`app.dispose()`: stop, SIGTERM/SIGINT, Flux reboot): abort the signal at once (also during a `start()` still running), drain HTTP, await each `stop()` in reverse order (after any running `start()` settles; all run even if one throws), then dispose the container. Services stop while what they use is still open.
 - **The container closes DataSources**: `withTypeOrm` creates a `ManagedDataSource` (with `Symbol.asyncDispose`) and resolves it right after build, so the root container owns it as one of its first instances and closes it last.
-- Lives in `@decohere/http` for now (`src/hosting/`), with `Builder` and `App`; it moves with them to `@decohere/host`.
+- Lives in `@decohere/http` for now (`src/hosting/`), with `Builder` and `App`; it moves with them to `@decohere/core`.
 
 ## Consequences
 
@@ -29,3 +29,4 @@ Apps need work that runs for the life of the app outside a request: ledger's pos
 - 2026-10-14: Decided.
 - 2026-10-21: Same-named hosted service classes no longer collide, since the container keys services by identity ([ADR 0013](0013-container-keys-and-lifetimes.md)).
 - 2026-10-21: Package names updated to the plain names of [ADR 0014](0014-package-names.md). The decision is unchanged.
+- 2026-11-04: `Builder`, `App` and hosted services move to `@decohere/core` rather than a new `@decohere/host` package ([ADR 0014](0014-package-names.md)).

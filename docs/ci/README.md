@@ -169,8 +169,6 @@ Current `@decohere/*` packages under `projects/` (Vitest plugin is `@decohere/fo
 - `@decohere/scaffold`
 - `@decohere/ci-tools`
 
-Retired npm names (`nexus`, `cortex`, `protocol`, `codex`, `mesh`, `terminal`, `anvil`, `hearth`, `forge-vitest`, …) must not appear in new docs. The retired-names table in [docs/architecture](../architecture/README.md#appendix--retired-names) maps them.
-
 ## Building from source
 
 The repo installs no published `@decohere/*` package. `tools/register.mjs` runs the repo's own TypeScript from source (`pnpm forge …`, `pnpm flux …`), and the Vitest configs load the `forgeBuild` plugin from source too. A fresh clone installs without an npm token, a bad publish can't break CI, and deprecating or unpublishing an npm name doesn't affect this repo.

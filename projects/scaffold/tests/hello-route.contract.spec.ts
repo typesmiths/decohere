@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { RouteMetadata } from "../../http/src/routing/anvil.types.js";
+import type { RouteMetadata } from "../../http/src/routing/http.types.js";
 import {
 	Controller,
 	Delete,

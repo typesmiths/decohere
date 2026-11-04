@@ -42,7 +42,7 @@ import {
 	type StartOptions,
 	type StartResponse,
 	type StopResponse,
-} from "../routing/anvil.types.js";
+} from "../routing/http.types.js";
 import {
 	DefaultHttpExceptionFilter,
 	type ExceptionFilterHost,

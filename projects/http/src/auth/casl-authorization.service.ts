@@ -1,6 +1,6 @@
 import type { AnyAbility } from "@casl/ability";
-import type { HttpRequest } from "../routing/anvil.types.js";
-import { ForbiddenError } from "../routing/anvil.types.js";
+import type { HttpRequest } from "../routing/http.types.js";
+import { ForbiddenError } from "../routing/http.types.js";
 import type { IAuthorizationService, Principal } from "./auth.types.js";
 import type { TokenService } from "./token-service.js";
 

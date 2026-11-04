@@ -1,6 +1,6 @@
 import { inject, injectable } from "@decohere/crucible/decorators";
 import { ReadinessServiceToken } from "../const.js";
-import { HttpError } from "../routing/anvil.types.js";
+import { HttpError } from "../routing/http.types.js";
 import { AllowAnonymous, Controller, Get } from "../routing/index.js";
 import { ReadinessService } from "./readiness.service.js";
 

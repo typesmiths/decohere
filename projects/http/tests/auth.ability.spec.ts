@@ -5,7 +5,7 @@ import {
 	defineAbilitiesFor,
 } from "../src/auth/ability.js";
 import { CaslAuthorizationService } from "../src/auth/casl-authorization.service.js";
-import { ForbiddenError } from "../src/routing/anvil.types.js";
+import { ForbiddenError } from "../src/routing/http.types.js";
 
 describe("defineAbilitiesFor", () => {
 	it("grants manage/all for the admin role", async () => {

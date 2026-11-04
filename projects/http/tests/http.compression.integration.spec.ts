@@ -21,7 +21,7 @@ import {
 	Sse,
 	type SseStream,
 } from "../src/index.js";
-import { HttpError } from "../src/routing/anvil.types.js";
+import { HttpError } from "../src/routing/http.types.js";
 import { bootModule } from "../src/testing/index.js";
 import type { Builder } from "../src/builder/builder.js";
 
