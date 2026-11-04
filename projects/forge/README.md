@@ -6,6 +6,8 @@ Build system (SWC). `forge build --configuration debug` rewrites workspace impor
 
 `forge build` transpiles without waiting for a whole-workspace typecheck. Run `forge typecheck` independently (including in the background) and require it before shipping. Why executable tests come before static contracts: [testing principles](../../docs/testing/#executable-behavior-before-type-contracts).
 
+With no `tsconfig.json`, `forge typecheck` reads a project as plain `tsc` would, with decorators on because forge and flux compile them by default. Add a `tsconfig.json` to choose your own options; forge then limits `lib` to ES2022 and turns off `@types` discovery unless it sets them (`types: ["node"]`).
+
 ## Debug path aliases (not `node_modules` links)
 
 Forge debug (`aliasPaths: true`) asks the workspace package for a map of `package.json` `name` → source `main` (`Workspace.getPackageAliases`) and feeds it to SWC as `jsc.paths`. Flux uses the same map in its resolve hook only, and compiles without `jsc.paths` or `resolveFully`, so imports are resolved once.

@@ -36,9 +36,8 @@
     "@decohere/core": "0.0.1-dev.5",
     "@decohere/crucible": "0.0.1-dev.5",
     "@decohere/devkit": "0.0.1-dev.5",
-    "picomatch": "^4.0.4",
-    "rxjs": "^7.8.2",
-    "typescript": "^6.0.3"
+    "get-tsconfig": "^4.14.3",
+    "picomatch": "^4.0.4"
   },
   "devDependencies": {}
 }

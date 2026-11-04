@@ -1,8 +1,7 @@
-import fs from "node:fs";
 import { Tsconfig } from "@decohere/workspace";
 import { resetMemfs } from "@decohere/testing";
 import { vol } from "memfs";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, expect, it } from "vitest";
 import { WorkspaceConfigurationError } from "../../src/errors.js";
 
 afterEach(() => {
@@ -58,51 +57,32 @@ it("should throw when file not found", async () => {
 	await expect(config).rejects.toThrow("TSConfig not found");
 });
 
-it("should report error if extends file not found", async () => {
+it("should throw if the extends file is not found", async () => {
 	vol.fromJSON({
-		"path/to/MOCK.ts": "",
 		"path/tsconfig.json": JSON.stringify({
 			extends: "../MOCK.json",
 		}),
-		"tsconfig.json": "",
 	});
 
-	const config = await Tsconfig.parse("path/tsconfig.json");
-	expect(config.errors).toHaveLength(1);
-	expect(config.errors).toEqual(
-		expect.arrayContaining([
-			expect.objectContaining({
-				messageText: expect.stringMatching(/Cannot read file '.*MOCK\.json'/),
-			}),
-		]),
-	);
+	const config = () => Tsconfig.parse("path/tsconfig.json");
+	await expect(config).rejects.toThrow(WorkspaceConfigurationError);
+	await expect(config).rejects.toThrow(/Error parsing path\/tsconfig\.json.*MOCK\.json/);
 });
 
-it("should not crash when tsconfig is at a relative path with no include patterns", async () => {
-	// The workspace-level tsconfig.json has no include/files, so TypeScript enumerates
-	// files from the basePath. Tsconfig.parse() passes path.dirname(filePath) = "." to
-	// ts.parseJsonConfigFileContent, which TypeScript normalizes internally to "".
-	// On a real filesystem readdirSync("") throws ENOENT; memfs silently resolves it to
-	// CWD, masking the bug. This spy enforces real-filesystem behaviour so the test fails
-	// without the fix (pass an absolute basePath to parseJsonConfigFileContent).
+it("resolves baseUrl and keeps paths from an extended tsconfig, without the TypeScript compiler", async () => {
 	vol.fromJSON({
-		"tsconfig.json": JSON.stringify({
-			compilerOptions: { declaration: true, emitDeclarationOnly: true },
-		}),
+		"/ws/tsconfig.json": JSON.stringify({
+			// A comment and a trailing comma, as tsconfig.json allows.
+			compilerOptions: { baseUrl: ".", paths: { "@ws/lib": ["projects/lib/src/index.ts"] } },
+		})
+			.replace("{", "{ // root\n")
+			.replace(/}$/, ",}"),
+		"/ws/projects/app/tsconfig.json": JSON.stringify({ extends: "../../tsconfig.json" }),
 	});
 
-	const realReaddirSync = fs.readdirSync.bind(fs);
-	vi.spyOn(fs, "readdirSync").mockImplementation((p, ...args) => {
-		if (p === "") {
-			throw Object.assign(new Error("ENOENT: no such file or directory, scandir ''"), {
-				errno: -2,
-				code: "ENOENT",
-				syscall: "scandir",
-				path: "",
-			});
-		}
-		return realReaddirSync(p, ...(args as [any]));
-	});
+	const config = Tsconfig.parseSync("/ws/projects/app/tsconfig.json");
 
-	await expect(Tsconfig.parse("tsconfig.json")).resolves.toBeDefined();
+	expect(config.filePath).toBe("/ws/projects/app/tsconfig.json");
+	expect(config.compilerOptions.baseUrl).toBe("/ws");
+	expect(config.compilerOptions.paths).toEqual({ "@ws/lib": ["projects/lib/src/index.ts"] });
 });

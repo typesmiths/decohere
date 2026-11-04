@@ -40,8 +40,7 @@
     "@decohere/forge": "0.0.1-dev.5",
     "@decohere/scribe": "0.0.1-dev.5",
     "@decohere/workspace": "0.0.1-dev.5",
-    "commander": "^13.1.0",
-    "rxjs": "^7.8.2"
+    "commander": "^13.1.0"
   },
   "devDependencies": {}
 }

@@ -1,5 +1,5 @@
 import type { ProjectFileEvent, Workspace } from "@decohere/workspace";
-import { Subject } from "rxjs";
+import { Subject } from "@decohere/core/system";
 import { describe, expect, it } from "vitest";
 import { IncrementalWatch } from "../../src/services/incremental-watch.js";
 import type { TransformResponse } from "../../src/types/transform-response.model.js";

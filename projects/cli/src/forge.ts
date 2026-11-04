@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./compile-cache.js";
 import "./logger.setup.js";
 import { ForgeModule } from "@decohere/forge";
 import { scribe } from "@decohere/scribe";

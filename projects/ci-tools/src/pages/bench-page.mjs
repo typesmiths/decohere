@@ -8,6 +8,7 @@ import { REGRESSION, STALE_AFTER_DAYS } from "../bench/history.mjs";
 
 const GROUPS = [
 	{ prefix: "flux.serve.", title: "flux serve (real process)" },
+	{ prefix: "flux.run.", title: "flux run (installed CLI, real process)" },
 	{ prefix: "flux.load.", title: "flux load (in process)" },
 	{ prefix: "flux.transpile.", title: "Transpile strategies (SWC only)" },
 	{ prefix: "forge.build.", title: "forge build" },

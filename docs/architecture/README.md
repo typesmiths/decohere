@@ -20,7 +20,7 @@ The repo was sometimes called “Ark”. Use **Decohere** in new prose.
 | `@decohere/scribe-console` | `projects/scribe/scribe-console` | JSON console adapter (Workers, browsers, Deno, Bun, Node) |
 | `@decohere/crucible` | `projects/crucible` | Dependency injection |
 | `@decohere/workspace` | `projects/workspace` | Workspace / project model. Package discovery and aliases — [layout](../../projects/workspace/README.md#workspace-layout). |
-| `@decohere/forge` | `projects/forge` | Build system (SWC); Vitest plugin at `@decohere/forge/vitest` |
+| `@decohere/forge` | `projects/forge` | Build system (SWC); Vitest plugin at `@decohere/forge/vitest`; `@decohere/forge/transpile` compiles one file without loading forge's commands (what flux uses) |
 | `@decohere/flux` | `projects/flux` | In-process HMR for Node ESM |
 | `@decohere/cli` | `projects/cli` | Product CLI host (bins: `decohere`, `forge`, `flux`) |
 | `@decohere/http` | `projects/http` | HTTP/API platform (Fastify, routing, auth) |

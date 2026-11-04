@@ -54,6 +54,7 @@ Update the topic's record **in the same PR as the code**. Rewrite what no longer
 | [0012](0012-workspace-package-resolution.md) | Workspace packages resolve to source from the workspace aliases (entry, exported subpaths, `src/<sub>`; `.ts`/`.tsx`/`.mts`/`.cts`); `forge paths` generates them for `tsc` | Proposed |
 | [0015](0015-core-devkit-testing.md) | `core` is the runtime base (no third-party deps beyond `reflect-metadata`, no side effects on import); the CLI base is `devkit`, test helpers are `testing`, `semver` lives in forge | Proposed |
 | [0017](0017-dependency-manifests-from-imports.md) | `forge dependencies sync` writes each package's dependency lists from its imports; the root owns every version; peers are declared by name in the package's `peerDependencies`; a shipped import of a root devDependency is an error unless it is a peer | Proposed |
+| [0018](0018-flux-run-loads-only-what-running-needs.md) | `flux run` loads only what running a file needs: no TypeScript compiler (tsconfig via get-tsconfig), no rxjs, `@decohere/forge/transpile` not the whole of forge; Node's compile cache on; no bundler yet | Accepted |
 
 ### Data
 
