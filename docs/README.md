@@ -2,6 +2,12 @@
 
 The repo [README](../README.md) is the product landing. This folder is the handbook.
 
+## Getting started
+
+From an empty directory to a deployable API: the CLI, Flux, Forge, and the scaffolder.
+
+[Read more](getting-started.md)
+
 ## Why Decohere
 
 The problem it takes on, what it is, and how it compares with NestJS and Nx.
