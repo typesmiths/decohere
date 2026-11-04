@@ -48,7 +48,7 @@ Each entry has a reason to be here. If you add one, add its reason; if the reaso
 | `__mocks__/` | Vitest's automatic `fs`, `fs/promises` and `glob` mocks, picked up by `vi.mock` in `test/`. |
 | `.changeset/` | Pending release notes ([Changesets](https://github.com/changesets/changesets)). |
 | `.devcontainer/` | The optional Dev Container. |
-| `.github/` | CI workflows, composite actions, the PR and issue templates, `CONTRIBUTING.md` (points here) and `SECURITY.md` (how to report a vulnerability). GitHub reads both from this folder. |
+| `.github/` | CI workflows, composite actions, the PR and issue templates, `CONTRIBUTING.md` (points here), `SECURITY.md` (how to report a vulnerability) and `CODE_OF_CONDUCT.md`. GitHub reads all three from this folder. |
 | `.claude/` | `CLAUDE.md`, which imports `AGENTS.md` for Claude Code, and `settings.json`, the commands it may run without asking. |
 | `.vscode/` | Editor settings and three debug configurations. |
 | `.node-version` | The Node version CI and contributors run (24). `engines.node` in `package.json` is the oldest version the packages support. |
