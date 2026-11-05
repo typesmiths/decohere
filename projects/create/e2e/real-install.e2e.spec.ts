@@ -31,6 +31,20 @@ const PNPM_VERSIONS = ["10.34.6", "12.16.1"];
 const DEVCONTAINER_CLI_VERSION = "0.90.0";
 const FIVE_MINUTES = 300_000;
 
+/**
+ * Runs at the same time as the other groups, with its own steps still in order. Vitest decides
+ * this level by level, so it takes a concurrent suite holding a sequential one.
+ */
+function group(name: string, steps: () => void, options: { skip?: boolean } = {}) {
+	(options.skip ? describe.skip : describe.concurrent)(
+		name,
+		() => {
+			describe.sequential("steps", steps, FIVE_MINUTES);
+		},
+		FIVE_MINUTES,
+	);
+}
+
 const SOURCE = `enum Level {
 	Info = "info",
 }
@@ -78,25 +92,45 @@ describe.skipIf(!registry || !version)(
 			expect(result.status, result.output).toBe(0);
 		}
 
-		/** Installs a pnpm of its own, so the one on this machine doesn't decide the result. */
-		async function installPnpm(pnpmVersion: string): Promise<string> {
-			const tool = join(root, `pnpm-${pnpmVersion}`);
-			if (!existsSync(tool)) {
-				mkdirSync(tool);
-				expectOk(
-					await run(
-						"npm",
-						["i", "--no-audit", "--no-fund", "--prefix", tool, `pnpm@${pnpmVersion}`],
-						root,
-					),
-				);
+		const pnpmInstalls = new Map<string, Promise<string>>();
+
+		/**
+		 * Installs a pnpm of its own, so the one on this machine doesn't decide the result. Groups
+		 * running at once share the install.
+		 */
+		function installPnpm(pnpmVersion: string): Promise<string> {
+			let install = pnpmInstalls.get(pnpmVersion);
+			if (install === undefined) {
+				install = (async () => {
+					const tool = join(root, `pnpm-${pnpmVersion}`);
+					mkdirSync(tool);
+					expectOk(
+						await run(
+							"npm",
+							["i", "--no-audit", "--no-fund", "--prefix", tool, `pnpm@${pnpmVersion}`],
+							root,
+						),
+					);
+					return join(tool, "node_modules/.bin");
+				})();
+				pnpmInstalls.set(pnpmVersion, install);
 			}
-			return join(tool, "node_modules/.bin");
+			return install;
 		}
 
 		beforeAll(async () => {
 			writeFileSync(userConfig, `registry=${registry}\n`);
-		});
+			if (containerRegistry) {
+				// Two Dev Container groups share this. npx can collide filling its cache at the same time.
+				expectOk(
+					await run(
+						"npx",
+						["-y", `@devcontainers/cli@${DEVCONTAINER_CLI_VERSION}`, "--version"],
+						root,
+					),
+				);
+			}
+		}, FIVE_MINUTES);
 
 		afterAll(async () => {
 			rmSync(root, { recursive: true, force: true });
@@ -149,9 +183,8 @@ describe.skipIf(!registry || !version)(
 			});
 		});
 
-		describe.each(PNPM_VERSIONS)(
-			"the generated app on pnpm %s",
-			async (pnpmVersion) => {
+		for (const pnpmVersion of PNPM_VERSIONS) {
+			group(`the generated app on pnpm ${pnpmVersion}`, () => {
 				const dir = join(root, `app-${pnpmVersion}`);
 				let path: string;
 				let pnpm: string;
@@ -190,12 +223,11 @@ describe.skipIf(!registry || !version)(
 						if (server.pid != null) process.kill(-server.pid, "SIGTERM");
 					}
 				});
-			},
-			FIVE_MINUTES,
-		);
+			});
+		}
 
 		// Inside a container, the registry is reached through the Docker host.
-		describe.skipIf(!containerRegistry)(
+		group(
 			"the generated Dev Container",
 			() => {
 				const dir = join(root, "devcontainer-app");
@@ -251,11 +283,11 @@ describe.skipIf(!registry || !version)(
 					},
 				);
 			},
-			FIVE_MINUTES,
+			{ skip: !containerRegistry },
 		);
 
 		// Adds its own Dockerfile layer, a Postgres service, and roles the app creates when it starts.
-		describe.skipIf(!containerRegistry)(
+		group(
 			"the generated Dev Container with Postgres",
 			() => {
 				const dir = join(root, "shop");
@@ -335,67 +367,63 @@ exit 1`),
 					);
 				});
 			},
-			FIVE_MINUTES,
+			{ skip: !containerRegistry },
 		);
 
 		// The steps in docs/getting-started.md.
-		describe(
-			"the CLI installed in an empty folder",
-			() => {
-				it("works with npm", async () => {
-					const dir = join(root, "npm-steps");
-					mkdirSync(dir);
-					writeFileSync(join(dir, "app.ts"), SOURCE);
+		group("the CLI installed in an empty folder", () => {
+			it("works with npm", async () => {
+				const dir = join(root, "npm-steps");
+				mkdirSync(dir);
+				writeFileSync(join(dir, "app.ts"), SOURCE);
 
-					expectOk(await run("npm", ["init", "-y"], dir));
-					expectOk(await run("npm", ["pkg", "set", "type=module"], dir));
-					expectOk(await run("npm", ["i", "-D", `@decohere/cli@${version}`], dir));
+				expectOk(await run("npm", ["init", "-y"], dir));
+				expectOk(await run("npm", ["pkg", "set", "type=module"], dir));
+				expectOk(await run("npm", ["i", "-D", `@decohere/cli@${version}`], dir));
 
-					const flux = await run("npx", ["flux", "run", "app.ts"], dir);
-					expectOk(flux);
-					expect(flux.output).toContain("[info] Hello, Ada!");
-					expectOk(await run("npx", ["forge", "typecheck"], dir));
-					expectOk(await run("npx", ["forge", "build"], dir));
-				});
+				const flux = await run("npx", ["flux", "run", "app.ts"], dir);
+				expectOk(flux);
+				expect(flux.output).toContain("[info] Hello, Ada!");
+				expectOk(await run("npx", ["forge", "typecheck"], dir));
+				expectOk(await run("npx", ["forge", "build"], dir));
+			});
 
-				it("is ESM only: require() gets Node's normal answer, not a crash", async () => {
-					const dir = join(root, "require-steps");
-					mkdirSync(dir);
-					expectOk(await run("npm", ["init", "-y"], dir));
-					expectOk(await run("npm", ["i", `@decohere/workspace@${version}`], dir));
-					writeFileSync(join(dir, "load.cjs"), 'require("@decohere/workspace");\n');
+			it("is ESM only: require() gets Node's normal answer, not a crash", async () => {
+				const dir = join(root, "require-steps");
+				mkdirSync(dir);
+				expectOk(await run("npm", ["init", "-y"], dir));
+				expectOk(await run("npm", ["i", `@decohere/workspace@${version}`], dir));
+				writeFileSync(join(dir, "load.cjs"), 'require("@decohere/workspace");\n');
 
-					const result = await run("node", ["load.cjs"], dir);
+				const result = await run("node", ["load.cjs"], dir);
 
-					expect(result.status).not.toBe(0);
-					expect(result.output).toContain("ERR_PACKAGE_PATH_NOT_EXPORTED");
-				});
+				expect(result.status).not.toBe(0);
+				expect(result.output).toContain("ERR_PACKAGE_PATH_NOT_EXPORTED");
+			});
 
-				it.each(PNPM_VERSIONS)("works with pnpm %s and its flag", async (pnpmVersion) => {
-					const bin = await installPnpm(pnpmVersion);
-					const pnpm = join(bin, "pnpm");
-					const dir = join(root, `pnpm-steps-${pnpmVersion}`);
-					mkdirSync(dir);
-					writeFileSync(join(dir, "app.ts"), SOURCE);
-					const extraEnv = { PATH: `${bin}:${process.env.PATH}` };
+			it.each(PNPM_VERSIONS)("works with pnpm %s and its flag", async (pnpmVersion) => {
+				const bin = await installPnpm(pnpmVersion);
+				const pnpm = join(bin, "pnpm");
+				const dir = join(root, `pnpm-steps-${pnpmVersion}`);
+				mkdirSync(dir);
+				writeFileSync(join(dir, "app.ts"), SOURCE);
+				const extraEnv = { PATH: `${bin}:${process.env.PATH}` };
 
-					expectOk(await run(pnpm, ["init"], dir, extraEnv));
-					expectOk(
-						await run(
-							pnpm,
-							["add", "-D", `@decohere/cli@${version}`, "--allow-build=@swc/core"],
-							dir,
-							extraEnv,
-						),
-					);
+				expectOk(await run(pnpm, ["init"], dir, extraEnv));
+				expectOk(
+					await run(
+						pnpm,
+						["add", "-D", `@decohere/cli@${version}`, "--allow-build=@swc/core"],
+						dir,
+						extraEnv,
+					),
+				);
 
-					const flux = await run(pnpm, ["exec", "flux", "run", "app.ts"], dir, extraEnv);
-					expectOk(flux);
-					expect(flux.output).toContain("[info] Hello, Ada!");
-				});
-			},
-			FIVE_MINUTES,
-		);
+				const flux = await run(pnpm, ["exec", "flux", "run", "app.ts"], dir, extraEnv);
+				expectOk(flux);
+				expect(flux.output).toContain("[info] Hello, Ada!");
+			});
+		});
 	},
 	FIVE_MINUTES,
 );

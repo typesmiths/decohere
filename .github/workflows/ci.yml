@@ -133,9 +133,9 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  # Two groups side by side, because the unit tests are what a PR waits for longest.
+  # Three groups side by side, because the unit tests are what a PR waits for longest.
   test:
-    name: test (${{ matrix.shard }}/2)
+    name: test (${{ matrix.shard }}/3)
     needs: [changes]
     if: >
       needs.changes.outputs.run == 'true' &&
@@ -147,7 +147,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -156,7 +156,7 @@ jobs:
       - uses: ./.github/actions/setup-node-pnpm
 
       - name: Run unit tests
-        run: pnpm test --shard=${{ matrix.shard }}/2
+        run: pnpm test --shard=${{ matrix.shard }}/3
 
   # Enforces the thresholds on main. On release it also feeds the Pages badges.
   coverage:

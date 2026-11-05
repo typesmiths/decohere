@@ -61,7 +61,7 @@ flowchart LR
 `changes` decides whether to run the suite; these jobs run and `ci` fails if any that ran didn't pass:
 
 - **lint/typecheck**: `lint:check`, `typecheck`, actionlint, a check for packages not on npm yet, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
-- **test (1/2, 2/2)**: unit tests split across two jobs, on everything except `main` and `release`.
+- **test (1/3, 2/3, 3/3)**: unit tests split across three jobs, on everything except `main` and `release`.
 - **coverage** (`main` and `release`): the unit tests with coverage thresholds. On `release` it uploads coverage for Pages.
 - **test-docker**: Docker-backed tests. On `main`, `release` and manual runs, and on a PR that changes data code.
 - **build** (`main` and manual runs): stamps the dev version, syncs dependency versions and uploads the release build as `forge-release-beta-<run>`.
@@ -80,9 +80,10 @@ CI chooses a dev version once, before its release build: `0.0.1-dev.20261104.512
 
 1. **guard**: skips docs-only commits, commits that are no longer the branch tip, and commits that already have a `v*` tag.
 2. **verify**: probes npm and GHCR for this version and outputs which steps to skip. It fails if a package name isn't on npm yet, which the merge queue should already have stopped.
-3. **npm**: `forge publish --channel dev` from `main`, `--channel latest` from `release`, over OIDC. Skipped if the version is already on npm.
-4. **docker**: the only job with `packages: write`. Builds and pushes the `create` and `devcontainer` images (plus `:latest` from `release`), then runs `npx @decohere/create@<version> --help`, first waiting for npm to serve the new version.
-5. **tag**: `forge tag --prefix v --push`.
+3. **npm**: `forge publish --channel dev` from `main`, `--channel latest` from `release`, over OIDC. Skipped if the version is already on npm. Runs alongside **docker**.
+4. **docker**: the only job with `packages: write`. Builds and pushes the `create` and `devcontainer` images (plus `:latest` from `release`).
+5. **smoke**: after both, runs `npx @decohere/create@<version> --help`, first waiting for npm to serve the new version.
+6. **tag**: `forge tag --prefix v --push`.
 
 A `v*` tag means that commit fully shipped. If any step fails there is no tag, so re-running Publish is safe: npm and Docker each skip what is already published.
 

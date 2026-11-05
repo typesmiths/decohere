@@ -183,12 +183,9 @@ jobs:
         run: echo "skip_npm=true — forge publish not run"
 
   docker:
-    needs: [guard, verify, npm]
-    if: >
-      always() &&
-      needs.guard.outputs.should_publish == 'true' &&
-      needs.verify.result == 'success' &&
-      needs.npm.result == 'success'
+    # Alongside npm: the images unpack a local tarball, so they don't need the packages published.
+    needs: [guard, verify]
+    if: needs.guard.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # The only job anywhere that may push images: it runs after CI passes on main/release.
@@ -251,18 +248,32 @@ jobs:
           FORGE_DOCKER_BUILD_ARGS_JSON: ${{ format('{{"CREATE_VERSION":"{0}"}}', needs.verify.outputs.create_version) }}
           FORGE_DOCKER_EXTRA_TAGS_JSON: ${{ needs.guard.outputs.channel == 'latest' && needs.verify.outputs.repository != '' && format('["{0}:latest","{1}:latest"]', needs.verify.outputs.repository, needs.verify.outputs.devcontainer_repository) || '[]' }}
 
+  # Mostly waits for npm to serve the new version, so it needs no install of its own.
+  smoke:
+    needs: [guard, verify, npm, docker]
+    if: needs.guard.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
       - name: Smoke npm create launcher against the shipped image
         env:
           CREATE_VERSION: ${{ needs.verify.outputs.create_version }}
         run: node projects/ci-tools/src/github/smoke-create-launcher.mjs
 
   tag:
-    needs: [guard, verify, docker]
-    if: >
-      always() &&
-      needs.guard.outputs.should_publish == 'true' &&
-      needs.verify.result == 'success' &&
-      needs.docker.result == 'success'
+    needs: [guard, verify, smoke]
+    if: needs.guard.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
