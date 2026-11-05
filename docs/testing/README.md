@@ -18,6 +18,10 @@ Test what the program does for its users (files written, HTTP responses, exit co
 2. Prove it with the smallest executable test: a behavior suite for user-visible results, a unit for an isolated edge.
 3. Fix types and run `pnpm run typecheck` before review. Type errors are deferred from the inner loop, never accepted.
 
+## When `main` catches what a PR didn't
+
+`verify-release` on `main` is the slowest check, and a failure there has already merged. When it catches a bug, fix it, then add a test at the cheapest level that could have caught it. If no cheaper test can, say why in the PR.
+
 ## Canonical suite ownership
 
 | Concern | Canonical behavior suite | Units only for |
