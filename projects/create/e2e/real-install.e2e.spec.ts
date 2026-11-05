@@ -206,7 +206,18 @@ describe.skipIf(!registry || !version)(
 				});
 
 				it("builds, starts and installs the app", () => {
-					expectOk(devcontainer("up", "--workspace-folder", dir));
+					// Behave like a machine whose user ID matches the image's node user. On any other ID the tool
+					// remaps that user, and the node_modules volume keeps the old owner.
+					expectOk(run("chmod", ["-R", "a+rwX", dir], root));
+					expectOk(
+						devcontainer(
+							"up",
+							"--workspace-folder",
+							dir,
+							"--update-remote-user-uid-default",
+							"off",
+						),
+					);
 				});
 
 				it.each(["typecheck", "build", "test", "lint:check"])(
