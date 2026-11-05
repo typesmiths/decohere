@@ -322,6 +322,24 @@ describe("scaffolder writes a webapi project", () => {
 		expect(workspace).toContain("esbuild: false");
 	});
 
+	// The base image ends as a non-root user, and a build argument doesn't carry over from it, so
+	// the app's own layers failed with "Permission denied" and the container never built.
+	it("builds the Dev Container's own layers as root, then hands back to the node user", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+
+		const lines = readFileSync("/my-app/.devcontainer/Dockerfile", "utf8")
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean);
+		const ownership = lines.findIndex((line) => line.includes("/my-app/node_modules"));
+
+		expect(lines[0]).toMatch(/^FROM /);
+		expect(lines).toContain("ARG USERNAME=node");
+		expect(ownership).toBeGreaterThan(lines.indexOf("USER root"));
+		expect(lines.indexOf("USER root")).toBeGreaterThan(0);
+		expect(lines.at(-1)).toBe("USER ${USERNAME}");
+	});
+
 	it("writes files for: webapi -d my-app (npx / direct bin)", async () => {
 		await runCliAsNodeBin(["create", "webapi", "-d", "my-app", ...NON_INTERACTIVE]);
 		expectWebapiTree("/my-app");
