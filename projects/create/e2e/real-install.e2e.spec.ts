@@ -271,8 +271,11 @@ describe.skipIf(!registry || !version)(
 							run("docker", ["exec", "-u", "root", id, "chmod", "-R", "a+rwX", "/shop"], root),
 						);
 					}
-					expectOk(run("docker", ["compose", "-f", compose, "down", "-v"], root));
-				});
+					// No need to wait for them to stop cleanly.
+					expectOk(
+						run("docker", ["compose", "-f", compose, "down", "-v", "--timeout", "0"], root),
+					);
+				}, FIVE_MINUTES);
 
 				it("builds, starts and installs the app", () => {
 					// The same user ID workaround as the Dev Container without a database.
