@@ -45,6 +45,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 | [0014](0014-package-names.md) | Products keep their names (forge, flux, crucible, scribe); support libraries are named for what they do; hosting moves into `core` | Proposed |
 | [0019](0019-dev-versions-from-the-ci-run.md) | Dev versions come from the CI run, chosen once in CI; Publish reads them from the build; tags only record what shipped | Accepted |
 | [0020](0020-test-the-real-install-before-publishing.md) | `main` tests the real install from a temporary registry before publishing; PRs run the quicker checks | Accepted |
+| [0021](0021-esm-only-packages.md) | Published packages are ESM only; forge's default release build makes ESM and types |
 
 ### Build and packaging
 

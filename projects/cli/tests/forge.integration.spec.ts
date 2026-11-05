@@ -134,7 +134,7 @@ describe("forge build", () => {
 		expect(fileExists("/dist/release")).toBe(false);
 	});
 
-	it("emits output under dist/release/ with multiple targets when --configuration release", async () => {
+	it("emits ESM and no CommonJS under dist/release/ when --configuration release", async () => {
 		vol.fromJSON(projectFiles);
 
 		const app = await RootModule.create([ForgeModule]);
@@ -143,7 +143,7 @@ describe("forge build", () => {
 		expect(response.build?.succeeded).toBe(true);
 		// Release config (pack=true): each target gets its own sub-directory
 		expect(fileExists("/dist/release/projects/lib1/es6/src/index.js")).toBe(true);
-		expect(fileExists("/dist/release/projects/lib1/commonjs/src/index.js")).toBe(true);
+		expect(fileExists("/dist/release/projects/lib1/commonjs")).toBe(false);
 		// Debug output must NOT be produced
 		expect(fileExists("/dist/debug")).toBe(false);
 	});
@@ -159,9 +159,6 @@ describe("forge build", () => {
 
 		const read = (p: string) => vol.readFileSync(p, "utf8") as string;
 		expect(read("/dist/release/projects/lib1/es6/src/index.js")).not.toContain(
-			"sourceMappingURL",
-		);
-		expect(read("/dist/release/projects/lib1/commonjs/src/index.js")).not.toContain(
 			"sourceMappingURL",
 		);
 		expect(read("/dist/debug/projects/lib1/src/index.js")).toContain("sourceMappingURL");

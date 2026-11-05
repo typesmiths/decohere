@@ -25,8 +25,7 @@
   "exports": {
     ".": {
       "types": "./types/src/index.d.ts",
-      "import": "./es6/src/index.js",
-      "require": "./commonjs/src/index.js"
+      "import": "./es6/src/index.js"
     }
   },
   "scripts": {

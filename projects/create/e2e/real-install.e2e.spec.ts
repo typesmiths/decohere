@@ -358,6 +358,19 @@ exit 1`),
 					expectOk(await run("npx", ["forge", "build"], dir));
 				});
 
+				it("is ESM only: require() gets Node's normal answer, not a crash", async () => {
+					const dir = join(root, "require-steps");
+					mkdirSync(dir);
+					expectOk(await run("npm", ["init", "-y"], dir));
+					expectOk(await run("npm", ["i", `@decohere/workspace@${version}`], dir));
+					writeFileSync(join(dir, "load.cjs"), 'require("@decohere/workspace");\n');
+
+					const result = await run("node", ["load.cjs"], dir);
+
+					expect(result.status).not.toBe(0);
+					expect(result.output).toContain("ERR_PACKAGE_PATH_NOT_EXPORTED");
+				});
+
 				it.each(PNPM_VERSIONS)("works with pnpm %s and its flag", async (pnpmVersion) => {
 					const bin = await installPnpm(pnpmVersion);
 					const pnpm = join(bin, "pnpm");

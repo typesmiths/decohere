@@ -49,7 +49,7 @@ In CI, use [`bitwarden/sm-action`](https://github.com/bitwarden/sm-action); in p
 
 ## Publish a TypeScript package to npm
 
-Build a package into ESM, CommonJS and type declarations, then publish that build.
+Build a package into ESM and type declarations, then publish that build.
 
 The default [workspace](../../projects/workspace/README.md) layout finds packages under `projects/`:
 
@@ -72,8 +72,7 @@ Point the package's `exports` at the layout [Forge](../../projects/forge/README.
   "exports": {
     ".": {
       "types": "./types/src/index.d.ts",
-      "import": "./es6/src/index.js",
-      "require": "./commonjs/src/index.js"
+      "import": "./es6/src/index.js"
     }
   }
 }

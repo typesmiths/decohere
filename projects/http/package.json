@@ -27,28 +27,23 @@
   "exports": {
     ".": {
       "types": "./types/src/index.d.ts",
-      "import": "./es6/src/index.js",
-      "require": "./commonjs/src/index.js"
+      "import": "./es6/src/index.js"
     },
     "./providers": {
       "types": "./types/src/providers/index.d.ts",
-      "import": "./es6/src/providers/index.js",
-      "require": "./commonjs/src/providers/index.js"
+      "import": "./es6/src/providers/index.js"
     },
     "./auth": {
       "types": "./types/src/auth/auth.extensions.d.ts",
-      "import": "./es6/src/auth/auth.extensions.js",
-      "require": "./commonjs/src/auth/auth.extensions.js"
+      "import": "./es6/src/auth/auth.extensions.js"
     },
     "./testing": {
       "types": "./types/src/testing/index.d.ts",
-      "import": "./es6/src/testing/index.js",
-      "require": "./commonjs/src/testing/index.js"
+      "import": "./es6/src/testing/index.js"
     },
     "./http": {
       "types": "./types/src/http/index.d.ts",
-      "import": "./es6/src/http/index.js",
-      "require": "./commonjs/src/http/index.js"
+      "import": "./es6/src/http/index.js"
     }
   },
   "scripts": {
