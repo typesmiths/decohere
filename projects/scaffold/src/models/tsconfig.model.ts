@@ -18,6 +18,8 @@ export class TsConfig implements KeyedModel {
 							skipLibCheck: true,
 							experimentalDecorators: true,
 							emitDecoratorMetadata: true,
+							// TypeScript 6 doesn't pick up @types packages on its own.
+							types: ["node"],
 						},
 					},
 					null,
