@@ -50,7 +50,11 @@ if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]
 	for (const dir of packages) {
 		const result = spawnSync("npm", ["publish", dir, "--tag", "dev"], {
 			stdio: ["ignore", "inherit", "inherit"],
-			env: { ...process.env, NPM_CONFIG_REGISTRY: registry, NPM_CONFIG_USERCONFIG: userConfig },
+			env: {
+				...process.env,
+				NPM_CONFIG_REGISTRY: registry,
+				NPM_CONFIG_USERCONFIG: userConfig,
+			},
 		});
 		if (result.status !== 0) {
 			console.error(`Publishing ${dir} failed`);
