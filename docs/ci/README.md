@@ -60,7 +60,7 @@ flowchart LR
 
 `changes` decides whether to run the suite; these jobs run and `ci` fails if any that ran didn't pass:
 
-- **lint/typecheck**: `lint:check`, `typecheck`, actionlint, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
+- **lint/typecheck**: `lint:check`, `typecheck`, actionlint, a check for packages not on npm yet, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
 - **test (1/2, 2/2)**: unit tests split across two jobs, on everything except `main` and `release`.
 - **coverage** (`main` and `release`): the unit tests with coverage thresholds. On `release` it uploads coverage for Pages.
 - **test-docker**: Docker-backed tests. On `main`, `release` and manual runs, and on a PR that changes data code.
@@ -79,11 +79,10 @@ Runs when CI succeeds on a **push** to this repository's `main` or `release`; pu
 CI chooses a dev version once, before its release build: `0.0.1-dev.20261104.512` is the commit's UTC date and CI's run number. Publish reads that version from the build and never works it out again ([ADR 0019](../adr/0019-dev-versions-from-the-ci-run.md)).
 
 1. **guard**: skips docs-only commits, commits that are no longer the branch tip, and commits that already have a `v*` tag.
-2. **verify**: probes npm and GHCR for this version; outputs which steps to skip and which package names are not on npm yet.
-3. **oidc-bootstrap**: only when a name is missing; waits for approval (see [Adding a new npm package](#adding-a-new-npm-package)).
-4. **npm**: `forge publish --channel dev` from `main`, `--channel latest` from `release`, over OIDC. Skipped if the version is already on npm.
-5. **docker**: the only job with `packages: write`. Builds and pushes the `create` and `devcontainer` images (plus `:latest` from `release`), then runs `npx @decohere/create@<version> --help`, first waiting for npm to serve the new version.
-6. **tag**: `forge tag --prefix v --push`.
+2. **verify**: probes npm and GHCR for this version and outputs which steps to skip. It fails if a package name isn't on npm yet, which the merge queue should already have stopped.
+3. **npm**: `forge publish --channel dev` from `main`, `--channel latest` from `release`, over OIDC. Skipped if the version is already on npm.
+4. **docker**: the only job with `packages: write`. Builds and pushes the `create` and `devcontainer` images (plus `:latest` from `release`), then runs `npx @decohere/create@<version> --help`, first waiting for npm to serve the new version.
+5. **tag**: `forge tag --prefix v --push`.
 
 A `v*` tag means that commit fully shipped. If any step fails there is no tag, so re-running Publish is safe: npm and Docker each skip what is already published.
 
@@ -128,7 +127,9 @@ The repo installs no published `@decohere/*` package (`tools/register.mjs` runs 
 
 ## Adding a new npm package
 
-npm can attach a Trusted Publisher only to a name that exists. When Publish finds an unpublished name, **verify** opens the issue `deploy(publish): OIDC bootstrap unpublished packages` (assigned to the environment's reviewers) and **oidc-bootstrap** waits on the `npm-oidc-bootstrap` environment. Keep required reviewers on that environment only, not on `npm-publish`.
+npm can attach a Trusted Publisher only to a name that exists, and creating a name needs an owner's npm login, so CI can't do it. Contributors need no npm access: on their PR, **lint/typecheck** leaves a notice naming the package and stays green. In the merge queue, the same check fails until the name exists.
+
+When the PR is ready to merge:
 
 1. From the repo root, after `npm login` to the org:
 
@@ -139,7 +140,7 @@ npm can attach a Trusted Publisher only to a name that exists. When Publish find
    [`npm-bootstrap.mjs`](../../projects/ci-tools/src/github/npm-bootstrap.mjs) first-publishes each name public and runs `npm trust github` for it, skipping what is done. `--otp` is optional (npm asks when needed); `--dry-run` prints the commands.
 
 2. By hand instead: `npm publish ./projects/<dir> --access public --tag dev` (drop `--tag` for a stable version), then on npm: package settings, Trusted Publisher, GitHub Actions, with organization `typesmiths`, repository `decohere`, workflow `publish.yml`, environment `npm-publish`, allowed action `npm publish`.
-3. Approve the waiting deployment. The job checks the names exist and Publish continues. If it already failed, run `gh run rerun --failed`.
+3. Add the PR to the merge queue. Doing this only when it's ready avoids leaving an unused name on npm if the PR is abandoned.
 
 ## Promote to latest
 

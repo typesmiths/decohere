@@ -169,7 +169,7 @@ export async function runBootstrap(options = {}) {
 		"\nFor each new package, also run `pnpm npm:trust-promote --otp <code>`, so Promote to latest can move its tag.",
 	);
 	log(
-		"\nDone. Approve the waiting npm-oidc-bootstrap deployment on the Publish run, or rerun it: `gh run rerun --failed <run-id>`.",
+		"\nDone. Add the PR to the merge queue. If Publish already failed on this, rerun it: `gh run rerun --failed <run-id>`.",
 	);
 	return 0;
 }

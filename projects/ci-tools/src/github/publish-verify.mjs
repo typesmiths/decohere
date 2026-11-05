@@ -199,8 +199,6 @@ if (isCli) {
 		appendFileSync(process.env.GITHUB_OUTPUT, `${body}\n`);
 	}
 	if (result.unpublished.length) {
-		process.stderr.write(
-			`Never-published packages (bootstrap OIDC before PUT): ${result.unpublished.join(", ")}\n`,
-		);
+		process.stderr.write(`Not on npm yet: ${result.unpublished.join(", ")}\n`);
 	}
 }
