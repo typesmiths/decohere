@@ -134,6 +134,16 @@ export class RouteRegistry {
 			argumentIndex,
 		);
 
+		// A named value typed as a union or interface reaches here as Object, which would build an
+		// empty object. Pass the value through as it arrived.
+		if (
+			argumentType === Object &&
+			argMeta?.mappingKey != null &&
+			!isInjectedPart(argMeta.argumentLocation)
+		) {
+			return this.getRouteArgument(String, argumentIndex, handler);
+		}
+
 		// @CurrentUser() / interface params are Object (or other non-DTO types) — no field map.
 		if (isInjectedPart(argMeta?.argumentLocation) || !isConstructable(argumentType)) {
 			return {
