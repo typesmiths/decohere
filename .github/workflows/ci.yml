@@ -318,6 +318,24 @@ jobs:
           docker run --rm --entrypoint decohere "$image" --help
           docker image inspect "${{ steps.docker_meta.outputs.devcontainer_repository }}:${{ steps.docker_meta.outputs.image_tag }}" >/dev/null
 
+      # On the base image just built, which the generated Dockerfile names by its own version.
+      - name: Build a generated app's Dev Container
+        if: env.BUILD_IMAGES == 'true'
+        run: |
+          app="$(mktemp -d)"
+          repo_root="$PWD"
+          (cd "$app" && printf 'pnpm\n' | node --import "$repo_root/tools/register.mjs" "$repo_root/projects/scaffold/src/cli.ts" \
+            create webapi orders --database none --auth none --postman none --install no)
+          from="$(sed -n 's/^FROM //p' "$app/orders/.devcontainer/Dockerfile")"
+          docker tag "${{ steps.docker_meta.outputs.devcontainer_repository }}:${{ steps.docker_meta.outputs.image_tag }}" "$from"
+          docker build -t generated-devcontainer "$app/orders/.devcontainer"
+          user="$(docker run --rm --entrypoint id generated-devcontainer -un)"
+          owner="$(docker run --rm --entrypoint stat generated-devcontainer -c %U /orders/node_modules)"
+          if [[ "$user" != "node" || "$owner" != "node" ]]; then
+            echo "::error::The generated Dev Container should run as node and own node_modules. User: $user. Owner: $owner."
+            exit 1
+          fi
+
       - name: Run e2e smoke tests
         if: github.ref == 'refs/heads/release'
         run: pnpm run test:e2e
@@ -386,6 +404,15 @@ jobs:
           pnpm forge --log-level info docker --configuration release --dry-run
         env:
           FORGE_DOCKER_BUILD_ARGS_JSON: '{"CREATE_VERSION":"${{ env.DECOHERE_E2E_VERSION }}"}'
+
+      - name: Check the scaffolder in the image matches its tag
+        run: |
+          found="$(docker run --rm --entrypoint node "ghcr.io/typesmiths/decohere/create:$DECOHERE_E2E_VERSION" \
+            -p "require('/usr/local/lib/node_modules/@decohere/scaffold/package.json').version")"
+          if [[ "$found" != "$DECOHERE_E2E_VERSION" ]]; then
+            echo "::error::The create image tagged $DECOHERE_E2E_VERSION contains scaffolder $found."
+            exit 1
+          fi
 
       - name: Use it the way a user does
         run: pnpm exec vitest run --project e2e --silent=passed-only projects/create/e2e
