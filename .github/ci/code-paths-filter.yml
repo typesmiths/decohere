@@ -14,3 +14,14 @@ code:
   - ".github/workflows/**"
   - ".github/actions/**"
   - ".github/ci/**"
+
+# A PR builds the images only when these change. main always builds them, in verify-release.
+images:
+  - "projects/create/**"
+  - "projects/devcontainer/**"
+  - "projects/forge/src/actions/docker.action.ts"
+  - ".github/workflows/ci.yml"
+
+# A PR runs the Docker-backed tests only when these change. main always runs them.
+data:
+  - "projects/data/**"

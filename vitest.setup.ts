@@ -22,7 +22,6 @@ registerHooks({
 	load: (url, context, next) => {
 		try {
 			const path = new URL(url).pathname;
-			console.log(path);
 			if (vol.existsSync(path)) {
 				const source = vol.readFileSync(path, "utf-8") as string;
 				return { format: "module", source, shortCircuit: true };
