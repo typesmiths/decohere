@@ -280,6 +280,8 @@ jobs:
     env:
       DECOHERE_E2E_REGISTRY: http://localhost:4873/
       DECOHERE_E2E_CONTAINER_REGISTRY: http://172.17.0.1:4873/
+      # Compose asks permission to read the Dev Container tool's Dockerfile; there's no one to answer.
+      BUILDX_BAKE_ENTITLEMENTS_FS: "0"
     steps:
       - uses: actions/checkout@v4
         with:
