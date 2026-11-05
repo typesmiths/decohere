@@ -30,19 +30,20 @@ Related: [`@decohere/workspace`](../workspace/README.md) (package discovery), [F
 
 ## Install
 
-The `flux` command is on `@decohere/cli` (this package is the API). Add the CLI with your package manager:
+The `flux` command is on `@decohere/cli` (this package is the API):
 
 ```bash
-pnpm add -D @decohere/cli
-# npm install --save-dev @decohere/cli
+npm i -D @decohere/cli
 ```
+
+With pnpm, see [Using pnpm](../../docs/getting-started.md#using-pnpm).
 
 That installs the `flux`, `forge`, and `decohere` bins. Then:
 
 ```bash
-pnpm exec flux --help
-flux run projects/greeter/src/cli.ts
-flux serve
+npx flux --help
+npx flux run projects/greeter/src/cli.ts
+npx flux serve
 ```
 
 Scaffolded apps already depend on `@decohere/cli` — use those scripts (`pnpm dev`) or `pnpm exec flux`.

@@ -15,7 +15,7 @@ Higher layers (for example `@decohere/http`'s `Builder.withServices`) register o
 ## Install
 
 ```bash
-pnpm add @decohere/crucible
+npm i @decohere/crucible
 ```
 
 ```ts
