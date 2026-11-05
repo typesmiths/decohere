@@ -17,7 +17,7 @@ A failed publish had a related hazard: it leaves no tag, so the next commit coul
 - It is chosen once, in CI, before the release build: `forge version --channel dev --build-number <n>`. Forge takes the number as a flag and reads no CI variable ([architecture §1](../architecture/README.md#1-keep-the-product-pure-of-its-host)).
 - Publish never works out a version. It reads it from the build with `forge version --from-build`, which fails if the built packages disagree.
 - A `v*` tag only records that a commit fully shipped. Nothing reads tags to pick a dev version.
-- Stable releases are unchanged: they still go through changesets and `release-prep.yml`.
+- A stable release takes the build of a tested dev version and changes only the version in its `package.json` files ([ADR 0020](0020-test-the-real-install-before-publishing.md)).
 
 ## Consequences
 
@@ -36,3 +36,4 @@ Not chosen:
 ## History
 
 - 2026-11-04: Decided, after a publish reported success on `main` while publishing nothing.
+- 2026-11-05: Stable releases no longer use changesets or `release-prep.yml`.

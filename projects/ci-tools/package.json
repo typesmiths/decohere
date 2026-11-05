@@ -41,7 +41,6 @@
     "./changeset/check-status": "./src/changeset/check-status.mjs",
     "./github/create-issue": "./src/github/create-issue.mjs",
     "./github/ensure-metadata": "./src/github/ensure-metadata.mjs",
-    "./github/create-or-update-pr": "./src/github/create-or-update-pr.mjs",
     "./github/publish-verify": "./src/github/publish-verify.mjs",
     "./github/first-publish-check": "./src/github/first-publish-check.mjs",
     "./github/npm-bootstrap": "./src/github/npm-bootstrap.mjs"

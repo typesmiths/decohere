@@ -1,0 +1,69 @@
+name: Verify a release build
+description: Uses the build in dist/release from a temporary registry, the way a user does. Nothing is published to npm.
+
+runs:
+  using: composite
+  steps:
+    - name: Apply the version from the build
+      shell: bash
+      run: |
+        pnpm forge --log-level info version --from-build --configuration release
+        pnpm forge --log-level info dependencies --configuration release sync
+        {
+          echo "DECOHERE_E2E_VERSION=$(node -p 'require("./package.json").version')"
+          echo "DECOHERE_E2E_REGISTRY=http://localhost:4873/"
+          echo "DECOHERE_E2E_CONTAINER_REGISTRY=http://172.17.0.1:4873/"
+          # Compose asks permission to read the Dev Container tool's Dockerfile; there's no one to answer.
+          echo "BUILDX_BAKE_ENTITLEMENTS_FS=0"
+        } >> "$GITHUB_ENV"
+
+    # First: they take seconds, and packing for the images changes dist/release.
+    - name: Check the build and the forge CLI
+      shell: bash
+      run: pnpm exec vitest run --project e2e --silent=passed-only projects/cli/e2e projects/forge/e2e
+
+    - name: Start the temporary registry
+      shell: bash
+      run: |
+        docker run -d --name registry --network host \
+          -v "$PWD/.github/ci/verdaccio.yaml:/verdaccio/conf/config.yaml:ro" \
+          verdaccio/verdaccio:6.11.1
+        for _ in $(seq 1 30); do
+          curl -sf "$DECOHERE_E2E_REGISTRY-/ping" >/dev/null && exit 0
+          sleep 1
+        done
+        docker logs registry
+        exit 1
+
+    - name: Publish to the temporary registry
+      shell: bash
+      run: node projects/ci-tools/src/release/publish-to-temporary-registry.mjs dist/release
+
+    - name: Build the images without pushing
+      shell: bash
+      run: |
+        node projects/create/pack-builder-tgz.mjs \
+          --out-dir dist/release/projects/scaffold \
+          --workspace-out dist/release \
+          --dest projects/create/create.tgz
+        FORGE_DOCKER_BUILD_ARGS_JSON="{\"CREATE_VERSION\":\"$DECOHERE_E2E_VERSION\"}" \
+          pnpm forge --log-level info docker --configuration release --dry-run
+
+    - name: Check the scaffolder in the image matches its tag
+      shell: bash
+      run: |
+        found="$(docker run --rm --entrypoint node "ghcr.io/typesmiths/decohere/create:$DECOHERE_E2E_VERSION" \
+          -p "require('/usr/local/lib/node_modules/@decohere/scaffold/package.json').version")"
+        if [[ "$found" != "$DECOHERE_E2E_VERSION" ]]; then
+          echo "::error::The create image tagged $DECOHERE_E2E_VERSION contains scaffolder $found."
+          exit 1
+        fi
+
+    - name: Use it the way a user does
+      shell: bash
+      run: pnpm exec vitest run --project e2e --silent=passed-only projects/create/e2e
+
+    - name: Registry log
+      if: failure()
+      shell: bash
+      run: docker logs registry

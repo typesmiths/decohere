@@ -3,11 +3,28 @@ name: Publish
 on:
   workflow_run:
     workflows: ["CI"]
-    branches: [main, release]
+    branches: [main]
     types: [completed]
+  # A stable release, started by hand. It lives in this file because npm's trusted publishing is
+  # tied to it. See "Stable release" in docs/ci/README.md.
+  workflow_dispatch:
+    inputs:
+      tested_version:
+        description: "The tested version to release, such as 0.0.1-dev.20261105.110. It needs a v* tag."
+        required: true
+        type: string
+      version:
+        description: "The stable version to give it, such as 0.1.0."
+        required: true
+        type: string
+      dry_run:
+        description: "Do everything up to publishing, then stop."
+        required: false
+        type: boolean
+        default: true
 
 concurrency:
-  group: publish-${{ github.event.workflow_run.head_branch }}
+  group: publish-${{ github.event.workflow_run.head_branch || 'release' }}
   cancel-in-progress: false
 
 env:
@@ -15,30 +32,76 @@ env:
 
 jobs:
   guard:
-    # Only a push to this repo's main or release: a pull request's CI run also
-    # triggers workflow_run, and a fork's branch can be called main too.
+    # Only a push to this repo's main: a pull request's CI run also triggers workflow_run, and a
+    # fork's branch can be called main too.
     if: >
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      (github.event.workflow_run.head_branch == 'main' ||
-       github.event.workflow_run.head_branch == 'release')
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+      pull-requests: read
     outputs:
-      should_publish: ${{ steps.check.outputs.should_publish }}
-      channel: ${{ steps.meta.outputs.channel }}
-      release_channel: ${{ steps.meta.outputs.release_channel }}
+      should_publish: ${{ steps.release.outputs.should_publish || steps.check.outputs.should_publish }}
+      channel: ${{ steps.release.outputs.channel || 'dev' }}
+      release_channel: ${{ steps.release.outputs.release_channel || 'beta' }}
+      sha: ${{ steps.release.outputs.sha || github.event.workflow_run.head_sha }}
+      # The run holding the build to publish. A release makes its own, from the tested one.
+      build_run_id: ${{ steps.release.outputs.build_run_id || github.event.workflow_run.id }}
+      tested_run_id: ${{ steps.release.outputs.tested_run_id }}
     steps:
+      - name: Check the release request
+        id: release
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TESTED_VERSION: ${{ inputs.tested_version }}
+          VERSION: ${{ inputs.version }}
+          BUILD_RUN_ID: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::$VERSION isn't a stable version: expected major.minor.patch"
+            exit 1
+          fi
+          if ! sha="$(gh api "repos/$REPO/commits/v$TESTED_VERSION" --jq .sha)"; then
+            echo "::error::There's no v$TESTED_VERSION tag, so that version didn't fully ship."
+            exit 1
+          fi
+          if [[ -n "$(npm view "@decohere/cli@$VERSION" version 2>/dev/null)" ]]; then
+            echo "::error::$VERSION is already on npm."
+            exit 1
+          fi
+          tested_run_id="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&status=success&per_page=1" --jq '.workflow_runs[0].id // empty')"
+          if [[ -z "$tested_run_id" ]]; then
+            echo "::error::No successful CI run on main for $sha."
+            exit 1
+          fi
+          {
+            echo "sha=$sha"
+            echo "tested_run_id=$tested_run_id"
+            echo "build_run_id=$BUILD_RUN_ID"
+            echo "channel=latest"
+            echo "release_channel=stable"
+            echo "should_publish=true"
+          } >> "$GITHUB_OUTPUT"
+
       # workflow_run has no push `before` SHA — fetch parent and pass it
       # explicitly so paths-filter does not fall back to a whole-tree guess.
       - uses: actions/checkout@v4
+        if: github.event_name != 'workflow_dispatch'
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 2
 
       - name: Resolve parent commit
         id: parent
+        if: github.event_name != 'workflow_dispatch'
         run: |
           if ! parent="$(git rev-parse --verify HEAD^1)"; then
             echo "No parent for ${{ github.event.workflow_run.head_sha }} — skip publish"
@@ -49,7 +112,7 @@ jobs:
           echo "sha=$parent" >> "$GITHUB_OUTPUT"
 
       - id: filter
-        if: steps.parent.outputs.sha != ''
+        if: github.event_name != 'workflow_dispatch' && steps.parent.outputs.sha != ''
         uses: dorny/paths-filter@v3
         with:
           token: ${{ github.token }}
@@ -57,19 +120,9 @@ jobs:
           ref: ${{ github.event.workflow_run.head_sha }}
           filters: .github/ci/code-paths-filter.yml
 
-      - name: Resolve publish channel
-        id: meta
-        run: |
-          if [[ "${{ github.event.workflow_run.head_branch }}" == "main" ]]; then
-            echo "channel=dev" >> "$GITHUB_OUTPUT"
-            echo "release_channel=beta" >> "$GITHUB_OUTPUT"
-          else
-            echo "channel=latest" >> "$GITHUB_OUTPUT"
-            echo "release_channel=stable" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Skip duplicate, stale, or docs-only publishes
         id: check
+        if: github.event_name != 'workflow_dispatch'
         run: |
           BRANCH="${{ github.event.workflow_run.head_branch }}"
           SHA="${{ github.event.workflow_run.head_sha }}"
@@ -107,9 +160,57 @@ jobs:
 
           echo "should_publish=true" >> "$GITHUB_OUTPUT"
 
-  verify:
+  # Gives the tested build its stable version, changing only package.json files, then uses it the
+  # way a user does. The images are rebuilt around it, because the scaffolder pins versions.
+  release-build:
     needs: [guard]
-    if: needs.guard.outputs.should_publish == 'true'
+    if: github.event_name == 'workflow_dispatch' && needs.guard.outputs.should_publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.guard.outputs.sha }}
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download the tested build
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-release-beta-${{ needs.guard.outputs.tested_run_id }}
+          run-id: ${{ needs.guard.outputs.tested_run_id }}
+          github-token: ${{ github.token }}
+          path: dist/release/
+
+      - name: Give it the stable version
+        env:
+          TESTED_VERSION: ${{ inputs.tested_version }}
+          VERSION: ${{ inputs.version }}
+        run: node projects/ci-tools/src/release/restamp-build.mjs dist/release "$TESTED_VERSION" "$VERSION"
+
+      # Before verifying: packing for the images changes dist/release.
+      - name: Upload the stable build
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-release-stable-${{ github.run_id }}
+          path: dist/release/
+          if-no-files-found: error
+          retention-days: 14
+
+      - uses: ./.github/actions/verify-release
+
+  verify:
+    needs: [guard, release-build]
+    # always(): release-build is skipped on a normal publish. A dry run stops here.
+    if: >
+      always() &&
+      needs.guard.outputs.should_publish == 'true' &&
+      (needs.release-build.result == 'success' || needs.release-build.result == 'skipped') &&
+      inputs.dry_run != true
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -127,14 +228,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ needs.guard.outputs.sha }}
           fetch-depth: 0
 
       - uses: ./.github/actions/publish-prepare
         with:
-          ci_run_id: ${{ github.event.workflow_run.id }}
+          ci_run_id: ${{ needs.guard.outputs.build_run_id }}
           release_channel: ${{ needs.guard.outputs.release_channel }}
-          channel: ${{ needs.guard.outputs.channel }}
 
       - name: Probe npm and GHCR
         id: probe
@@ -153,7 +253,7 @@ jobs:
 
   npm:
     needs: [guard, verify]
-    if: needs.guard.outputs.should_publish == 'true'
+    if: always() && needs.verify.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: npm-publish
@@ -164,14 +264,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ needs.guard.outputs.sha }}
           fetch-depth: 0
 
       - uses: ./.github/actions/publish-prepare
         with:
-          ci_run_id: ${{ github.event.workflow_run.id }}
+          ci_run_id: ${{ needs.guard.outputs.build_run_id }}
           release_channel: ${{ needs.guard.outputs.release_channel }}
-          channel: ${{ needs.guard.outputs.channel }}
 
       - name: Publish packages
         if: needs.verify.outputs.skip_npm != 'true'
@@ -185,10 +284,10 @@ jobs:
   docker:
     # Alongside npm: the images unpack a local tarball, so they don't need the packages published.
     needs: [guard, verify]
-    if: needs.guard.outputs.should_publish == 'true'
+    if: always() && needs.verify.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # The only job anywhere that may push images: it runs after CI passes on main/release.
+    # The only job anywhere that may push images.
     permissions:
       contents: read
       actions: read
@@ -196,14 +295,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ needs.guard.outputs.sha }}
           fetch-depth: 0
 
       - uses: ./.github/actions/publish-prepare
         with:
-          ci_run_id: ${{ github.event.workflow_run.id }}
+          ci_run_id: ${{ needs.guard.outputs.build_run_id }}
           release_channel: ${{ needs.guard.outputs.release_channel }}
-          channel: ${{ needs.guard.outputs.channel }}
 
       - name: Pack create CLI into Docker build context
         if: needs.verify.outputs.skip_docker != 'true'
@@ -251,7 +349,7 @@ jobs:
   # This job has no login, so it sees what a stranger sees.
   check-images:
     needs: [guard, verify, docker]
-    if: needs.guard.outputs.should_publish == 'true'
+    if: always() && needs.docker.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -266,7 +364,7 @@ jobs:
 
   tag:
     needs: [guard, verify, npm, check-images]
-    if: needs.guard.outputs.should_publish == 'true'
+    if: always() && needs.npm.result == 'success' && needs.check-images.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -275,16 +373,54 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ needs.guard.outputs.sha }}
           fetch-depth: 0
 
       - uses: ./.github/actions/publish-prepare
         with:
-          ci_run_id: ${{ github.event.workflow_run.id }}
+          ci_run_id: ${{ needs.guard.outputs.build_run_id }}
           release_channel: ${{ needs.guard.outputs.release_channel }}
-          channel: ${{ needs.guard.outputs.channel }}
           configure-git: "true"
 
       - name: Tag release
         run: |
           pnpm forge --log-level info tag --prefix v --push
+
+  # main's base version has to pass the release, or dev versions would sort below it. This repo
+  # doesn't let Actions open PRs, so it pushes the branch and links to opening one.
+  release-finish:
+    needs: [guard, tag]
+    if: always() && github.event_name == 'workflow_dispatch' && needs.tag.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          SHA: ${{ needs.guard.outputs.sha }}
+        run: gh release create "v$VERSION" --target "$SHA" --title "v$VERSION" --generate-notes --latest
+
+      - name: Push the branch that raises main's base version
+        env:
+          VERSION: ${{ inputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          IFS=. read -r major minor patch <<<"$VERSION"
+          next="$major.$minor.$((patch + 1))"
+          branch="chore/base-version-$next"
+          git config --local user.name "typesmiths-actions[bot]"
+          git config --local user.email "typesmiths-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          npm pkg set "version=$next"
+          git commit -am "chore: raise the base version to $next after releasing $VERSION"
+          git push origin "$branch"
+          echo "### Next: open the PR that raises main's base version to $next" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://github.com/$REPO/compare/main...$branch?expand=1" >> "$GITHUB_STEP_SUMMARY"

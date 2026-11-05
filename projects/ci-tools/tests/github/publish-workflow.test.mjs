@@ -9,6 +9,27 @@ const PUBLISH_YML = fileURLToPath(
 describe("publish.yml", () => {
 	const yml = fs.readFileSync(PUBLISH_YML, "utf8");
 
+	it("defaults a stable release to a dry run", () => {
+		const dryRun = yml.slice(yml.indexOf("dry_run:"), yml.indexOf("\nconcurrency:"));
+
+		expect(dryRun).toMatch(/default: true/);
+	});
+
+	it("stops a stable release before publishing on a dry run, or if its checks fail", () => {
+		const verify = yml.slice(yml.indexOf("\n  verify:"), yml.indexOf("\n  npm:"));
+
+		expect(verify).toContain("inputs.dry_run != true");
+		expect(verify).toContain("needs.release-build.result == 'success'");
+	});
+
+	it("ships a stable release from the tested build, without rebuilding it", () => {
+		const build = yml.slice(yml.indexOf("\n  release-build:"), yml.indexOf("\n  verify:"));
+
+		expect(build).toContain("forge-release-beta-");
+		expect(build).toContain("restamp-build.mjs");
+		expect(build).not.toContain("forge --log-level info build");
+	});
+
 	it("only tags a version once npm and the images have shipped", () => {
 		const tag = yml.slice(yml.indexOf("\n  tag:"));
 		const needs = /needs: \[(.+)\]/.exec(tag)?.[1].split(", ");

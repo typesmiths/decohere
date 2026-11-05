@@ -7,7 +7,7 @@ on:
   pull_request:
   merge_group:
   push:
-    branches: [main, release]
+    branches: [main]
   workflow_dispatch:
 concurrency:
   group: ci-${{ github.ref }}
@@ -15,7 +15,6 @@ concurrency:
 env:
   SCRIBE_LOG_LEVEL: info
   CI_TOOLS: projects/ci-tools/src
-  RELEASE_SCRIPTS: projects/ci-tools/src/release
 
 jobs:
   changes:
@@ -45,7 +44,6 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ||
                 "${{ github.event_name }}" == "merge_group" ||
-                "${{ github.ref }}" == "refs/heads/release" ||
                 "${{ steps.filter.outputs.code }}" == "true" ]]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
@@ -137,9 +135,7 @@ jobs:
   test:
     name: test (${{ matrix.shard }}/3)
     needs: [changes]
-    if: >
-      needs.changes.outputs.run == 'true' &&
-      github.ref != 'refs/heads/main' && github.ref != 'refs/heads/release'
+    if: needs.changes.outputs.run == 'true' && github.ref != 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -158,12 +154,10 @@ jobs:
       - name: Run unit tests
         run: pnpm test --shard=${{ matrix.shard }}/3
 
-  # Enforces the thresholds on main. On release it also feeds the Pages badges.
+  # Enforces the thresholds on main, and feeds the Pages badges.
   coverage:
     needs: [changes]
-    if: >
-      needs.changes.outputs.run == 'true' &&
-      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release')
+    if: needs.changes.outputs.run == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -179,7 +173,6 @@ jobs:
         run: pnpm run test:coverage
 
       - name: Upload coverage data
-        if: github.ref == 'refs/heads/release'
         uses: actions/upload-artifact@v4
         with:
           name: coverage-data
@@ -195,7 +188,7 @@ jobs:
     if: >
       needs.changes.outputs.run == 'true' &&
       (needs.changes.outputs.data == 'true' ||
-       github.ref == 'refs/heads/main' || github.ref == 'refs/heads/release' ||
+       github.ref == 'refs/heads/main' ||
        github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -258,7 +251,7 @@ jobs:
     permissions:
       contents: read
     env:
-      BUILD_IMAGES: ${{ needs.changes.outputs.images == 'true' || github.ref == 'refs/heads/release' }}
+      BUILD_IMAGES: ${{ needs.changes.outputs.images == 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -336,10 +329,6 @@ jobs:
             exit 1
           fi
 
-      - name: Run e2e smoke tests
-        if: github.ref == 'refs/heads/release'
-        run: pnpm run test:e2e
-
   # Uses the build `build` stamped, from a temporary registry, the way a user would. Publish only
   # runs if this passes, and uploads this same build. Only on main: too slow for every PR.
   verify-release:
@@ -352,11 +341,6 @@ jobs:
     timeout-minutes: 40
     permissions:
       contents: read
-    env:
-      DECOHERE_E2E_REGISTRY: http://localhost:4873/
-      DECOHERE_E2E_CONTAINER_REGISTRY: http://172.17.0.1:4873/
-      # Compose asks permission to read the Dev Container tool's Dockerfile; there's no one to answer.
-      BUILDX_BAKE_ENTITLEMENTS_FS: "0"
     steps:
       - uses: actions/checkout@v4
         with:
@@ -370,56 +354,7 @@ jobs:
           name: forge-release-beta-${{ github.run_id }}
           path: dist/release/
 
-      - name: Apply the version from the build
-        run: |
-          pnpm forge --log-level info version --from-build --configuration release
-          pnpm forge --log-level info dependencies --configuration release sync
-          echo "DECOHERE_E2E_VERSION=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
-
-      # First: they take seconds, and packing for the images changes dist/release.
-      - name: Check the build and the forge CLI
-        run: pnpm exec vitest run --project e2e --silent=passed-only projects/cli/e2e projects/forge/e2e
-
-      - name: Start the temporary registry
-        run: |
-          docker run -d --name registry --network host \
-            -v "$PWD/.github/ci/verdaccio.yaml:/verdaccio/conf/config.yaml:ro" \
-            verdaccio/verdaccio:6.11.1
-          for _ in $(seq 1 30); do
-            curl -sf "$DECOHERE_E2E_REGISTRY-/ping" >/dev/null && exit 0
-            sleep 1
-          done
-          docker logs registry
-          exit 1
-
-      - name: Publish to the temporary registry
-        run: node ${{ env.RELEASE_SCRIPTS }}/publish-to-temporary-registry.mjs dist/release
-
-      - name: Build the images without pushing
-        run: |
-          node projects/create/pack-builder-tgz.mjs \
-            --out-dir dist/release/projects/scaffold \
-            --workspace-out dist/release \
-            --dest projects/create/create.tgz
-          pnpm forge --log-level info docker --configuration release --dry-run
-        env:
-          FORGE_DOCKER_BUILD_ARGS_JSON: '{"CREATE_VERSION":"${{ env.DECOHERE_E2E_VERSION }}"}'
-
-      - name: Check the scaffolder in the image matches its tag
-        run: |
-          found="$(docker run --rm --entrypoint node "ghcr.io/typesmiths/decohere/create:$DECOHERE_E2E_VERSION" \
-            -p "require('/usr/local/lib/node_modules/@decohere/scaffold/package.json').version")"
-          if [[ "$found" != "$DECOHERE_E2E_VERSION" ]]; then
-            echo "::error::The create image tagged $DECOHERE_E2E_VERSION contains scaffolder $found."
-            exit 1
-          fi
-
-      - name: Use it the way a user does
-        run: pnpm exec vitest run --project e2e --silent=passed-only projects/create/e2e
-
-      - name: Registry log
-        if: failure()
-        run: docker logs registry
+      - uses: ./.github/actions/verify-release
 
   # Required check name stays `ci` (branch protection). Succeeds on docs-only skips.
   ci:
@@ -438,14 +373,3 @@ jobs:
             exit 1
           fi
           echo "All passed or not needed for this run"
-
-  release:
-    if: github.ref == 'refs/heads/release'
-    needs: [ci]
-    uses: ./.github/workflows/release.yml
-    # Default GITHUB_TOKEN is read-only; the called workflow's jobs request contents: write.
-    permissions:
-      contents: write
-    with:
-      channel: stable
-    secrets: inherit

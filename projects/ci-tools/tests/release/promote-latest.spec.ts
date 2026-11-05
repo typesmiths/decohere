@@ -20,7 +20,10 @@ function fakeRun(registry: Registry) {
 		"@decohere/cli": [VERSION],
 		"@decohere/core": [VERSION],
 	};
-	const latest = registry.latest ?? { "@decohere/cli": "old", "@decohere/core": "old" };
+	const latest = registry.latest ?? {
+		"@decohere/cli": "0.0.1-dev.1",
+		"@decohere/core": "0.0.1-dev.1",
+	};
 	const moves: string[] = (registry.moves ??= []);
 	return (command: string, args: string[]) => {
 		const ok = (stdout = "") => ({ status: 0, stdout });
@@ -80,6 +83,17 @@ describe("promoteLatest", () => {
 		expect(moves).toEqual(PACKAGES);
 	});
 
+	it("refuses to replace a stable latest with a dev version, moving nothing", () => {
+		const { code, output, moves } = promote(
+			{ latest: { "@decohere/cli": "0.1.0", "@decohere/core": "0.1.0" } },
+			{ version: VERSION },
+		);
+
+		expect(code).toBe(1);
+		expect(output).toContain("latest is the stable 0.1.0");
+		expect(moves).toEqual([]);
+	});
+
 	it("refuses a version without a v* tag, moving nothing", () => {
 		const { code, output, moves } = promote({ tags: [] }, { version: VERSION });
 
@@ -122,7 +136,7 @@ describe("promoteLatest", () => {
 
 	it("skips packages already there, so it can be run again", () => {
 		const { code, moves } = promote(
-			{ latest: { "@decohere/cli": VERSION, "@decohere/core": "old" } },
+			{ latest: { "@decohere/cli": VERSION, "@decohere/core": "0.0.1-dev.1" } },
 			{ version: VERSION },
 		);
 
