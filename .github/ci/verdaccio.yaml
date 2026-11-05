@@ -1,0 +1,15 @@
+# The temporary npm registry CI publishes to before anything reaches npm. It lives only inside the
+# job. @decohere/* comes only from what the job published; everything else comes from npm.
+storage: /verdaccio/storage/data
+max_body_size: 200mb
+uplinks:
+  npmjs:
+    url: https://registry.npmjs.org/
+packages:
+  "@decohere/*":
+    access: $all
+    publish: $all
+  "**":
+    access: $all
+    proxy: npmjs
+log: { type: stdout, format: pretty, level: warn }

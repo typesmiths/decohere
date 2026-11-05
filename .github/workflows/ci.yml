@@ -179,19 +179,19 @@ jobs:
 
       # The one place a dev version is chosen; Publish reads it from this build.
       - name: Stamp the dev version
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: pnpm forge --log-level info version --channel dev --build-number ${{ github.run_number }}
 
       - name: Sync cross-library dependency versions
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: node ${{ env.RELEASE_SCRIPTS }}/sync-dependencies.mjs
 
       - name: Build release artifacts
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         run: pnpm forge --log-level info build --configuration release
 
       - name: Upload release build artifacts
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v4
         with:
           name: forge-release-beta-${{ github.run_id }}
@@ -261,21 +261,78 @@ jobs:
           docker run --rm --entrypoint decohere "$image" --help
           docker image inspect "${{ steps.docker_meta.outputs.devcontainer_repository }}:${{ steps.docker_meta.outputs.image_tag }}" >/dev/null
 
-      - name: Run create scaffold Docker e2e
-        if: github.ref != 'refs/heads/release'
-        run: pnpm exec vitest run --project e2e --silent=passed-only projects/create/e2e
-
-      - name: Run installed CLI e2e
-        if: github.ref != 'refs/heads/release'
-        run: pnpm exec vitest run --project e2e --silent=passed-only projects/cli/e2e/installed-cli
-
       - name: Run e2e smoke tests
         if: github.ref == 'refs/heads/release'
         run: pnpm run test:e2e
 
+  # Uses the build `test` stamped, from a temporary registry, the way a user would. Publish only
+  # runs if this passes, and uploads this same build. Only on main: too slow for every PR.
+  verify-release:
+    name: verify-release
+    needs: [changes, test]
+    if: >
+      needs.changes.outputs.run == 'true' &&
+      (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    env:
+      DECOHERE_E2E_REGISTRY: http://localhost:4873/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Download the stamped build
+        uses: actions/download-artifact@v4
+        with:
+          name: forge-release-beta-${{ github.run_id }}
+          path: dist/release/
+
+      - name: Apply the version from the build
+        run: |
+          pnpm forge --log-level info version --from-build --configuration release
+          pnpm forge --log-level info dependencies --configuration release sync
+          echo "DECOHERE_E2E_VERSION=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+
+      - name: Start the temporary registry
+        run: |
+          docker run -d --name registry --network host \
+            -v "$PWD/.github/ci/verdaccio.yaml:/verdaccio/conf/config.yaml:ro" \
+            verdaccio/verdaccio:6.11.1
+          for _ in $(seq 1 30); do
+            curl -sf "$DECOHERE_E2E_REGISTRY-/ping" >/dev/null && exit 0
+            sleep 1
+          done
+          docker logs registry
+          exit 1
+
+      - name: Publish to the temporary registry
+        run: node ${{ env.RELEASE_SCRIPTS }}/publish-to-temporary-registry.mjs dist/release
+
+      - name: Build the images without pushing
+        run: |
+          node projects/create/pack-builder-tgz.mjs \
+            --out-dir dist/release/projects/scaffold \
+            --workspace-out dist/release \
+            --dest projects/create/create.tgz
+          pnpm forge --log-level info docker --configuration release --dry-run
+        env:
+          FORGE_DOCKER_BUILD_ARGS_JSON: '{"CREATE_VERSION":"${{ env.DECOHERE_E2E_VERSION }}"}'
+
+      - name: Use it the way a user does
+        run: pnpm exec vitest run --project e2e --silent=passed-only projects/create/e2e
+
+      - name: Registry log
+        if: failure()
+        run: docker logs registry
+
   # Required check name stays `ci` (branch protection). Succeeds on docs-only skips.
   ci:
-    needs: [changes, lint, test, docker]
+    needs: [changes, lint, test, docker, verify-release]
     if: always() && needs.changes.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -285,6 +342,11 @@ jobs:
           if [[ "${{ needs.changes.outputs.run }}" != "true" ]]; then
             echo "Docs/meta only — suite skipped"
             exit 0
+          fi
+          verify="${{ needs.verify-release.result }}"
+          if [[ "$verify" != "success" && "$verify" != "skipped" ]]; then
+            echo "verify-release=$verify"
+            exit 1
           fi
           if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.test.result }}" != "success" || "${{ needs.docker.result }}" != "success" ]]; then
             echo "lint=${{ needs.lint.result }} test=${{ needs.test.result }} docker=${{ needs.docker.result }}"
