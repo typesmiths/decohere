@@ -44,8 +44,7 @@
     "./github/create-or-update-pr": "./src/github/create-or-update-pr.mjs",
     "./github/publish-verify": "./src/github/publish-verify.mjs",
     "./github/first-publish-check": "./src/github/first-publish-check.mjs",
-    "./github/npm-bootstrap": "./src/github/npm-bootstrap.mjs",
-    "./github/smoke-create-launcher": "./src/github/smoke-create-launcher.mjs"
+    "./github/npm-bootstrap": "./src/github/npm-bootstrap.mjs"
   },
   "scripts": {
     "test": "vitest run"
