@@ -20,7 +20,10 @@ function fakeRun(registry: Registry) {
 		"@decohere/cli": [VERSION],
 		"@decohere/core": [VERSION],
 	};
-	const latest = registry.latest ?? { "@decohere/cli": "old", "@decohere/core": "old" };
+	const latest = registry.latest ?? {
+		"@decohere/cli": "0.0.1-dev.1",
+		"@decohere/core": "0.0.1-dev.1",
+	};
 	const moves: string[] = (registry.moves ??= []);
 	return (command: string, args: string[]) => {
 		const ok = (stdout = "") => ({ status: 0, stdout });
@@ -133,7 +136,7 @@ describe("promoteLatest", () => {
 
 	it("skips packages already there, so it can be run again", () => {
 		const { code, moves } = promote(
-			{ latest: { "@decohere/cli": VERSION, "@decohere/core": "old" } },
+			{ latest: { "@decohere/cli": VERSION, "@decohere/core": "0.0.1-dev.1" } },
 			{ version: VERSION },
 		);
 

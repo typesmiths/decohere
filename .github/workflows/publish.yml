@@ -413,7 +413,8 @@ jobs:
           VERSION: ${{ inputs.version }}
           REPO: ${{ github.repository }}
         run: |
-          next="$(node -p 'const [a, b, c] = process.env.VERSION.split("."); `${a}.${b}.${Number(c) + 1}`')"
+          IFS=. read -r major minor patch <<<"$VERSION"
+          next="$major.$minor.$((patch + 1))"
           branch="chore/base-version-$next"
           git config --local user.name "typesmiths-actions[bot]"
           git config --local user.email "typesmiths-actions[bot]@users.noreply.github.com"
