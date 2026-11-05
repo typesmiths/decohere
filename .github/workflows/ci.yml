@@ -150,7 +150,7 @@ jobs:
 
       - uses: ./.github/actions/setup-node-pnpm
         with:
-          configure-git: "${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}"
+          configure-git: "${{ (github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') && 'true' || 'false' }}"
           git-user-name: GitHub Actions
           git-user-email: actions@github.com
 
