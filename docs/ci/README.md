@@ -6,14 +6,14 @@ CI stores no secrets or variables. npm publishing uses Trusted Publishing (OIDC)
 
 | Event | What runs |
 |---|---|
-| Pull request (this repo or a fork) | CI: lint, typecheck, unit and Docker-backed tests, release build, publish dry run, image build. Read-only token, no secrets. |
-| Merge queue (`merge_group`) | CI again on the PR combined with `main` and the PRs ahead of it. Always the full suite, docs-only or not. |
-| Push to `main` | CI with a coverage gate and a beta release build, then **verify-release** uses that build from a temporary registry. If it passes, Publish uploads that build to the npm `dev` dist-tag. |
+| Pull request (this repo or a fork) | CI: lint, typecheck, unit tests, release build and publish dry run. Images are built only when their files change, and Docker-backed tests run only when data code changes. Read-only token, no secrets. |
+| Merge queue (`merge_group`) | The same checks on the PR combined with `main` and the PRs ahead of it, docs-only or not. No images or Docker-backed tests: `main` covers those. |
+| Push to `main` | The integration run. A beta release build, then **verify-release** uses it from a temporary registry, alongside the coverage gate and Docker-backed tests. Lint, typecheck and the package check don't repeat, because the queue tested this same commit. If it all passes, Publish uploads that build to the npm `dev` dist-tag. |
 | Push to `release` | CI with coverage, full e2e and a GitHub Release, then, in parallel, Publish to the npm `latest` dist-tag and Pages (badges). |
 | Nightly 03:17 UTC | Bench on `main`, then Pages (benchmark charts). |
 | Nightly 06:00 UTC | npm audit. |
 
-`main` accepts changes only through the merge queue, with squash merges, and requires the `ci` check. A branch without a pull request gets no CI; open a draft PR. Docs-only changes (nothing matching [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml)) skip the suite on pull requests and `main` pushes, and the `ci` check still passes. `release`, `workflow_dispatch` and the merge queue always run everything.
+`main` accepts changes only through the merge queue, with squash merges, and requires the `ci` check. A branch without a pull request gets no CI; open a draft PR. Docs-only changes (nothing matching [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml)) skip the suite on pull requests and `main` pushes, and the `ci` check still passes. `release`, `workflow_dispatch` and the merge queue never skip for docs. An image break can land on `main` when a PR didn't touch the image files: `main` turns red and nothing publishes until it's fixed.
 
 ## The flows
 
@@ -32,7 +32,7 @@ A push to `main`:
 
 ```mermaid
 flowchart LR
-  push["Push to main"] --> build["Checks and<br/>one build"]
+  push["Push to main"] --> build["One build"]
   build --> verify["Verify<br/>use it as a user would"]
   verify --> publish["Publish that build<br/>to npm dev"]
   publish --> latest["Promote to latest<br/>you start it"]
@@ -58,12 +58,15 @@ flowchart LR
 
 ## CI (`ci.yml`)
 
-`changes` decides whether to run the suite; these jobs run and `ci` aggregates them:
+`changes` decides whether to run the suite; these jobs run and `ci` fails if any that ran didn't pass:
 
 - **lint/typecheck**: `lint:check`, `typecheck`, actionlint, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
-- **test**: unit tests (with coverage thresholds on `main` and `release`) and Docker-backed tests. On `main` it also computes the next dev version from git tags, syncs dependency versions and uploads the release build as `forge-release-beta-<run>`. On `release` it uploads coverage for Pages.
-- **docker**: one release build, dependency drift report, `forge publish --dry-run`, packs `create.tgz`, `forge docker --dry-run` (images built, not pushed), and on `release` the full e2e suite.
-- **verify-release** (`main` and manual runs only): takes `test`'s build, publishes it to a temporary registry ([Verdaccio](../../.github/ci/verdaccio.yaml)) inside the job, builds the images, then runs [`real-install.e2e.spec.ts`](../../projects/create/e2e/real-install.e2e.spec.ts): the real launcher, the generated app's install, typecheck, build, test, lint and `/health` on exact pnpm versions, the generated Dev Container, and the install steps in the docs. If it fails, nothing reaches npm. A broken merge turns `main` red, and publishing stops until a fix or revert lands ([ADR 0020](../adr/0020-test-the-real-install-before-publishing.md)).
+- **test (1/2, 2/2)**: unit tests split across two jobs, on everything except `main` and `release`.
+- **coverage** (`main` and `release`): the unit tests with coverage thresholds. On `release` it uploads coverage for Pages.
+- **test-docker**: Docker-backed tests. On `main`, `release` and manual runs, and on a PR that changes data code.
+- **build** (`main` and manual runs): stamps the dev version, syncs dependency versions and uploads the release build as `forge-release-beta-<run>`.
+- **package** (everything except `main`): one release build, dependency drift report and `forge publish --dry-run`. When the image files changed, or on `release`, it also packs `create.tgz` and runs `forge docker --dry-run` (images built, not pushed). On `release` it runs the full e2e suite too.
+- **verify-release** (`main` and manual runs only): takes `build`'s build, publishes it to a temporary registry ([Verdaccio](../../.github/ci/verdaccio.yaml)) inside the job, builds the images, then runs [`real-install.e2e.spec.ts`](../../projects/create/e2e/real-install.e2e.spec.ts): the real launcher, the generated app's install, typecheck, build, test, lint and `/health` on exact pnpm versions, the generated Dev Container, and the install steps in the docs. If it fails, nothing reaches npm. A broken merge turns `main` red, and publishing stops until a fix or revert lands ([ADR 0020](../adr/0020-test-the-real-install-before-publishing.md)).
 
 To run it on a branch without publishing: `gh workflow run ci.yml --ref <branch>`. Publish only follows pushes.
 

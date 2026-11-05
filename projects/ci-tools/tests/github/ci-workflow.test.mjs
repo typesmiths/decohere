@@ -16,4 +16,15 @@ describe("ci.yml and the merge queue", () => {
 	it("runs the whole suite in the queue: the docs-only shortcut is only for pull requests", () => {
 		expect(gate).toContain('"${{ github.event_name }}" == "merge_group"');
 	});
+
+	it("makes the required check wait for every job, so a failing job can't be missed", () => {
+		const jobs = yml.slice(yml.indexOf("\njobs:"));
+		const names = [...jobs.matchAll(/^ {2}([a-z-]+):$/gm)].map((match) => match[1]);
+		const needs = /^ {2}ci:\n {4}needs: \[(.+)\]$/m.exec(jobs)?.[1].split(", ");
+
+		// `release` follows `ci`.
+		expect(needs?.toSorted()).toEqual(
+			names.filter((name) => name !== "ci" && name !== "release").toSorted(),
+		);
+	});
 });

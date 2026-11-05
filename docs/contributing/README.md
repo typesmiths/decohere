@@ -52,4 +52,4 @@ GitHub is the only tracker; the plan is the milestones.
 
 ## CI
 
-Every PR, merge-queue run and push to `main` or `release` runs lint, typecheck, unit tests, Docker tests and an image build. A PR that only touches docs (nothing in [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml)) skips them. A merge to `main` publishes a dev release. Details: [CI and release](../ci/).
+Every PR and merge-queue run does lint, typecheck, unit tests and a package check. A PR also builds the images or runs the Docker tests when those files change. A PR that only touches docs (nothing in [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml)) skips them. `main` is the integration run: images, Docker tests, coverage and a real install, so a break there stops publishing. A merge to `main` publishes a dev release. Details: [CI and release](../ci/).
