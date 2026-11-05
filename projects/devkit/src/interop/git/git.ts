@@ -30,6 +30,17 @@ export class Git extends Shell {
 		return result.data[0];
 	}
 
+	/** When HEAD was committed, as seconds since the Unix epoch. */
+	public async getHeadCommitTime(options: GitOptions = defaultOptions): Promise<number> {
+		const { cwd } = options;
+		const result = await this.run({ cwd }, "show", "-s", "--format=%ct", "HEAD");
+		const seconds = Number(result.data[0]);
+		if (!Number.isInteger(seconds)) {
+			throw new InteropError(`git reported no commit time for HEAD: ${result.data.join(" ")}`);
+		}
+		return seconds;
+	}
+
 	public async tag(tag: string, options: GitOptions = defaultOptions) {
 		const args = [Commands.tag, tag];
 		const { cwd } = options;

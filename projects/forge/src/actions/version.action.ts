@@ -22,6 +22,12 @@ export type VersionOptions = {
 	releaseType?: VersionType;
 	channel?: string;
 	version?: string;
+	/** A CI run number: the version becomes `<base>-<channel>.<commit's UTC date>.<number>`. */
+	buildNumber?: string;
+	/** Copy the version from the built packages, failing if they don't all match. */
+	fromBuild?: boolean;
+	/** The build `fromBuild` reads. */
+	configuration?: string;
 	dryRun?: boolean;
 	commit?: boolean;
 	message?: string;
@@ -56,13 +62,7 @@ export class Version implements Action<VersionOptions> {
 		options: VersionOptions = DefaultVersionOptions,
 	): Promise<ActionResponse<VersionResponse>> {
 		const projects = workspace.getProjects("debug");
-		const rootVersion = await this.resolveBaseVersion(workspace, options);
-		const releaseType = options.fromChangesets
-			? await this.resolveReleaseTypeFromChangesets()
-			: (options.releaseType ?? DefaultReleaseType);
-		const channel = options.channel ?? DefaultChannel;
-		const nextVersion = this.getNextVersion(rootVersion, releaseType, channel);
-		this.#logger.info(`${rootVersion} → ${nextVersion} [${releaseType}]`);
+		const nextVersion = await this.resolveNextVersion(workspace, options);
 
 		if (options.dryRun) {
 			this.#logger.info(
@@ -102,6 +102,83 @@ export class Version implements Action<VersionOptions> {
 		}
 
 		return ActionResponse.Success(Version.name, responses);
+	}
+
+	private async resolveNextVersion(
+		workspace: Workspace,
+		options: VersionOptions,
+	): Promise<Semver> {
+		if (options.buildNumber != null && options.fromBuild) {
+			throw new ForgeError("Use --build-number or --from-build, not both");
+		}
+		if (options.buildNumber != null) {
+			return await this.versionFromBuildNumber(workspace, options);
+		}
+		if (options.fromBuild) {
+			return await this.versionFromBuild(workspace, options);
+		}
+
+		const rootVersion = await this.resolveBaseVersion(workspace, options);
+		const releaseType = options.fromChangesets
+			? await this.resolveReleaseTypeFromChangesets()
+			: (options.releaseType ?? DefaultReleaseType);
+		const channel = options.channel ?? DefaultChannel;
+		const nextVersion = this.getNextVersion(rootVersion, releaseType, channel);
+		this.#logger.info(`${rootVersion} → ${nextVersion} [${releaseType}]`);
+		return nextVersion;
+	}
+
+	private async versionFromBuildNumber(
+		workspace: Workspace,
+		options: VersionOptions,
+	): Promise<Semver> {
+		const { buildNumber, channel = DefaultChannel } = options;
+		if (buildNumber == null || !/^[1-9]\d*$/.test(buildNumber)) {
+			throw new ForgeError(`--build-number must be a positive whole number: ${buildNumber}`);
+		}
+		const seconds = await new Git().getHeadCommitTime({ cwd: workspace.rootDir });
+		const utcDay = new Date(seconds * 1000).toISOString().slice(0, 10).replaceAll("-", "");
+		const nextVersion = new Semver(await workspace.getVersion()).withPrerelease(
+			`${channel}.${utcDay}.${buildNumber}`,
+		);
+		this.#logger.info(`Version from build number: ${nextVersion}`);
+		return nextVersion;
+	}
+
+	private async versionFromBuild(
+		workspace: Workspace,
+		options: VersionOptions,
+	): Promise<Semver> {
+		const projects = workspace.getProjects(options.configuration ?? "release");
+		const built = await Promise.all(
+			projects.map(async (project) => ({
+				name: project.name,
+				version: await this.readBuiltVersion(project.getOutDir(), project.name),
+			})),
+		);
+		const versions = [...new Set(built.map((b) => b.version))];
+		if (versions.length !== 1) {
+			throw new ForgeError(
+				`Built packages disagree on the version: ${built.map((b) => `${b.name}@${b.version}`).join(", ")}`,
+			);
+		}
+		this.#logger.info(`Version from the build: ${versions[0]}`);
+		return new Semver(versions[0]);
+	}
+
+	private async readBuiltVersion(outDir: string, name: string): Promise<string> {
+		const file = join(outDir, "package.json");
+		let text: string;
+		try {
+			text = await readFile(file, "utf8");
+		} catch (reason) {
+			throw new ForgeError(`No build for ${name} at ${file}: ${formatUnknownError(reason)}`);
+		}
+		const { version } = JSON.parse(text) as { version?: unknown };
+		if (typeof version !== "string") {
+			throw new ForgeError(`The build of ${name} has no version: ${file}`);
+		}
+		return version;
 	}
 
 	private async resolveBaseVersion(

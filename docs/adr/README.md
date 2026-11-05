@@ -43,6 +43,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 | [0004](0004-oxlint-and-prettier.md) | Lint with oxlint, format with Prettier | Accepted |
 | [0009](0009-agent-instructions-in-agents-md.md) | Agent instructions live in `AGENTS.md`; `.claude/CLAUDE.md` imports it | Proposed |
 | [0014](0014-package-names.md) | Products keep their names (forge, flux, crucible, scribe); support libraries are named for what they do; hosting moves into `core` | Proposed |
+| [0019](0019-dev-versions-from-the-ci-run.md) | Dev versions come from the CI run, chosen once in CI; Publish reads them from the build; tags only record what shipped | Accepted |
 
 ### Build and packaging
 
