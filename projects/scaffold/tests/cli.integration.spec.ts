@@ -303,6 +303,25 @@ describe("scaffolder writes a webapi project", () => {
 		expectWebapiTree("/my-app");
 	});
 
+	// Without these, a new app failed its own typecheck (`Cannot find name 'process'`) and its
+	// install ended in ERR_PNPM_IGNORED_BUILDS on current pnpm.
+	it("declares the Node types the generated code needs to typecheck", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+
+		const pkg = JSON.parse(readFileSync("/my-app/package.json", "utf8"));
+		expect(pkg.devDependencies["@types/node"]).toBeTruthy();
+		expect(readFileSync("/my-app/projects/api/src/main.ts", "utf8")).toContain("process.env");
+	});
+
+	it("tells pnpm what to do with each dependency's install script", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+
+		const workspace = readFileSync("/my-app/pnpm-workspace.yaml", "utf8");
+		expect(workspace).toContain("allowBuilds:");
+		expect(workspace).toContain('"@swc/core": false');
+		expect(workspace).toContain("esbuild: false");
+	});
+
 	it("writes files for: webapi -d my-app (npx / direct bin)", async () => {
 		await runCliAsNodeBin(["create", "webapi", "-d", "my-app", ...NON_INTERACTIVE]);
 		expectWebapiTree("/my-app");

@@ -54,6 +54,7 @@ my-app/
       publish.yml       # forge publish (skips private); no docker push by default
   tsconfig.json
   biome.json
+  pnpm-workspace.yaml   # tells pnpm not to run the SWC and esbuild install scripts
   .env
   config/
     config.yaml

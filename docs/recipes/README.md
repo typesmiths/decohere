@@ -8,8 +8,8 @@ Run a `.ts` file directly, with no build step or scaffold.
 
 ```bash
 mkdir hello && cd hello
-pnpm init
-pnpm add -D @decohere/cli
+npm init -y && npm pkg set type=module
+npm i -D @decohere/cli
 ```
 
 ```ts
@@ -19,7 +19,7 @@ console.log(`hello ${name}`);
 ```
 
 ```bash
-pnpm exec flux run hello.ts -- Ada
+npx flux run hello.ts -- Ada
 # hello Ada
 ```
 
@@ -80,9 +80,9 @@ Point the package's `exports` at the layout [Forge](../../projects/forge/README.
 ```
 
 ```bash
-pnpm exec forge build --configuration release
-pnpm exec forge publish --channel latest --dry-run
-pnpm exec forge publish --channel latest    # after npm login
+npx forge build --configuration release
+npx forge publish --channel latest --dry-run
+npx forge publish --channel latest    # after npm login
 ```
 
 `--channel` is the npm dist-tag and defaults to `beta`. Forge skips private packages and versions already on npm; it does not write the name, version or `exports` for you.

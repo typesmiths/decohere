@@ -79,6 +79,7 @@ export class PackageJson implements KeyedModel {
 		this._devDependencies = {
 			"@decohere/forge": CREATE_VERSION,
 			"@decohere/cli": CREATE_VERSION,
+			"@types/node": "^24.0.0",
 			typescript: "^6.0.3",
 			"@biomejs/biome": "^2.0.0",
 			vitest: "^3.2.4",

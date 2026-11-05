@@ -25,11 +25,11 @@ Decohere chose the facade for the monorepo and published packages: **call sites 
 ## Install
 
 ```bash
-pnpm add @decohere/scribe
+npm i @decohere/scribe
 # optional Pino binding + recipe peers (Node):
-pnpm add @decohere/scribe-pino pino-pretty pino-roll
+npm i @decohere/scribe-pino pino-pretty pino-roll
 # or JSON lines through console (Workers, browsers, Deno, Bun, Node):
-pnpm add @decohere/scribe-console
+npm i @decohere/scribe-console
 ```
 
 ```ts
