@@ -6,11 +6,13 @@ Docker is required on the host. `@decohere/create` only pulls `ghcr.io/typesmith
 
 ## Usage
 
-`npm create` already says “create”, so the first token is the kind (`webapi`), not `create` again. The launcher forwards `decohere create webapi …` into the builder image.
+`npm create` already says “create”, so the first token is the kind (`webapi`), not `create` again. `webapi` is the only kind today, so you can leave it out and give just the project's folder. The launcher forwards `decohere create webapi …` into the builder image.
 
 This run prompts for database, auth, Postman, and whether to install:
 
 ```bash
+npm create @decohere@dev my-app
+# or
 npm create @decohere@dev webapi -d my-app
 # or
 npx @decohere/create@dev webapi -d my-app
@@ -26,7 +28,7 @@ npm create @decohere@dev -- webapi -d my-app --database postgres/typeorm --auth 
 
 Target directory is `webapi`'s optional argument or `-d` (default `.`). `npm create` treats `-d` as its own loglevel flag and forwards `my-app` as a positional — that form is supported. Extra create flags still need `--` after `npm create`.
 
-The first token after the package must be a command (`webapi`); a bare directory name is an unknown command.
+A first token that isn't a command (`webapi`, `create`, `add`, `auth0`, `help`) or a flag is the project's folder, so a mistyped command starts a project with that name.
 
 The scaffolded Dev Container asks **y/N** (TTY only) before npm auth and optional codebase RAG MCP (semantic search). Decline or run without a TTY to skip. Credentials are written under the project `.cursor/` directory (gitignored).
 

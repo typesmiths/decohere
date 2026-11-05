@@ -130,6 +130,45 @@ describe("resolveLaunch", () => {
 	});
 });
 
+describe("resolveLaunch with a bare project name", () => {
+	it("scaffolds a web API into that folder", () => {
+		const plan = resolveLaunch(["my-app"], "/cwd");
+		expect(plan.targetDir).toBe("/cwd/my-app");
+		expect(plan.projectName).toBe("my-app");
+		expect(plan.kind).toBe("scaffold");
+		expect(plan.containerArgv).toEqual(["create", "webapi", "-d", "."]);
+	});
+
+	it("keeps the flags that follow the name", () => {
+		const plan = resolveLaunch(["my-app", "--auth", "none", "-y"], "/cwd");
+		expect(plan.targetDir).toBe("/cwd/my-app");
+		expect(plan.containerArgv).toEqual([
+			"create",
+			"webapi",
+			"--auth",
+			"none",
+			"-y",
+			"-d",
+			".",
+		]);
+	});
+
+	it.each([["create", "webapi"], ["add", "api", "billing"], ["auth0", "login"], ["help"]])(
+		"leaves the command %s as it is",
+		(...command) => {
+			const plan = resolveLaunch(command, "/cwd");
+			expect(plan.targetDir).toBe("/cwd");
+			expect(plan.containerArgv).toEqual([...command, "-d", "."]);
+		},
+	);
+
+	it("leaves a leading flag alone", () => {
+		const plan = resolveLaunch(["--version", "extra"], "/cwd");
+		expect(plan.targetDir).toBe("/cwd");
+		expect(plan.containerArgv).toEqual(["--version", "extra", "-d", "."]);
+	});
+});
+
 describe("containerArgvFromHost", () => {
 	it("strips host --log-level / --config-file and prepends create for npm webapi", () => {
 		expect(

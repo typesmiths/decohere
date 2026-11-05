@@ -10,18 +10,24 @@ export type LaunchPlan = {
 };
 
 const HOST_FLAGS_WITH_VALUE = new Set(["--config-file", "--log-level"]);
+const PRODUCT_COMMANDS = new Set(["create", "add", "auth0", "help"]);
 
 /**
  * Map host / npm-create argv onto the product CLI (`create webapi` / `add api`).
  * `npm create @decohere webapi` already says “create”, so we prepend `create`
- * rather than making users type `create create webapi`.
+ * rather than making users type `create create webapi`. `webapi` is the only kind
+ * of project, so a first word that isn't a command is the project's folder.
  */
 export function toProductArgv(tokens: string[]): string[] {
-	if (tokens[0] === "webapi" && tokens[1] === "add") {
+	const [first] = tokens;
+	if (first === "webapi" && tokens[1] === "add") {
 		return ["add", "api", ...tokens.slice(2)];
 	}
-	if (tokens[0] === "webapi") {
+	if (first === "webapi") {
 		return ["create", "webapi", ...tokens.slice(1)];
+	}
+	if (first != null && !first.startsWith("-") && !PRODUCT_COMMANDS.has(first)) {
+		return ["create", "webapi", ...tokens];
 	}
 	return tokens;
 }
