@@ -25,23 +25,19 @@
   "exports": {
     "./cli": {
       "types": "./types/src/cli/index.d.ts",
-      "import": "./es6/src/cli/index.js",
-      "require": "./commonjs/src/cli/index.js"
+      "import": "./es6/src/cli/index.js"
     },
     "./diagnostics": {
       "types": "./types/src/diagnostics/index.d.ts",
-      "import": "./es6/src/diagnostics/index.js",
-      "require": "./commonjs/src/diagnostics/index.js"
+      "import": "./es6/src/diagnostics/index.js"
     },
     "./interop": {
       "types": "./types/src/interop/index.d.ts",
-      "import": "./es6/src/interop/index.js",
-      "require": "./commonjs/src/interop/index.js"
+      "import": "./es6/src/interop/index.js"
     },
     "./io": {
       "types": "./types/src/io/index.d.ts",
-      "import": "./es6/src/io/index.js",
-      "require": "./commonjs/src/io/index.js"
+      "import": "./es6/src/io/index.js"
     }
   },
   "scripts": {

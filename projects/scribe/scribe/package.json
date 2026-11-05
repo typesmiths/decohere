@@ -24,13 +24,11 @@
   "exports": {
     ".": {
       "types": "./types/src/index.d.ts",
-      "import": "./es6/src/index.js",
-      "require": "./commonjs/src/index.js"
+      "import": "./es6/src/index.js"
     },
     "./testing": {
       "types": "./types/src/testing/index.d.ts",
-      "import": "./es6/src/testing/index.js",
-      "require": "./commonjs/src/testing/index.js"
+      "import": "./es6/src/testing/index.js"
     }
   },
   "scripts": {

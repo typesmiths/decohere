@@ -26,13 +26,11 @@
   "exports": {
     ".": {
       "types": "./types/src/index.d.ts",
-      "import": "./es6/src/index.js",
-      "require": "./commonjs/src/index.js"
+      "import": "./es6/src/index.js"
     },
     "./decorators": {
       "types": "./types/src/decorators/index.d.ts",
-      "import": "./es6/src/decorators/index.js",
-      "require": "./commonjs/src/decorators/index.js"
+      "import": "./es6/src/decorators/index.js"
     }
   },
   "scripts": {

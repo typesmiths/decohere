@@ -27,7 +27,6 @@ describe("forge release build output", () => {
 		const rootExport = packageJson.exports["."];
 
 		expect(existsSync(releasePath(rootExport.import))).toBe(true);
-		expect(existsSync(releasePath(rootExport.require))).toBe(true);
 		expect(existsSync(releasePath(rootExport.types))).toBe(true);
 		expect(existsSync(releasePath("./types/src/actions/version.action.d.ts"))).toBe(true);
 		expect(existsSync(releasePath("./types/src/commands/forge.command.d.ts"))).toBe(true);

@@ -66,7 +66,7 @@ function install(app: string, built: Map<string, string>, leaveOut?: string) {
 		const to = join(modules, name);
 		cpSync(from, to, {
 			recursive: true,
-			filter: (path) => !/\/(commonjs|tests)(\/|$)/.test(path.slice(from.length)),
+			filter: (path) => !/\/tests(\/|$)/.test(path.slice(from.length)),
 		});
 		for (const dependency of declaredBy(readManifest(to))) copyBuilt(dependency);
 	};
