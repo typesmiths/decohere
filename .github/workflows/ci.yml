@@ -273,6 +273,9 @@ jobs:
         run: |
           pnpm forge --log-level info dependencies --configuration release report --fail-on-drift
 
+      - name: Typecheck a generated app against this build
+        run: pnpm exec vitest run --project e2e --silent=passed-only projects/scaffold/e2e
+
       - name: Dry-run npm publish
         run: |
           pnpm forge --log-level info publish --configuration release --channel dev --dry-run
