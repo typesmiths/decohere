@@ -1,0 +1,48 @@
+name: Promote to latest
+
+# Moves npm's `latest` tag to a version already on `dev`. Started by hand. npm grants this over OIDC
+# only to this file: each package has a trusted publisher for it with "Allow npm dist-tag" on.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to promote. Empty: what dev points at."
+        required: false
+        type: string
+      allow_young:
+        description: "Allow a version under a day old. Current pnpm would install an older one until it's a day old."
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: promote-latest
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          fetch-tags: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      # Moving a tag over OIDC needs npm 11.21 or 12.2 at least.
+      - name: Install npm
+        run: npm install -g npm@12.2.2
+
+      - name: Move latest
+        env:
+          PROMOTE_VERSION: ${{ inputs.version }}
+          PROMOTE_ALLOW_YOUNG: ${{ inputs.allow_young }}
+        run: node projects/ci-tools/src/release/promote-latest.mjs

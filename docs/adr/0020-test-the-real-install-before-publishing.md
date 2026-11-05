@@ -15,6 +15,7 @@ Testing after publishing would find them, but only once a broken version was alr
 - A push to `main` also runs `verify-release`. It takes the stamped build, publishes it to a Verdaccio registry that exists only inside the job, builds the images, and uses them as a user would: the launcher, the generated app, and the install steps in the docs.
 - Publish runs only if that passes, and uploads the same package build.
 - These tests pin exact tool versions, updated in PRs, so a new tool release can't fail a merge without warning.
+- `latest` moves only by starting `promote-latest.yml`, and only to a version with a `v*` tag, so only a version that passed these checks and shipped. It has its own trusted publisher, so `publish.yml` never gets the right to move `latest`.
 
 ## Consequences
 
@@ -32,3 +33,4 @@ Not chosen:
 ## History
 
 - 2026-11-05: Decided, after those bugs reached users.
+- 2026-11-05: Added promoting to `latest` from a manually started workflow, which npm's trusted publishing has allowed since 2026-09-30.
