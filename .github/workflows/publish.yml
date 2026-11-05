@@ -117,10 +117,7 @@ jobs:
       actions: read
       packages: read
       deployments: read
-      issues: write
     outputs:
-      unpublished: ${{ steps.probe.outputs.unpublished }}
-      bootstrap_issue_url: ${{ steps.bootstrap_nudge.outputs.issue_url }}
       skip_npm: ${{ steps.probe.outputs.skip_npm }}
       skip_docker: ${{ steps.probe.outputs.skip_docker }}
       image_tag: ${{ steps.probe.outputs.image_tag }}
@@ -145,77 +142,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node projects/ci-tools/src/github/publish-verify.mjs
 
-      - name: OIDC bootstrap issue
+      # The merge queue stops this first; a push that skipped it still shouldn't half-publish.
+      - name: Stop if a package has never been published
         if: steps.probe.outputs.unpublished != ''
-        id: bootstrap_nudge
         env:
           UNPUBLISHED: ${{ steps.probe.outputs.unpublished }}
-          PUBLISH_CHANNEL: ${{ needs.guard.outputs.channel }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: node projects/ci-tools/src/github/oidc-bootstrap-nudge.mjs
-
-  oidc-bootstrap:
-    name: "First-publish ${{ needs.verify.outputs.unpublished }}"
-    needs: [guard, verify]
-    if: >
-      needs.guard.outputs.should_publish == 'true' &&
-      needs.verify.outputs.unpublished != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    environment:
-      name: npm-oidc-bootstrap
-      url: ${{ needs.verify.outputs.bootstrap_issue_url }}
-    permissions:
-      contents: read
-    steps:
-      - name: Wait for trusted publisher
         run: |
-          {
-            echo "## npm OIDC bootstrap required"
-            echo
-            echo "Instructions: ${{ needs.verify.outputs.bootstrap_issue_url }}"
-            echo
-            echo "These package names are not on the registry yet:"
-            echo
-            echo "\`${{ needs.verify.outputs.unpublished }}\`"
-            echo
-            echo "For each name:"
-            echo "1. First-publish **public** (\`--access public\`; scoped names default to restricted)."
-            echo "2. npm package settings → Trusted Publisher → GitHub Actions:"
-            echo "   - Organization: \`typesmiths\`"
-            echo "   - Repository: \`decohere\`"
-            echo "   - Workflow filename: \`publish.yml\`"
-            echo "   - Environment: \`npm-publish\`"
-            echo "   - Allowed action: \`npm publish\` (not staged-only)"
-            echo "3. Approve this deployment."
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-
-      - name: Re-check package names exist
-        run: |
-          node projects/ci-tools/src/github/publish-verify.mjs
-          unpublished="$(grep '^unpublished=' "$GITHUB_OUTPUT" | tail -1 | cut -d= -f2-)"
-          if [[ -n "$unpublished" ]]; then
-            echo "Still unpublished after approval: $unpublished"
-            exit 1
-          fi
+          echo "::error::Not on npm yet: $UNPUBLISHED. An owner runs pnpm npm:bootstrap --otp <code> $UNPUBLISHED, then reruns this."
+          exit 1
 
   npm:
-    needs: [guard, verify, oidc-bootstrap]
-    if: >
-      always() &&
-      needs.guard.outputs.should_publish == 'true' &&
-      needs.verify.result == 'success' &&
-      (needs.oidc-bootstrap.result == 'success' || needs.oidc-bootstrap.result == 'skipped')
+    needs: [guard, verify]
+    if: needs.guard.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: npm-publish

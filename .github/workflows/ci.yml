@@ -103,6 +103,9 @@ jobs:
           tar -xzf /tmp/actionlint.tar.gz -C /tmp actionlint
           /tmp/actionlint -color
 
+      - name: Check for packages not on npm yet
+        run: node ${{ env.CI_TOOLS }}/github/first-publish-check.mjs
+
       - name: Run pnpm audit
         run: |
           set +e

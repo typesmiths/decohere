@@ -43,7 +43,7 @@
     "./github/ensure-metadata": "./src/github/ensure-metadata.mjs",
     "./github/create-or-update-pr": "./src/github/create-or-update-pr.mjs",
     "./github/publish-verify": "./src/github/publish-verify.mjs",
-    "./github/oidc-bootstrap-nudge": "./src/github/oidc-bootstrap-nudge.mjs",
+    "./github/first-publish-check": "./src/github/first-publish-check.mjs",
     "./github/npm-bootstrap": "./src/github/npm-bootstrap.mjs",
     "./github/smoke-create-launcher": "./src/github/smoke-create-launcher.mjs"
   },
