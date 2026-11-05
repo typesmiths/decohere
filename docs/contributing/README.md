@@ -53,3 +53,7 @@ GitHub is the only tracker; the plan is the milestones.
 ## CI
 
 Every PR and merge-queue run does lint, typecheck, unit tests and a package check. A PR also builds the images or runs the Docker tests when those files change. A PR that only touches docs (nothing in [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml)) skips them. `main` is the integration run: images, Docker tests, coverage and a real install, so a break there stops publishing. A merge to `main` publishes a dev release. Details: [CI and release](../ci/).
+
+## Adding a package
+
+You can propose a new package without any npm access. A package's first publish needs an owner's npm login, so an owner does it: see [Adding a new npm package](../ci/#adding-a-new-npm-package).

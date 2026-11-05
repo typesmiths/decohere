@@ -224,17 +224,13 @@ jobs:
           fetch-depth: 1
 
       - uses: ./.github/actions/setup-node-pnpm
-        with:
-          configure-git: "true"
-          git-user-name: GitHub Actions
-          git-user-email: actions@github.com
 
       # The one place a dev version is chosen; Publish reads it from this build.
       - name: Stamp the dev version
         run: pnpm forge --log-level info version --channel dev --build-number ${{ github.run_number }}
 
       - name: Sync cross-library dependency versions
-        run: node ${{ env.RELEASE_SCRIPTS }}/sync-dependencies.mjs
+        run: pnpm forge --log-level info dependencies --configuration release sync
 
       - name: Build release artifacts
         run: pnpm forge --log-level info build --configuration release
@@ -355,6 +351,10 @@ jobs:
           pnpm forge --log-level info version --from-build --configuration release
           pnpm forge --log-level info dependencies --configuration release sync
           echo "DECOHERE_E2E_VERSION=$(node -p 'require("./package.json").version')" >> "$GITHUB_ENV"
+
+      # First: they take seconds, and packing for the images changes dist/release.
+      - name: Check the build and the forge CLI
+        run: pnpm exec vitest run --project e2e --silent=passed-only projects/cli/e2e projects/forge/e2e
 
       - name: Start the temporary registry
         run: |
