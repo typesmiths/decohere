@@ -80,6 +80,17 @@ describe("promoteLatest", () => {
 		expect(moves).toEqual(PACKAGES);
 	});
 
+	it("refuses to replace a stable latest with a dev version, moving nothing", () => {
+		const { code, output, moves } = promote(
+			{ latest: { "@decohere/cli": "0.1.0", "@decohere/core": "0.1.0" } },
+			{ version: VERSION },
+		);
+
+		expect(code).toBe(1);
+		expect(output).toContain("latest is the stable 0.1.0");
+		expect(moves).toEqual([]);
+	});
+
 	it("refuses a version without a v* tag, moving nothing", () => {
 		const { code, output, moves } = promote({ tags: [] }, { version: VERSION });
 

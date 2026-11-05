@@ -1,11 +1,9 @@
 name: Prepare publish workspace
-description: Install, download release artifacts, apply their version (dev) (repo must already be checked out)
+description: Install, download release artifacts, apply their version (repo must already be checked out)
 inputs:
   ci_run_id:
     required: true
   release_channel:
-    required: true
-  channel:
     required: true
   configure-git:
     required: false
@@ -28,13 +26,11 @@ runs:
 
     # CI chose the version when it built; working it out again here could disagree.
     - name: Apply the version from the build
-      if: ${{ inputs.channel == 'dev' }}
       shell: bash
       run: |
         pnpm forge --log-level info version --from-build --configuration release
 
     - name: Sync cross-library dependency versions
-      if: ${{ inputs.channel == 'dev' }}
       shell: bash
       run: |
         pnpm forge --log-level info dependencies --configuration release sync

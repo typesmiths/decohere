@@ -43,6 +43,13 @@ export function promoteLatest(options) {
 	}
 	log(`Promoting ${version} to latest on ${packages.length} packages`);
 
+	// Once a stable version is out, latest belongs to releases: see "Stable release" in docs/ci.
+	const current = /^latest: (.+)$/m.exec(npm("dist-tag", "ls", LAUNCH_PACKAGE).stdout)?.[1];
+	if (current != null && !current.includes("-") && version.includes("-")) {
+		log(`latest is the stable ${current}, and ${version} is a dev version. Nothing moved.`);
+		return 1;
+	}
+
 	const tag = run("git", ["tag", "--list", `v${version}`]).stdout.trim();
 	if (tag !== `v${version}`) {
 		log(`${version} has no v${version} tag, so it didn't fully ship. Nothing moved.`);

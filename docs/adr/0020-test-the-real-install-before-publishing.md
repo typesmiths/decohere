@@ -15,7 +15,8 @@ Testing after publishing would find them, but only once a broken version was alr
 - A push to `main` is the integration run, and does not repeat what the queue checked on that same commit. It runs the coverage gate, Docker-backed tests and `verify-release`, which takes the stamped build, publishes it to a Verdaccio registry that exists only inside the job, builds the images, and uses them as a user would: the launcher, the generated app, and the install steps in the docs.
 - Publish runs only if that passes, and uploads the same package build.
 - These tests pin exact tool versions, updated in PRs, so a new tool release can't fail a merge without warning.
-- `latest` moves only by starting `promote-latest.yml`, and only to a version with a `v*` tag, so only a version that passed these checks and shipped. It has its own trusted publisher, so `publish.yml` never gets the right to move `latest`.
+- A stable release ships a tested build without rebuilding it or repeating `main`'s checks. Started by hand in `publish.yml`, it changes only the version and pins in the build's `package.json` files, fails if the old version appears anywhere else, and passes the same `verify-release` checks before publishing. A build at two versions differed only in those files when measured, though images are rebuilt because the scaffolder pins versions.
+- Until the first stable release, `latest` moves only by starting `promote-latest.yml`, and only to a version with a `v*` tag, so only a version that passed these checks and shipped. It has its own trusted publisher, so `publish.yml` never gets the right to move `latest`.
 
 ## Consequences
 
@@ -33,5 +34,6 @@ Not chosen:
 ## History
 
 - 2026-11-05: Decided, after those bugs reached users.
+- 2026-11-05: Added stable releases from a tested build, replacing the long-running `release` branch.
 - 2026-11-05: Shortened merges: images and Docker-backed tests left the queue and most PRs, and `main` stopped repeating the queue's checks. An image break can now land on `main`, where this check stops it from being published.
 - 2026-11-05: Added promoting to `latest` from a manually started workflow, which npm's trusted publishing has allowed since 2026-09-30.

@@ -36,7 +36,7 @@ GitHub issues and milestones are the only tracker. The full flow: [contributing]
 - PR descriptions follow `.github/pull_request_template.md`: the problem, what changed, how we know it works, in plain language for someone new to the code.
 - Bug fixes: write the failing test first, then fix, then rerun the same test.
 - Durable design choices get an ADR in `docs/adr/`: one record per topic, so check [the index](docs/adr/README.md) and update the existing record before adding a new one.
-- No changesets until the first public npm release ([ADR 0003](docs/adr/0003-no-changesets-until-public-release.md)). Don't add `.changeset/` files or the `skip-changeset` label.
+- No changesets for now ([ADR 0003](docs/adr/0003-no-changesets-until-public-release.md)). Don't add `.changeset/` files or the `skip-changeset` label.
 
 ## Working rules
 

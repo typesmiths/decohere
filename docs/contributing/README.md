@@ -44,7 +44,7 @@ GitHub is the only tracker; the plan is the milestones.
    - Test behaviour, not wiring ([testing](../testing/)).
    - A lasting design choice updates its [ADR](../adr/), and [architecture](../architecture/) or [style](../style/), in the same PR.
    - Changed a `package.json`? Run `pnpm install` and commit `pnpm-lock.yaml`.
-   - No changesets until the first public release ([ADR 0003](../adr/0003-no-changesets-until-public-release.md)).
+   - No changesets for now ([ADR 0003](../adr/0003-no-changesets-until-public-release.md)).
    - Before pushing: `pnpm run lint && pnpm run typecheck && pnpm test`.
 4. **Pull request.** Push and open one early (`gh pr create --fill --draft`). The template asks for the problem, what changed and how we know it works: write it for someone new to the code, and end with `Closes #<issue>`. Mark it ready when CI is green.
 5. **Merge.** Click merge. Once `ci` passes, the PR joins `main`'s merge queue: GitHub tests it on top of `main` and the PRs ahead of it, then squash-merges it. If that run fails, the PR leaves the queue and `main` is untouched. No need to update branches by hand.
