@@ -15,6 +15,53 @@ CI stores no secrets or variables. npm publishing uses Trusted Publishing (OIDC)
 
 `main` accepts changes only through the merge queue, with squash merges, and requires the `ci` check. A branch without a pull request gets no CI; open a draft PR. Docs-only changes (nothing matching [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml)) skip the suite on pull requests and `main` pushes, and the `ci` check still passes. `release`, `workflow_dispatch` and the merge queue always run everything.
 
+## The flows
+
+A pull request runs the quick checks, and nothing installs Decohere for real:
+
+```mermaid
+flowchart LR
+  pr["PR opened"] --> changes{"Code changed?"}
+  changes -- "docs only: suite skipped" --> ci
+  changes -- yes --> lint["lint/typecheck<br/>oxlint, Prettier, tsc,<br/>actionlint, audit"]
+  changes -- yes --> test["test<br/>unit and Docker-backed"]
+  changes -- yes --> docker["docker<br/>release build, drift,<br/>publish dry run, images"]
+  lint --> ci["ci<br/>required check"]
+  test --> ci
+  docker --> ci
+  ci -- "you add it" --> queue["Merge queue<br/>same suite again,<br/>on the PR plus main"]
+  queue --> main["main"]
+  ci -- fails --> stop["PR can't merge"]
+  queue -- fails --> stop
+```
+
+A push to `main` builds once and tests that build the way a user would. Only then does Publish upload it:
+
+```mermaid
+flowchart TD
+  push["Push to main"] --> suite["Same suite, plus coverage gate"]
+  suite --> build["One build, version stamped<br/>0.0.1-dev.20261105.49"]
+  build --> verify
+  subgraph verify["verify-release: uses the build as a user would"]
+    direction TB
+    registry["Publish the packages to a<br/>temporary registry in the job"] --> images["Build the images, no push"]
+    images --> launcher["Run the real launcher<br/>App pinned to this version?"]
+    launcher --> app["Generated app on exact pnpm versions:<br/>install, typecheck, build, test, lint, /health"]
+    app --> devcontainer["Same checks inside its Dev Container"]
+    devcontainer --> docsteps["The docs' npm and pnpm install steps"]
+  end
+  verify -- fails --> red["main is red, nothing reaches npm<br/>Publishing stops until a fix or revert"]
+  verify -- passes --> guard
+  subgraph publish["Publish"]
+    direction TB
+    guard["Newest commit only, skip docs-only"] --> upload["Upload the tested packages<br/>npm tag dev moves to this version"]
+    upload --> rebuilt["Rebuild images from those packages,<br/>push, run the launcher smoke check"]
+    rebuilt --> tag["Check npm serves it, push the v* tag"]
+  end
+  build -. "same package build" .-> upload
+  tag -. "by hand, see Changing npm by hand" .-> latest["Move latest"]
+```
+
 ## Workflow files
 
 | File | Role |
