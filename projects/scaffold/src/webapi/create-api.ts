@@ -147,6 +147,17 @@ function createWorkspace(
 	monoRepo.addModel(new EnvFile());
 	monoRepo.addFile(new DevContainerHostScripts());
 
+	// Current pnpm fails the install on any dependency's install script nobody has decided about.
+	// The app works without these two, so decide "don't run" rather than run third-party scripts.
+	monoRepo.addFile({
+		files: () => [
+			{
+				filePath: "pnpm-workspace.yaml",
+				content: 'allowBuilds:\n  "@swc/core": false\n  esbuild: false\n',
+			},
+		],
+	});
+
 	// Biome formatter/linter config
 	monoRepo.addFile({
 		files: () => [

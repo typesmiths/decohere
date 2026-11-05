@@ -68,4 +68,4 @@ describe("forge typecheck with no tsconfig.json (real process)", () => {
 		expect(result.stdout + result.stderr).toContain("TS2322");
 		expect(result.stdout + result.stderr).not.toContain("TS5101");
 	});
-});
+}, 180_000);
