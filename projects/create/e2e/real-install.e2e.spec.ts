@@ -5,6 +5,8 @@
  *
  * Requires DECOHERE_E2E_REGISTRY, with every package published there at DECOHERE_E2E_VERSION, and
  * the scaffolder image built under that version. Skipped without them.
+ * The Dev Container checks also need DECOHERE_E2E_CONTAINER_REGISTRY, the same registry as seen
+ * from inside a container.
  */
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import {
@@ -22,9 +24,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const registry = process.env.DECOHERE_E2E_REGISTRY ?? "";
 const version = process.env.DECOHERE_E2E_VERSION ?? "";
+const containerRegistry = process.env.DECOHERE_E2E_CONTAINER_REGISTRY ?? "";
 
 // Exact versions: a new release of a tool must not fail a publish without warning.
 const PNPM_VERSIONS = ["10.34.6", "12.16.1"];
+const DEVCONTAINER_CLI_VERSION = "0.90.0";
 const FIVE_MINUTES = 300_000;
 
 const SOURCE = `enum Level {
@@ -172,6 +176,45 @@ describe.skipIf(!registry || !version)(
 						if (server.pid != null) process.kill(-server.pid, "SIGTERM");
 					}
 				});
+			},
+			FIVE_MINUTES,
+		);
+
+		// Inside a container, the registry is reached through the Docker host.
+		describe.skipIf(!containerRegistry)(
+			"the generated Dev Container",
+			() => {
+				const dir = join(root, "devcontainer-app");
+				const devcontainer = (...args: string[]) =>
+					run("npx", ["-y", `@devcontainers/cli@${DEVCONTAINER_CLI_VERSION}`, ...args], root);
+
+				beforeAll(() => {
+					cpSync(app, dir, { recursive: true });
+					writeFileSync(join(dir, ".npmrc"), `registry=${containerRegistry}\n`);
+					expectOk(run("git", ["init", "-q"], dir));
+				});
+
+				afterAll(() => {
+					const containers = run(
+						"docker",
+						["ps", "-aq", "--filter", `label=devcontainer.local_folder=${dir}`],
+						root,
+					);
+					for (const id of containers.output.split("\n").filter(Boolean)) {
+						expectOk(run("docker", ["rm", "-f", id], root));
+					}
+				});
+
+				it("builds, starts and installs the app", () => {
+					expectOk(devcontainer("up", "--workspace-folder", dir));
+				});
+
+				it.each(["typecheck", "build", "test", "lint:check"])(
+					"passes %s inside it",
+					(script) => {
+						expectOk(devcontainer("exec", "--workspace-folder", dir, "pnpm", "run", script));
+					},
+				);
 			},
 			FIVE_MINUTES,
 		);
