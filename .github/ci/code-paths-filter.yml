@@ -19,6 +19,8 @@ code:
 images:
   - "projects/create/**"
   - "projects/devcontainer/**"
+  - "projects/scaffold/src/models/docker-image.model.ts"
+  - "projects/scaffold/src/webapi/models/webapi-image.model.ts"
   - "projects/forge/src/actions/docker.action.ts"
   - ".github/workflows/ci.yml"
 
