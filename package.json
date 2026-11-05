@@ -33,6 +33,7 @@
     "changeset:check": "node projects/ci-tools/src/changeset/check-status.mjs",
     "version:aggregate": "node projects/ci-tools/src/changeset/aggregate-changelog.mjs",
     "npm:bootstrap": "node projects/ci-tools/src/github/npm-bootstrap.mjs",
+    "npm:trust-promote": "node projects/ci-tools/src/github/npm-trust-promote.mjs",
     "forge": "node --import ./tools/register.mjs projects/cli/src/forge.ts",
     "flux": "node --import ./tools/register.mjs projects/cli/src/flux.ts",
     "test:docker": "vitest run --project docker --silent=passed-only"

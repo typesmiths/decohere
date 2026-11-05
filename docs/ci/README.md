@@ -35,7 +35,7 @@ flowchart LR
   push["Push to main"] --> build["Checks and<br/>one build"]
   build --> verify["Verify<br/>use it as a user would"]
   verify --> publish["Publish that build<br/>to npm dev"]
-  publish --> latest["Move latest<br/>by hand"]
+  publish --> latest["Promote to latest<br/>you start it"]
   verify -- fails --> red["main is red<br/>nothing published"]
 ```
 
@@ -44,6 +44,7 @@ flowchart LR
 | File | Role |
 |---|---|
 | [`ci.yml`](../../.github/workflows/ci.yml) | The suite; required check `ci`. Calls `release.yml` on `release`. |
+| [`promote-latest.yml`](../../.github/workflows/promote-latest.yml) | Started by hand: moves npm `latest` to a version that fully shipped. |
 | [`publish.yml`](../../.github/workflows/publish.yml) | After CI succeeds on `main`/`release`: npm, Docker images, smoke test, `v*` tag. |
 | [`pages.yml`](../../.github/workflows/pages.yml) | After CI succeeds on `release`: coverage and CI badges to GitHub Pages. |
 | [`bench.yml`](../../.github/workflows/bench.yml) | Nightly benchmarks on `main`, deployed to Pages. |
@@ -137,15 +138,40 @@ npm can attach a Trusted Publisher only to a name that exists. When Publish find
 2. By hand instead: `npm publish ./projects/<dir> --access public --tag dev` (drop `--tag` for a stable version), then on npm: package settings, Trusted Publisher, GitHub Actions, with organization `typesmiths`, repository `decohere`, workflow `publish.yml`, environment `npm-publish`, allowed action `npm publish`.
 3. Approve the waiting deployment. The job checks the names exist and Publish continues. If it already failed, run `gh run rerun --failed`.
 
+## Promote to latest
+
+[`promote-latest.yml`](../../.github/workflows/promote-latest.yml) moves `latest` to a version already on `dev`, with no login or OTP. Start it from the Actions tab, or:
+
+```bash
+gh workflow run promote-latest.yml                       # what dev points at
+gh workflow run promote-latest.yml -f version=<version>
+```
+
+It stops with nothing moved if any package lacks the version, or the version has no `v*` tag, which means it didn't fully ship. It also stops if the version is under a day old, because current pnpm skips versions that new and would install an older one; `-f allow_young=true` overrides that. Run it again if it stops partway: packages already there are skipped.
+
+**Setup, once.** Each package needs a Trusted Publisher for this workflow, separate from its `publish.yml` one, and `npm trust` has no flag for its permission.
+
+1. On npmjs.com, in the settings of `@decohere/cli`, add a Trusted Publisher: GitHub Actions, organization `typesmiths`, repository `decohere`, workflow `promote-latest.yml`, no environment. Under Allowed actions, turn **Allow npm publish** off and **Allow npm dist-tag** on.
+2. Copy it to every other package with one OTP code. This uses npm's undocumented registry endpoint, and only adds entries:
+
+   ```bash
+   NPM_TOKEN="$(sed -n 's#^//registry.npmjs.org/:_authToken=##p' ~/.npmrc)" \
+     pnpm npm:trust-promote --otp <code>
+   ```
+
+3. Run the workflow within 2 days: npm's docs say a new publisher must complete a successful publish in that time.
+
+A new package needs step 2 again: `pnpm npm:bootstrap` prints a reminder.
+
 ## Changing npm by hand
 
-CI can only publish: Trusted Publishing doesn't cover `dist-tag` or anything else an owner does on npm. Those run from an owner's machine, on the owner's npm login.
+When the workflow can't do it, changes on npm run from an owner's machine, on the owner's npm login.
 
 - **Log in through the browser.** `npm whoami` shows whether you're logged in; if not, run `npm login`. The owner does this; agents don't.
 - **Use one OTP code, not access tokens.** Every npm write needs 2FA. With `--otp=<code>` npm uses the code; without it, npm asks you to log in again in the browser for each package. Agents ask the owner for a code and never ask them to create a token.
 - **Run all the packages in one command.** A code expires in about 30 seconds, so go in parallel, not one by one.
 
-To point `latest` at a version on every package:
+To point `latest` at a version on every package without the workflow:
 
 ```bash
 VERSION=<version>   # must already be on npm for every package; check the dev tag

@@ -44,4 +44,4 @@ GitHub issues and milestones are the only tracker. The full flow: [contributing]
 - Never silence an error to get past it: no empty `catch`, no error listener that only logs and carries on, no `any` or `@ts-expect-error` to turn a check green. If a fix seems to need one, stop and ask.
 - If the same kind of attempt fails 3 times with no progress, stop and ask instead of guessing a new approach.
 - Debug CI from real run logs (`gh run view <id> --log-failed`), not by running workflows locally.
-- Changing anything on npm by hand (such as moving `latest`) uses the owner's browser login and one OTP code, never an access token: follow [Changing npm by hand](docs/ci/README.md#changing-npm-by-hand).
+- Move `latest` with the [Promote to latest](docs/ci/README.md#promote-to-latest) workflow. Anything else on npm by hand uses the owner's browser login and one OTP code, never an access token: follow [Changing npm by hand](docs/ci/README.md#changing-npm-by-hand).

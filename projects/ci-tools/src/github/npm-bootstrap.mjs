@@ -166,6 +166,9 @@ export async function runBootstrap(options = {}) {
 	}
 
 	log(
+		"\nFor each new package, also run `pnpm npm:trust-promote --otp <code>`, so Promote to latest can move its tag.",
+	);
+	log(
 		"\nDone. Approve the waiting npm-oidc-bootstrap deployment on the Publish run, or rerun it: `gh run rerun --failed <run-id>`.",
 	);
 	return 0;
