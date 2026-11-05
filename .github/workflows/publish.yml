@@ -95,7 +95,7 @@ jobs:
             exit 0
           fi
 
-          # A v* tag is pushed only after npm + Docker + create smoke succeed.
+          # A v* tag is pushed only after npm and Docker succeed, and anyone can read the images.
           # Presence means this tip SHA already fully shipped — skip duplicates.
           # Absence allows retries; verify skips npm and/or Docker when already shipped.
           existing="$(git tag --points-at "$SHA" | grep -E '^v[0-9]' || true)"
@@ -248,31 +248,24 @@ jobs:
           FORGE_DOCKER_BUILD_ARGS_JSON: ${{ format('{{"CREATE_VERSION":"{0}"}}', needs.verify.outputs.create_version) }}
           FORGE_DOCKER_EXTRA_TAGS_JSON: ${{ needs.guard.outputs.channel == 'latest' && needs.verify.outputs.repository != '' && format('["{0}:latest","{1}:latest"]', needs.verify.outputs.repository, needs.verify.outputs.devcontainer_repository) || '[]' }}
 
-  # Mostly waits for npm to serve the new version, so it needs no install of its own.
-  smoke:
-    needs: [guard, verify, npm, docker]
+  # This job has no login, so it sees what a stranger sees.
+  check-images:
+    needs: [guard, verify, docker]
     if: needs.guard.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
+    timeout-minutes: 5
+    permissions: {}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 1
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-
-      - name: Smoke npm create launcher against the shipped image
+      - name: Anyone can read the published images
         env:
-          CREATE_VERSION: ${{ needs.verify.outputs.create_version }}
-        run: node projects/ci-tools/src/github/smoke-create-launcher.mjs
+          CREATE_IMAGE: ${{ needs.verify.outputs.repository }}:${{ needs.verify.outputs.image_tag }}
+          DEVCONTAINER_IMAGE: ${{ needs.verify.outputs.devcontainer_repository }}:${{ needs.verify.outputs.image_tag }}
+        run: |
+          docker manifest inspect "$CREATE_IMAGE" > /dev/null
+          docker manifest inspect "$DEVCONTAINER_IMAGE" > /dev/null
 
   tag:
-    needs: [guard, verify, smoke]
+    needs: [guard, verify, npm, check-images]
     if: needs.guard.outputs.should_publish == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5

@@ -45,7 +45,7 @@ flowchart LR
 |---|---|
 | [`ci.yml`](../../.github/workflows/ci.yml) | The suite; required check `ci`. Calls `release.yml` on `release`. |
 | [`promote-latest.yml`](../../.github/workflows/promote-latest.yml) | Started by hand: moves npm `latest` to a version that fully shipped. |
-| [`publish.yml`](../../.github/workflows/publish.yml) | After CI succeeds on `main`/`release`: npm, Docker images, smoke test, `v*` tag. |
+| [`publish.yml`](../../.github/workflows/publish.yml) | After CI succeeds on `main`/`release`: npm, Docker images, `v*` tag. |
 | [`pages.yml`](../../.github/workflows/pages.yml) | After CI succeeds on `release`: coverage and CI badges to GitHub Pages. |
 | [`bench.yml`](../../.github/workflows/bench.yml) | Nightly benchmarks on `main`, deployed to Pages. |
 | [`clear-benchmark-history.yml`](../../.github/workflows/clear-benchmark-history.yml) | Manual: redeploys Pages with an empty benchmark history. |
@@ -82,8 +82,8 @@ CI chooses a dev version once, before its release build: `0.0.1-dev.20261104.512
 2. **verify**: probes npm and GHCR for this version and outputs which steps to skip. It fails if a package name isn't on npm yet, which the merge queue should already have stopped.
 3. **npm**: `forge publish --channel dev` from `main`, `--channel latest` from `release`, over OIDC. Skipped if the version is already on npm. Runs alongside **docker**.
 4. **docker**: the only job with `packages: write`. Builds and pushes the `create` and `devcontainer` images (plus `:latest` from `release`).
-5. **smoke**: after both, runs `npx @decohere/create@<version> --help`, first waiting for npm to serve the new version.
-6. **tag**: `forge tag --prefix v --push`.
+5. **check-images**: after **docker**, with no login, confirms anyone can read both images. It doesn't test that npm serves the packages: `verify-release` already tested them, `forge publish` fails if an upload fails, and **Promote to latest** refuses a version missing from any package.
+6. **tag**: after **npm** and **check-images**: `forge tag --prefix v --push`.
 
 A `v*` tag means that commit fully shipped. If any step fails there is no tag, so re-running Publish is safe: npm and Docker each skip what is already published.
 
