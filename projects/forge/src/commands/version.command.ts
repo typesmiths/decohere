@@ -28,6 +28,15 @@ export class VersionCommand extends DecohereCommand<VersionActions> {
 			"--version <version>",
 			"Explicit base version to increment (overrides git tag discovery)",
 		);
+		this.option(
+			"--build-number <number>",
+			"Set <base>-<channel>.<commit's UTC date>.<number>, with no git tags involved",
+		);
+		this.option(
+			"--from-build",
+			"Copy the version from the built packages; fails if they don't all match",
+			false,
+		);
 		this.option("--no-sync", "Skip lockfile sync after versioning", true);
 		this.option("--commit", "Commit versioned package.json files after bumping", false);
 		this.option("--message <message>", "Commit message (used with --commit)");

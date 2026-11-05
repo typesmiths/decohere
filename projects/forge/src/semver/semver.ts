@@ -68,6 +68,12 @@ export class Semver {
 		return this;
 	}
 
+	/** This version's major.minor.patch with `prerelease` in place of any it has now. */
+	public withPrerelease(prerelease: string): Semver {
+		const { major, minor, patch } = this.parse(this.version);
+		return new Semver(`${major}.${minor}.${patch}-${prerelease}`);
+	}
+
 	public toString(): string {
 		return this.version;
 	}
