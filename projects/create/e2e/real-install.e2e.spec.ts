@@ -201,6 +201,8 @@ describe.skipIf(!registry || !version)(
 						root,
 					);
 					for (const id of containers.output.split("\n").filter(Boolean)) {
+						// It wrote files the runner's user can't delete.
+						expectOk(run("docker", ["exec", id, "chmod", "-R", "a+rwX", "/orders"], root));
 						expectOk(run("docker", ["rm", "-f", id], root));
 					}
 				});
