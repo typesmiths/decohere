@@ -183,17 +183,22 @@ export function withWorkspaceNodeModulesOwnership(options?: {
 	workspaceDir?: string;
 	usernameExpr?: string;
 	order?: number;
+	/** Switch to root first: a layer before this one, like withPostgresqlClient, can end on node. */
+	asRoot?: boolean;
 }): LayerWriter {
 	const workspaceDir = options?.workspaceDir ?? "/workspace";
 	const usernameExpr = options?.usernameExpr ?? "${USERNAME}";
 	const order = options?.order ?? StepOrder.features + 200;
 
 	return (dockerfile) => {
+		if (options?.asRoot) {
+			dockerfile.addStep(DockerStep.raw("workspace-node-modules-root", "USER root", order));
+		}
 		dockerfile.addStep(
 			DockerStep.raw(
 				"workspace-node-modules",
 				`RUN mkdir -p ${workspaceDir}/node_modules && chown ${usernameExpr}:${usernameExpr} ${workspaceDir}/node_modules`,
-				order,
+				order + 1,
 			),
 		);
 	};

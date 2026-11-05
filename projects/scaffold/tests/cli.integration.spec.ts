@@ -340,6 +340,28 @@ describe("scaffolder writes a webapi project", () => {
 		expect(lines.at(-1)).toBe("USER ${USERNAME}");
 	});
 
+	// The Postgres layer hands back to node, because it can also be added to a finished Dockerfile.
+	it("creates node_modules as root in an app with a database too", async () => {
+		await runCliAsNodeBin([
+			"create",
+			"webapi",
+			"my-app",
+			...NON_INTERACTIVE,
+			"--database",
+			"postgres/typeorm",
+		]);
+
+		const lines = readFileSync("/my-app/.devcontainer/Dockerfile", "utf8")
+			.split("\n")
+			.map((line) => line.trim())
+			.filter(Boolean);
+		const ownership = lines.findIndex((line) => line.includes("/my-app/node_modules"));
+		const userBefore = lines.slice(0, ownership).findLast((line) => line.startsWith("USER "));
+
+		expect(userBefore).toBe("USER root");
+		expect(lines.at(-1)).toBe("USER ${USERNAME}");
+	});
+
 	it("writes files for: webapi -d my-app (npx / direct bin)", async () => {
 		await runCliAsNodeBin(["create", "webapi", "-d", "my-app", ...NON_INTERACTIVE]);
 		expectWebapiTree("/my-app");

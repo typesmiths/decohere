@@ -92,29 +92,33 @@ describe.skipIf(!registry || !version)(
 			rmSync(root, { recursive: true, force: true });
 		});
 
+		function generate(name: string, database: string) {
+			expectOk(
+				run(
+					"npm",
+					[
+						"create",
+						`@decohere@${version}`,
+						"--",
+						"webapi",
+						"-d",
+						name,
+						"--database",
+						database,
+						"--auth",
+						"none",
+						"--postman",
+						"none",
+						"-y",
+					],
+					root,
+				),
+			);
+		}
+
 		describe("the launcher", () => {
 			it("generates an app", () => {
-				expectOk(
-					run(
-						"npm",
-						[
-							"create",
-							`@decohere@${version}`,
-							"--",
-							"webapi",
-							"-d",
-							"orders",
-							"--database",
-							"none",
-							"--auth",
-							"none",
-							"--postman",
-							"none",
-							"-y",
-						],
-						root,
-					),
-				);
+				generate("orders", "none");
 				expect(existsSync(join(app, "projects/api/src/main.ts"))).toBe(true);
 			});
 
@@ -234,6 +238,77 @@ describe.skipIf(!registry || !version)(
 						expectOk(devcontainer("exec", "--workspace-folder", dir, "pnpm", "run", script));
 					},
 				);
+			},
+			FIVE_MINUTES,
+		);
+
+		// Adds its own Dockerfile layer, a Postgres service, and roles the app creates when it starts.
+		describe.skipIf(!containerRegistry)(
+			"the generated Dev Container with Postgres",
+			() => {
+				const dir = join(root, "shop");
+				const compose = join(dir, ".devcontainer/docker-compose.yml");
+				const devcontainer = (...args: string[]) =>
+					run("npx", ["-y", `@devcontainers/cli@${DEVCONTAINER_CLI_VERSION}`, ...args], root);
+				const inside = (script: string) =>
+					devcontainer("exec", "--workspace-folder", dir, "bash", "-c", script);
+
+				beforeAll(() => {
+					generate("shop", "postgres/typeorm");
+					writeFileSync(join(dir, ".npmrc"), `registry=${containerRegistry}\n`);
+					expectOk(run("git", ["init", "-q"], dir));
+				}, FIVE_MINUTES);
+
+				afterAll(() => {
+					const containers = run(
+						"docker",
+						["ps", "-aq", "--filter", `label=devcontainer.local_folder=${dir}`],
+						root,
+					);
+					for (const id of containers.output.split("\n").filter(Boolean)) {
+						// It and Postgres wrote files the runner's user can't delete.
+						expectOk(
+							run("docker", ["exec", "-u", "root", id, "chmod", "-R", "a+rwX", "/shop"], root),
+						);
+					}
+					expectOk(run("docker", ["compose", "-f", compose, "down", "-v"], root));
+				});
+
+				it("builds, starts and installs the app", () => {
+					// The same user ID workaround as the Dev Container without a database.
+					expectOk(run("chmod", ["-R", "a+rwX", dir], root));
+					expectOk(
+						devcontainer(
+							"up",
+							"--workspace-folder",
+							dir,
+							"--update-remote-user-uid-default",
+							"off",
+						),
+					);
+				});
+
+				it.each(["typecheck", "build", "test", "lint:check"])(
+					"passes %s inside it",
+					(script) => {
+						expectOk(devcontainer("exec", "--workspace-folder", dir, "pnpm", "run", script));
+					},
+				);
+
+				it("starts against Postgres, and creates the role the app connects as", () => {
+					expectOk(
+						inside(`until pg_isready -h "$API_DB_HOST" -p "$API_DB_PORT"; do sleep 1; done
+PORT=3200 pnpm run dev > /tmp/dev.log 2>&1 &
+for _ in $(seq 1 60); do
+  if curl -sf localhost:3200/health; then
+    PGPASSWORD="$API_DB_PASSWORD" exec psql -h "$API_DB_HOST" -p "$API_DB_PORT" -U "$API_DB_USER" -d "$API_DB_NAME" -c "select 1"
+  fi
+  sleep 1
+done
+cat /tmp/dev.log
+exit 1`),
+					);
+				});
 			},
 			FIVE_MINUTES,
 		);

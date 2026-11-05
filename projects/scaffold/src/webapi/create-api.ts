@@ -130,7 +130,9 @@ function createWorkspace(
 	monoRepo.addModel(compose);
 	monoRepo.addModel(devContainer);
 	const appDevImage = new WebapiDevContainer();
-	appDevImage.addLayer(withWorkspaceNodeModulesOwnership({ workspaceDir: workspaceRoot }));
+	appDevImage.addLayer(
+		withWorkspaceNodeModulesOwnership({ workspaceDir: workspaceRoot, asRoot: true }),
+	);
 	monoRepo.addModel(appDevImage);
 	monoRepo.addModel(new WebapiProductionDockerfile(apiNames));
 	monoRepo.addModel(new GithubCiWorkflows());
