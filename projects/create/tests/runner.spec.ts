@@ -291,10 +291,27 @@ describe("launch outside the tools", () => {
 	});
 
 	it("forwards scaffold options to the container", async () => {
-		await run(["webapi", "-d", "/tmp/my-project", "--database", "postgres/typeorm", "--name", "billing"]);
+		await run([
+			"webapi",
+			"-d",
+			"/tmp/my-project",
+			"--database",
+			"postgres/typeorm",
+			"--name",
+			"billing",
+		]);
 
 		expect(createArgs()).toEqual(
-			expect.arrayContaining(["create", "webapi", "--database", "postgres/typeorm", "--name", "billing", "-d", "."]),
+			expect.arrayContaining([
+				"create",
+				"webapi",
+				"--database",
+				"postgres/typeorm",
+				"--name",
+				"billing",
+				"-d",
+				".",
+			]),
 		);
 	});
 
@@ -358,7 +375,10 @@ describe("launch outside the tools", () => {
 
 		expect(exitCode).toBe(1);
 		expect(errors.join("\n")).toContain("docker cp failed");
-		expect(mocks.rmSync).toHaveBeenCalledWith("/tmp/my-project", { recursive: true, force: true });
+		expect(mocks.rmSync).toHaveBeenCalledWith("/tmp/my-project", {
+			recursive: true,
+			force: true,
+		});
 		expect(dockerCalls("rm")).toEqual([["rm", "-f", containerName()]]);
 	});
 

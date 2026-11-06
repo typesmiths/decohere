@@ -1,12 +1,5 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import {
-	existsSync,
-	mkdirSync,
-	mkdtempSync,
-	readdirSync,
-	renameSync,
-	rmSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { type LaunchPlan, resolveLaunch } from "./resolve-launch.js";
@@ -98,7 +91,9 @@ function assertDockerAvailable(): void {
 function removeContainer(name: string): void {
 	const removed = spawnSync("docker", ["rm", "-f", name], { stdio: "ignore" });
 	if (removed.status !== 0) {
-		console.error(`\n  Could not remove container ${name}. Remove it with: docker rm -f ${name}\n`);
+		console.error(
+			`\n  Could not remove container ${name}. Remove it with: docker rm -f ${name}\n`,
+		);
 	}
 }
 

@@ -112,7 +112,7 @@ export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
 	);
 
 	if (!hasAuth0) {
-		lines.push("## Add Auth0 later", "", "```bash", "decohere add auth0", "```", "");
+		lines.push("## Add Auth0 later", "", "```bash", "pnpm decohere add auth0", "```", "");
 	}
 
 	if (hasAuth0) {
