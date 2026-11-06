@@ -1,3 +1,4 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { scribe } from "@decohere/scribe";
 import axios from "axios";
@@ -5,7 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get, Param, Query } from "../src/routing/index.js";
-import "../src/http/http.extensions.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
 
 @Controller({ prefix: "/echo" })
@@ -36,8 +36,7 @@ describe("App HTTP routing", () => {
 
 	beforeEach(async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withControllers(EchoController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [EchoController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 	});
@@ -80,8 +79,7 @@ describe("App HTTP routing", () => {
 	it("starts two apps without a port collision", async () => {
 		const originA = axios.defaults.baseURL;
 		const other = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withControllers(EchoController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [EchoController] }))
 			.build();
 		try {
 			const originB = await listenEphemeral(other);
@@ -111,8 +109,7 @@ describe("App container dispose", () => {
 	it("closes HTTP and constructed DI services on dispose", async () => {
 		let hub: SocketHub | undefined;
 		const builder = Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withControllers(EchoController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [EchoController] }))
 			.withServices((cb) => {
 				cb.registerSingleton(SocketHub);
 			});

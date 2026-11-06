@@ -1,9 +1,9 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { Ajv } from "ajv";
 import axios from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Field, Param, Post, RequestParts } from "../src/routing/index.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
@@ -33,9 +33,13 @@ describe("request validation compiles each route's schemas once", () => {
 
 	it("does not compile again for later requests to the same route", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withOpenApi({ info: { title: "Notes", version: "1.0.0" }, path: "/openapi.json" })
-			.withHttpProvider(FastifyProvider)
-			.withControllers(NoteController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [NoteController],
+					openApi: { info: { title: "Notes", version: "1.0.0" }, path: "/openapi.json" },
+				}),
+			)
 			.build();
 		const baseURL = await listenEphemeral(app);
 		const compile = vi.spyOn(Ajv.prototype, "compile");

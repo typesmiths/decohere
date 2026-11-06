@@ -1,7 +1,7 @@
 import { DEFAULT_DATA_SOURCE } from "@decohere/data";
 import { inject } from "@decohere/crucible/decorators";
 
-/** Default TypeORM DataSource when `withTypeOrm` is used without `name`. */
+/** Default TypeORM DataSource when `typeOrm()` is used without `name`. */
 export const TypeOrmDataSourceToken = Symbol("TypeOrmDataSource");
 
 /**
@@ -18,7 +18,7 @@ export function typeOrmDataSourceToken(name?: string | symbol): symbol {
 
 /**
  * Inject the TypeORM DataSource for process-lifetime (singleton) work.
- * Pass the same `name` as `withTypeOrm({ name })`. Request-scoped persistence
+ * Pass the same `name` as `typeOrm({ name })`. Request-scoped persistence
  * should keep using `injectUnitOfWork`.
  */
 export function injectDataSource(name?: string | symbol) {

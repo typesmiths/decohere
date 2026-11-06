@@ -1,8 +1,8 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get, Param, Query } from "../src/routing/index.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
@@ -53,8 +53,7 @@ describe("@Query binding over HTTP", () => {
 
 	async function start() {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withControllers(TotalsController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [TotalsController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 	}
@@ -96,9 +95,13 @@ describe("@Query binding over HTTP", () => {
 
 	it("documents a union parameter in the OpenAPI document", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withOpenApi({ info: { title: "Totals", version: "1.0.0" }, path: "/openapi.json" })
-			.withHttpProvider(FastifyProvider)
-			.withControllers(TotalsController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [TotalsController],
+					openApi: { info: { title: "Totals", version: "1.0.0" }, path: "/openapi.json" },
+				}),
+			)
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 

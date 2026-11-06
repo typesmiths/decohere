@@ -137,9 +137,7 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 		existsSync(join(root, "projects/api/src/main.ts")),
 		`${root}/projects/api/src/main.ts`,
 	).toBe(true);
-	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain(
-		"withHealth()",
-	);
+	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain("health()");
 	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain(
 		"Number(process.env.PORT ?? 3000)",
 	);
@@ -905,13 +903,13 @@ describe("decohere add auth0", () => {
 
 	it("sets up Auth0 and wires it into a project created without it", async () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
-		expect(readFileSync(main, "utf8")).not.toContain("withAuth");
+		expect(readFileSync(main, "utf8")).not.toContain("auth(");
 
 		expect(await addAuth0()).toBe(0);
 
 		const source = readFileSync(main, "utf8");
-		expect(source).toContain('import "@decohere/http/auth";');
-		expect(source).toMatch(/\.withConfiguration\(YamlDataSource\)\n\s*\.withAuth\(\)/);
+		expect(source).toContain('import { auth } from "@decohere/http";');
+		expect(source).toMatch(/\.use\(config\(YamlDataSource\)\)\n\s*\.use\(auth\(\)\)/);
 		expect(readFileSync("/my-app/config/config.yaml", "utf8")).toContain(
 			"discoveryUrl: ${AUTH0_ISSUER_BASE_URL}",
 		);
@@ -945,7 +943,7 @@ describe("decohere add auth0", () => {
 
 		expect(readFileSync(main, "utf8")).toBe(custom);
 		expect(logs.join("\n")).toContain("projects/api/src/main.ts");
-		expect(logs.join("\n")).toContain('import "@decohere/http/auth";');
+		expect(logs.join("\n")).toContain('import { auth } from "@decohere/http";');
 	});
 
 	it("refuses outside a Decohere workspace", async () => {
@@ -1050,8 +1048,8 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(env).not.toContain("PASSWORD");
 
 		const main = readFileSync("/my-app/projects/api/src/main.ts", "utf8");
-		expect(main).toContain("withHealth()");
-		expect(main).toContain('withTypeOrm({ name: "api"');
+		expect(main).toContain("health()");
+		expect(main).toContain('typeOrm({ name: "api"');
 
 		const compose = readFileSync("/my-app/.devcontainer/docker-compose.yml", "utf8");
 		expect(compose).toContain("samples-my-app-postgres");
@@ -1169,10 +1167,10 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(apiDb).not.toBe(billingDb);
 
 		expect(readFileSync("/my-app/projects/api/src/main.ts", "utf8")).toContain(
-			'withTypeOrm({ name: "api"',
+			'typeOrm({ name: "api"',
 		);
 		expect(readFileSync("/my-app/projects/billing/src/main.ts", "utf8")).toContain(
-			'withTypeOrm({ name: "billing"',
+			'typeOrm({ name: "billing"',
 		);
 
 		const compose = readFileSync("/my-app/.devcontainer/docker-compose.yml", "utf8");
@@ -1265,7 +1263,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(env).toContain("API_DB_HOST=postgres");
 		expect(env).toContain("BILLING_DB_HOST=postgres");
 		expect(readFileSync("/my-app/projects/billing/src/main.ts", "utf8")).toContain(
-			'withTypeOrm({ name: "billing"',
+			'typeOrm({ name: "billing"',
 		);
 
 		const pkg = JSON.parse(readFileSync("/my-app/package.json", "utf8")) as {

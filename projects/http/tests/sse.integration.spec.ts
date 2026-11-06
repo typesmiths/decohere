@@ -1,3 +1,5 @@
+import { configureHttp } from "../src/http/http.plugin.js";
+import { auth } from "../src/auth/auth.plugin.js";
 import { setTimeout as sleep } from "node:timers/promises";
 import type { ContainerBuilder } from "@decohere/crucible";
 import { inject, injectable } from "@decohere/crucible/decorators";
@@ -7,7 +9,6 @@ import type { Constructable } from "@decohere/core/reflection";
 import { describe, expect, it } from "vitest";
 import type { OpenApiDocument } from "../src/openapi/openapi.types.js";
 import { AuthConfig } from "../src/auth/auth.config.js";
-import "../src/auth/auth.extensions.js";
 import { TokenService } from "../src/auth/token-service.js";
 import {
 	AllowAnonymous,
@@ -329,7 +330,7 @@ describe("SSE: auth runs before any event is sent", () => {
 			controllers: [SecureFeedController],
 			services: (c) =>
 				c.registerSingleton(ConfigurationServiceToken, new SecretConfigService()),
-			configure: (builder) => builder.withAuth(),
+			configure: (builder) => builder.use(auth()),
 		});
 	const tokens = new TokenService(secretConfig);
 
@@ -385,7 +386,8 @@ describe("SSE: OpenAPI", () => {
 		await using api = await bootModule({
 			controllers: [FeedController],
 			services: services(),
-			configure: (builder) => builder.withOpenApi({ info: { title: "t", version: "1" } }),
+			configure: (builder) =>
+				builder.use(configureHttp({ openApi: { info: { title: "t", version: "1" } } })),
 		});
 
 		const document = (await (

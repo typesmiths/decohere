@@ -117,7 +117,7 @@ CMD ["node", "es6/src/main.js"]
 
 ### Shipping the UI with the API
 
-A module deploys its API and its UI as one image: the API serves the UI's build ([`withStatic` in `@decohere/http`](../http/README.md#serving-a-built-ui)). To put that build in the package, declare the UI project on the deployable in `.decohere.js`, next to `docker`:
+A module deploys its API and its UI as one image: the API serves the UI's build ([`statics` in `@decohere/http`](../http/README.md#serving-a-built-ui)). To put that build in the package, declare the UI project on the deployable in `.decohere.js`, next to `docker`:
 
 ```js
 /** @type {import("@decohere/workspace").WorkspaceOptions} */
@@ -134,7 +134,7 @@ export default {
 };
 ```
 
-`forge package @app/shop.api` then copies `projects/shop.web/dist/` to `projects/shop.api/.package/ui/` (real files, never links). The API calls `.withStatic("/ui/", "ui")` and the Dockerfile stays `COPY .package/ ./`. `forge package` does **not** build the UI: if the folder is missing it fails and tells you to build the UI first. `to` must be a new folder inside `.package/` (not `es6`, `node_modules` or `config`). Running the UI's own toolchain from `forge build` is not done yet; see [ADR 0007](../../docs/adr/0007-serving-a-built-ui-from-http.md).
+`forge package @app/shop.api` then copies `projects/shop.web/dist/` to `projects/shop.api/.package/ui/` (real files, never links). The API calls `.statics("/ui/", "ui")` and the Dockerfile stays `COPY .package/ ./`. `forge package` does **not** build the UI: if the folder is missing it fails and tells you to build the UI first. `to` must be a new folder inside `.package/` (not `es6`, `node_modules` or `config`). Running the UI's own toolchain from `forge build` is not done yet; see [ADR 0007](../../docs/adr/0007-serving-a-built-ui-from-http.md).
 
 Design record: [ADR 0006](../../docs/adr/0006-forge-package-deployables.md).
 

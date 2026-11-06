@@ -1,10 +1,10 @@
+import { http } from "../src/http/http.plugin.js";
+import { health } from "../src/health/health.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { inject, injectable } from "@decohere/crucible/decorators";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import type { HostedService } from "@decohere/core/hosting";
-import "../src/health/health.extensions.js";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 
 /** What happened, in order, across every service and the app in one test. */
@@ -89,7 +89,7 @@ describe("hosted services", () => {
 		}
 		let appRef: App | undefined;
 		app = await builder()
-			.withHttp(FastifyProvider)
+			.use(http(FastifyProvider))
 			.withHostedService(First, Second, SeesAddresses)
 			.build();
 		appRef = app;
@@ -105,7 +105,7 @@ describe("hosted services", () => {
 	});
 
 	it("stops in reverse order: signal first, then each stop(), then the container", async () => {
-		app = await builder().withHttp(FastifyProvider).withHostedService(First, Second).build();
+		app = await builder().use(http(FastifyProvider)).withHostedService(First, Second).build();
 		await app.start({ port: 0, host: "127.0.0.1", shutdownSignals: false });
 		events = [];
 
@@ -181,7 +181,7 @@ describe("hosted services", () => {
 				});
 			}
 		}
-		app = await builder().withHttp(FastifyProvider).withHostedService(SlowWarmUp).build();
+		app = await builder().use(http(FastifyProvider)).withHostedService(SlowWarmUp).build();
 
 		const started = Date.now();
 		await app.start({ port: 0, host: "127.0.0.1", shutdownSignals: false });
@@ -230,7 +230,7 @@ describe("hosted services", () => {
 			}
 		}
 		app = await builder()
-			.withHttp(FastifyProvider)
+			.use(http(FastifyProvider))
 			.withHostedService(First, Broken, Second)
 			.build();
 
@@ -277,8 +277,8 @@ describe("hosted services", () => {
 			}
 		}
 		app = await builder()
-			.withHttp(FastifyProvider)
-			.withHealth()
+			.use(http(FastifyProvider))
+			.use(health())
 			.withHostedService(Warming)
 			.build();
 		await app.start({ port: 0, host: "127.0.0.1", shutdownSignals: false });

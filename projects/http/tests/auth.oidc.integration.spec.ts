@@ -1,10 +1,10 @@
+import { http } from "../src/http/http.plugin.js";
+import { auth } from "../src/auth/auth.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { AuthConfig } from "../src/auth/auth.config.js";
-import "../src/auth/auth.extensions.js";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import type { IConfigurationService } from "@decohere/core/configuration";
 import { ConfigurationServiceToken } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
@@ -54,12 +54,11 @@ describe("Auth integration — discoveryUrl + real RS256 tokens", () => {
 
 	beforeEach(async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [OidcController] }))
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new OidcConfigService());
 			})
-			.withAuth()
-			.withControllers(OidcController)
+			.use(auth())
 			.build();
 
 		axios.defaults.baseURL = await listenEphemeral(app);
@@ -115,19 +114,20 @@ describe("Auth integration — principalMapper", () => {
 	beforeEach(async () => {
 		// Map Keycloak-style realm_access.roles to scopes
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [OidcController] }))
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new OidcConfigService());
 			})
-			.withAuth(undefined, {
-				principalMapper: (payload) => ({
-					sub: payload.sub as string,
-					scopes: ((payload.realm_access as { roles?: string[] })?.roles ?? []).map(
-						(r) => `read:${r}`,
-					),
+			.use(
+				auth(undefined, {
+					principalMapper: (payload) => ({
+						sub: payload.sub as string,
+						scopes: ((payload.realm_access as { roles?: string[] })?.roles ?? []).map(
+							(r) => `read:${r}`,
+						),
+					}),
 				}),
-			})
-			.withControllers(OidcController)
+			)
 			.build();
 
 		axios.defaults.baseURL = await listenEphemeral(app);

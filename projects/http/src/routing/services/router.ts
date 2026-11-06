@@ -57,7 +57,7 @@ export class Router {
 			.map(({ controller, handler }) => `${controller.name}.${String(handler)}`);
 		if (protectedRoutes.length > 0) {
 			throw new RoutingError(
-				`Routes use @Authorize but auth is not configured, so they would be open to anyone: ${protectedRoutes.join(", ")}. Add .withAuth() to the builder, or remove @Authorize.`,
+				`Routes use @Authorize but auth is not configured, so they would be open to anyone: ${protectedRoutes.join(", ")}. Add .use(auth()) to the builder, or remove @Authorize.`,
 			);
 		}
 	}

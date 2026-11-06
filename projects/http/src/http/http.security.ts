@@ -1,7 +1,7 @@
 /**
  * Default HTTP security settings applied by {@link FastifyProvider} when
- * `withHttpProvider` is used. Override via `withHelmet` / `withRateLimit` /
- * `withBodyLimit` (pass `false` to disable helmet or rate-limit).
+ * `http(...)` is used. Override via `helmet` / `rateLimit` /
+ * `bodyLimit` (pass `false` to disable helmet or rate-limit).
  */
 
 /** Fastify body size limit (bytes). Matches Fastify's built-in default, made explicit and overridable. */

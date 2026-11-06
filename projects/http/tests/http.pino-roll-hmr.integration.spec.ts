@@ -1,3 +1,4 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 /**
  * Reproduces Flux hot-reload + pino-roll: App.dispose must finish so reboot can listen again.
@@ -13,7 +14,6 @@ import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { realFs } from "../../../vitest.setup.js";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get } from "../src/routing/index.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
@@ -35,8 +35,7 @@ async function bootWithPinoRoll(logFile: string): Promise<App> {
 		mkdir: true,
 	});
 	return Builder.create(new ServiceContainerBuilder())
-		.withHttp(FastifyProvider)
-		.withControllers(FundingArbStubController)
+		.use(http(FastifyProvider, { controllers: [FundingArbStubController] }))
 		.build();
 }
 

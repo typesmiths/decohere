@@ -14,6 +14,12 @@ export type BuilderOptions = {
 	applicationName?: string;
 };
 
+/**
+ * A feature an app adds with `builder.use(...)`, such as `http(...)` or `config(...)`. A plugin is
+ * a plain function: it registers what it needs on the builder it gets.
+ */
+export type BuilderPlugin = (builder: Builder) => void;
+
 export class Builder<T extends App = App> {
 	/**
 	 * @param containerBuilder The container the app runs on: `new ServiceContainerBuilder()` from
@@ -40,6 +46,11 @@ export class Builder<T extends App = App> {
 	public constructor(containerBuilder: ContainerBuilder, options?: BuilderOptions) {
 		this.containerBuilder = containerBuilder;
 		this.applicationName = options?.applicationName;
+	}
+
+	public use(plugin: BuilderPlugin): this {
+		plugin(this);
+		return this;
 	}
 
 	public withServices(userServices: (containerBuilder: ContainerBuilder) => void): Builder<T> {

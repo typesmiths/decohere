@@ -43,7 +43,7 @@ export class CaslAuthorizationService implements IAuthorizationService {
 	public async authenticateRequest(request: HttpRequest): Promise<Principal> {
 		if (!this.tokenService) {
 			throw new Error(
-				"CaslAuthorizationService requires a TokenService to authenticate requests. Register it via .withAuth().",
+				"CaslAuthorizationService requires a TokenService to authenticate requests. Register it via .use(auth()).",
 			);
 		}
 		return this.tokenService.verifyRequest(request);

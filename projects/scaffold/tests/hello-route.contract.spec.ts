@@ -25,9 +25,9 @@ describe("Hello controller route contract", () => {
 		expect(content).not.toMatch(/@Post\("\/"\)/);
 	});
 
-	it("enables withOpenApi by default so Hello @Field bodies are validated", () => {
+	it("enables openApi by default so Hello @Field bodies are validated", () => {
 		const content = new MainSourceFile("demo.api").files()[0]?.content ?? "";
-		expect(content).toContain("withOpenApi");
+		expect(content).toContain("openApi:");
 		expect(content).toContain('title: "demo.api"');
 	});
 

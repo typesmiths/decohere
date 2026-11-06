@@ -373,7 +373,6 @@ function wireApiDatabase(project: ProjectScaffold): void {
 	project
 		.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
 		?.setDataSourceName(apiName)
-		.addSideEffectImport("@decohere/data-typeorm")
 		.addEntity({ className: "SampleEntity", importPath: "./entities/sample.entity.js" })
 		.addRepository({
 			className: "SampleEntityRepository",

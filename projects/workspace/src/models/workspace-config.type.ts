@@ -22,7 +22,7 @@ export type DockerConfig = {
 };
 
 /**
- * The UI a deployable serves from its API (`withStatic` in `@decohere/http`). `forge package` copies the
+ * The UI a deployable serves from its API (`statics` in `@decohere/http`). `forge package` copies the
  * UI project's build output into the deployable's `.package/` folder.
  */
 export type UiConfig = {

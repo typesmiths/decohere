@@ -1,4 +1,4 @@
-# 0008. `@decohere/http` compresses responses by default: `withCompression`, a thin wrapper around `@fastify/compress`
+# 0008. `@decohere/http` compresses responses by default: the `compression` setting, a thin wrapper around `@fastify/compress`
 
 - **Status:** Proposed
 - **Date:** 2026-10-12
@@ -9,11 +9,11 @@ Large JSON responses left the server at full size. Whether a CDN or load balance
 
 ## Decision
 
-- **On by default, in every environment**, so what you test is what ships: `builder.withCompression(options?)`, off with `withCompression(false)`. A proxy that also compresses passes an encoded body through.
+- **On by default, in every environment**, so what you test is what ships: the `compression` setting of `http(...)`, off with `compression: false`. A proxy that also compresses passes an encoded body through.
 - **A thin wrapper.** `FastifyProvider` registers `@fastify/compress` with `global: true`, `threshold: 1024`, `encodings: ["br", "gzip"]`, and the plugin's defaults for the rest (compressible types, brotli quality 4, `Vary`, `HEAD`, already-encoded responses, `206`, errors). The HTTP package adds no eligibility logic.
 - **Options map 1:1 onto the plugin.** `CompressionOptions` (`src/http/http.compression.ts`) is `false` or `{ threshold?, encodings?, types?, providerOptions? }`. `types` becomes the plugin's `customTypes`. `providerOptions` is an explicit Fastify escape hatch, merged last, for any other plugin option.
 - **Server-sent events are excluded** by the plugin's default pattern (`text/` except `text/event-stream`). Compression buffers, so events would arrive late ([ADR 0005](0005-server-sent-events-in-http.md)). A test reads the first event of a stream while the producer is still running. A `types` matching `text/event-stream` overrides this.
-- **BREACH.** Compressing an HTTPS response that holds both a secret and attacker-controlled input lets an attacker who sees response sizes recover the secret. That is typically HTML reflecting input beside a CSRF token. A JSON API with a bearer token in a header is low risk, since the token is not in the body. The README and the JSDoc of `withCompression` say so; mitigations are masked per-response secrets, not reflecting input beside secrets, or `withCompression(false)`.
+- **BREACH.** Compressing an HTTPS response that holds both a secret and attacker-controlled input lets an attacker who sees response sizes recover the secret. That is typically HTML reflecting input beside a CSRF token. A JSON API with a bearer token in a header is low risk, since the token is not in the body. The README and the JSDoc of the `compression` setting say so; mitigations are masked per-response secrets, not reflecting input beside secrets, or `compression: false`.
 - **Error replies are returned from the handler.** The exception path in `FastifyProvider` `return`s `reply.send(...)`; otherwise, with the plugin's async `onSend` hook, Fastify sent its own empty reply.
 
 ## Consequences
@@ -27,3 +27,4 @@ Large JSON responses left the server at full size. Whether a CDN or load balance
 ## History
 
 - 2026-10-12: Decided. A first version had its own eligibility hook and type allow-list; replaced by the thin wrapper before merge, because Decohere does not re-implement a library's policy.
+- 2026-11-06: `withCompression` became the `compression` setting of `http(...)`, when the builder's extensions became plugins ([ADR 0014](0014-package-names.md)).

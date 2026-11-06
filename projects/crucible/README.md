@@ -271,20 +271,20 @@ export class App {
 ```ts
 import { Builder } from "@decohere/core/hosting";
 import { ServiceContainerBuilder } from "@decohere/crucible";
+import { http } from "@decohere/http";
 import { FastifyProvider } from "@decohere/http/providers";
 import { SampleService } from "./services/sample.service.js";
 import { HelloController } from "./controllers/hello.controller.js";
 
 await Builder.create(new ServiceContainerBuilder())
-  .withHttp(FastifyProvider)
-  .withControllers(HelloController)
+  .use(http(FastifyProvider, { controllers: [HelloController] }))
   .withServices((cb) => {
     cb.registerSingleton(SampleService);
   })
   .buildAndStart();
 ```
 
-`withHttp` / `withControllers` already register the HTTP stack (router, controllers as request-scoped, …). Application services go in `withServices`.
+`http(...)` / `controllers` already register the HTTP stack (router, controllers as request-scoped, …). Application services go in `withServices`.
 
 ### Tests
 

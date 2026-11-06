@@ -1,12 +1,12 @@
+import { http } from "../src/http/http.plugin.js";
+import { auth } from "../src/auth/auth.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthConfig } from "../src/auth/auth.config.js";
-import "../src/auth/auth.extensions.js";
 import type { IPrincipalProvider } from "../src/auth/principal-provider.js";
 import { type App, Builder } from "@decohere/core/hosting";
 import { IPrincipalProviderToken } from "../src/const.js";
-import "../src/http/http.extensions.js";
 import { inject } from "@decohere/crucible/decorators";
 import type { IConfigurationService } from "@decohere/core/configuration";
 import { ConfigurationServiceToken } from "@decohere/core/configuration";
@@ -106,12 +106,16 @@ describe("Auth integration — devStatic", () => {
 		vi.stubEnv("NODE_ENV", "development");
 
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [GuardController, ClassAuthController],
+				}),
+			)
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new DevStaticConfigService());
 			})
-			.withAuth()
-			.withControllers(GuardController, ClassAuthController)
+			.use(auth())
 			.build();
 
 		axios.defaults.baseURL = await listenEphemeral(app);

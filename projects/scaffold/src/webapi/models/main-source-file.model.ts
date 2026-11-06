@@ -35,13 +35,12 @@ class ImportGroup {
  * Model for `projects/api/src/main.ts`.
  *
  * Starts with the minimal HTTP + YAML config setup. Features mutate the model
- * by calling addSideEffectImport / addImport / addBuilderCall / addEntity /
+ * by calling addImport / addBuilderCall / addEntity /
  * addRepository. files() renders whatever has been accumulated.
  */
 export class MainSourceFile implements KeyedModel {
 	public readonly key = WELL_KNOWN_FILES.MAIN_TS;
 
-	private readonly _sideEffectImports: string[] = [];
 	private readonly _extraImports = new Map<string, ImportGroup>();
 	private readonly _builderCalls: string[] = [];
 	private readonly _entities: TypeOrmImport[] = [];
@@ -50,12 +49,8 @@ export class MainSourceFile implements KeyedModel {
 	private _dataSourceName: string | undefined;
 	private _typeOrmSeed: string | undefined;
 
-	public constructor(private readonly appName: string) {}
-
-	/** Adds a bare side-effect import, e.g. `@decohere/http/auth`. */
-	public addSideEffectImport(path: string): this {
-		if (!this._sideEffectImports.includes(path)) this._sideEffectImports.push(path);
-		return this;
+	public constructor(private readonly appName: string) {
+		this.addImport("health", "@decohere/http").addImport("http", "@decohere/http");
 	}
 
 	/** Adds a named import, e.g. `import { Foo } from "bar"`. */
@@ -67,21 +62,21 @@ export class MainSourceFile implements KeyedModel {
 	}
 
 	/**
-	 * Adds a builder call inserted after `.withConfiguration()` and before
-	 * `.withServices()`. Pass the call without leading dot, e.g. `.withAuth()`.
+	 * Adds a builder call inserted after `.use(config())` and before
+	 * `.withServices()`. Pass the call with its leading dot, e.g. `.use(auth())`.
 	 */
 	public addBuilderCall(call: string): this {
 		this._builderCalls.push(call);
 		return this;
 	}
 
-	/** Adds a TypeORM entity — import and entry in `withTypeOrm({ entities })`. */
+	/** Adds a TypeORM entity — import and entry in `typeOrm({ entities })`. */
 	public addEntity(entity: TypeOrmImport): this {
 		this._entities.push(entity);
 		return this;
 	}
 
-	/** Adds a TypeORM repository — import and entry in `withTypeOrm({ repositories })`. */
+	/** Adds a TypeORM repository — import and entry in `typeOrm({ repositories })`. */
 	public addRepository(repo: TypeOrmImport): this {
 		this._repositories.push(repo);
 		return this;
@@ -94,7 +89,7 @@ export class MainSourceFile implements KeyedModel {
 	}
 
 	/**
-	 * Datasource name passed to `withTypeOrm({ name })`. Must match
+	 * Datasource name passed to `typeOrm({ name })`. Must match
 	 * `database.dataSources[].name` in config.yaml.
 	 */
 	public setDataSourceName(name: string): this {
@@ -103,7 +98,7 @@ export class MainSourceFile implements KeyedModel {
 	}
 
 	/**
-	 * Inline seed callback body for `withTypeOrm({ seed })`.
+	 * Inline seed callback body for `typeOrm({ seed })`.
 	 * Receives `dataSource` in scope. Example: `await dataSource.getRepository(User).save(...)`.
 	 */
 	public setTypeOrmSeed(seedBody: string): this {
@@ -112,24 +107,20 @@ export class MainSourceFile implements KeyedModel {
 	}
 
 	public files(): SourceFile[] {
-		const imports: string[] = [
-			'import "@decohere/scribe-pino";',
-			'import "@decohere/http/http";',
-		];
-
-		for (const path of this._sideEffectImports) {
-			imports.push(`import "${path}";`);
-		}
+		const imports: string[] = ['import "@decohere/scribe-pino";'];
 
 		imports.push(
-			'import "@decohere/config";',
-			'import { YamlDataSource } from "@decohere/config";',
+			'import { config, YamlDataSource } from "@decohere/config";',
 			'import { Builder } from "@decohere/core/hosting";',
 			'import { ServiceContainerBuilder } from "@decohere/crucible";',
 			'import { FastifyProvider } from "@decohere/http/providers";',
 			'import { scribe } from "@decohere/scribe";',
 			'import { SampleService } from "./services/sample.service.js";',
 		);
+
+		if (this._entities.length > 0) {
+			imports.push('import { typeOrm } from "@decohere/data-typeorm";');
+		}
 
 		for (const e of this._entities) {
 			imports.push(`import { ${e.className} } from "${e.importPath}";`);
@@ -159,10 +150,9 @@ export class MainSourceFile implements KeyedModel {
 		].join(" ");
 
 		const builderCalls: string[] = [
-			`\t.withHttp(FastifyProvider)`,
-			`\t.withConfiguration(YamlDataSource)`,
-			`\t.withHealth()`,
-			`\t.withOpenApi({ info: { title: "${this.appName}", version: "1.0.0" } })`,
+			`\t.use(http(FastifyProvider, { controllers: [HelloController], openApi: { info: { title: "${this.appName}", version: "1.0.0" } } }))`,
+			`\t.use(config(YamlDataSource))`,
+			`\t.use(health())`,
 			...this._builderCalls.map((c) => `\t${c}`),
 			`\t.withServices((cb) => { ${serviceRegs} })`,
 		];
@@ -171,18 +161,13 @@ export class MainSourceFile implements KeyedModel {
 			const entities = this._entities.map((e) => e.className).join(", ");
 			const repos = this._repositories.map((r) => r.className).join(", ");
 			const named = this._dataSourceName != null ? `name: "${this._dataSourceName}", ` : "";
-			if (this._typeOrmSeed) {
-				builderCalls.push(
-					`\t.withTypeOrm({ ${named}entities: [${entities}], repositories: [${repos}], seed: async (dataSource) => { ${this._typeOrmSeed} } })`,
-				);
-			} else {
-				builderCalls.push(
-					`\t.withTypeOrm({ ${named}entities: [${entities}], repositories: [${repos}] })`,
-				);
-			}
+			const seed = this._typeOrmSeed
+				? `, seed: async (dataSource) => { ${this._typeOrmSeed} }`
+				: "";
+			builderCalls.push(
+				`\t.use(typeOrm({ ${named}entities: [${entities}], repositories: [${repos}]${seed} }))`,
+			);
 		}
-
-		builderCalls.push(`\t.withControllers(HelloController)`);
 
 		const content = [
 			...imports,

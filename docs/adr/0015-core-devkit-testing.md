@@ -35,7 +35,7 @@ Rejected:
 
 ## Consequences
 
-- A production app using http and crucible installs none of `commander`, `glob` or a cache library through `core`. (`http` uses `picomatch` itself, for `withStatic`'s `exclude`.)
+- A production app using http and crucible installs none of `commander`, `glob` or a cache library through `core`. (`http` uses `picomatch` itself, for `statics`'s `exclude`.)
 - Moving a module between `core`, `devkit` and `testing` after 0.1.0 is a breaking change, so the boundary is meant to hold.
 - File search and watch are imported from `@decohere/devkit/io`.
 

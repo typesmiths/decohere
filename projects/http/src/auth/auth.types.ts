@@ -5,7 +5,7 @@ export type Principal = {
 	[key: string]: unknown;
 };
 
-/** Maps a raw JWT payload to a Principal. Override the default via withAuth() options. */
+/** Maps a raw JWT payload to a Principal. Override the default via auth() options. */
 export type PrincipalMapper = (payload: Record<string, unknown>) => Principal;
 
 export type JwksConfig = {

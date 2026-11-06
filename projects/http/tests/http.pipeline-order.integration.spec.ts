@@ -1,3 +1,5 @@
+import { http } from "../src/http/http.plugin.js";
+import { auth } from "../src/auth/auth.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import type { IConfigurationService } from "@decohere/core/configuration";
 import { ConfigurationServiceToken } from "@decohere/core/configuration";
@@ -6,9 +8,7 @@ import { scribe } from "@decohere/scribe";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthConfig } from "../src/auth/auth.config.js";
-import "../src/auth/auth.extensions.js";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import {
 	Authorize,
@@ -61,13 +61,16 @@ describe("request pipeline order", () => {
 			name === HttpAccessLogMiddleware.name ? (accessLog as never) : original(name),
 		);
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withOpenApi({ info: { title: "Orders", version: "1.0.0" }, path: "/openapi.json" })
-			.withHttp(FastifyProvider)
+			.use(
+				http(FastifyProvider, {
+					controllers: [OrderController],
+					openApi: { info: { title: "Orders", version: "1.0.0" }, path: "/openapi.json" },
+				}),
+			)
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new SecretConfigService());
 			})
-			.withAuth()
-			.withControllers(OrderController)
+			.use(auth())
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 	});

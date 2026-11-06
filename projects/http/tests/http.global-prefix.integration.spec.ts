@@ -1,8 +1,9 @@
+import { configureHttp } from "../src/http/http.plugin.js";
+import { health } from "../src/health/health.plugin.js";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import "../src/health/health.extensions.js";
 import { Controller, Get } from "../src/index.js";
 import type { OpenApiDocument } from "../src/openapi/openapi.types.js";
 import { bootModule } from "../src/testing/index.js";
@@ -80,7 +81,9 @@ async function status(
 
 describe("the global prefix and the probes", () => {
 	it("keeps /health and /ready at the root, and prefixes the controllers", async () => {
-		await using api = await boot((b) => b.withHealth().withGlobalPrefix("/api"));
+		await using api = await boot((b) =>
+			b.use(health()).use(configureHttp({ globalPrefix: "/api" })),
+		);
 
 		expect(await status(api, "/health")).toBe(200);
 		expect(await status(api, "/ready")).toBe(200);
@@ -93,7 +96,9 @@ describe("the global prefix and the probes", () => {
 	});
 
 	it("keeps the probes at the root whichever order the builder is called in", async () => {
-		await using api = await boot((b) => b.withGlobalPrefix("/api").withHealth());
+		await using api = await boot((b) =>
+			b.use(configureHttp({ globalPrefix: "/api" })).use(health()),
+		);
 
 		expect(await status(api, "/health")).toBe(200);
 		expect(await status(api, "/api/health")).toBe(404);
@@ -102,7 +107,7 @@ describe("the global prefix and the probes", () => {
 	it("leaves a controller that opts out unprefixed, parameters included", async () => {
 		await using api = await bootModule({
 			controllers: [PortfolioController, WebhookController],
-			configure: (b) => b.withGlobalPrefix("/api"),
+			configure: (b) => b.use(configureHttp({ globalPrefix: "/api" })),
 		});
 
 		expect(await status(api, "/webhooks/stripe")).toBe(200);
@@ -113,7 +118,7 @@ describe("the global prefix and the probes", () => {
 	it("prefixes a controller that declares /health itself: the path alone moves nothing", async () => {
 		await using api = await bootModule({
 			controllers: [OwnHealthController],
-			configure: (b) => b.withGlobalPrefix("/api"),
+			configure: (b) => b.use(configureHttp({ globalPrefix: "/api" })),
 		});
 
 		expect(await status(api, "/api/health")).toBe(200);
@@ -122,7 +127,7 @@ describe("the global prefix and the probes", () => {
 
 	it("puts the probes under the prefix with underGlobalPrefix", async () => {
 		await using api = await boot((b) =>
-			b.withHealth({ underGlobalPrefix: true }).withGlobalPrefix("/api"),
+			b.use(health({ underGlobalPrefix: true })).use(configureHttp({ globalPrefix: "/api" })),
 		);
 
 		expect(await status(api, "/api/health")).toBe(200);
@@ -133,7 +138,7 @@ describe("the global prefix and the probes", () => {
 
 	it("applies underGlobalPrefix whichever order the builder is called in", async () => {
 		await using api = await boot((b) =>
-			b.withGlobalPrefix("/api").withHealth({ underGlobalPrefix: true }),
+			b.use(configureHttp({ globalPrefix: "/api" })).use(health({ underGlobalPrefix: true })),
 		);
 
 		expect(await status(api, "/api/health")).toBe(200);
@@ -141,7 +146,7 @@ describe("the global prefix and the probes", () => {
 	});
 
 	it("serves the probes at the root with underGlobalPrefix and no prefix", async () => {
-		await using api = await boot((b) => b.withHealth({ underGlobalPrefix: true }));
+		await using api = await boot((b) => b.use(health({ underGlobalPrefix: true })));
 
 		expect(await status(api, "/health")).toBe(200);
 		expect(await status(api, "/ready")).toBe(200);
@@ -149,10 +154,12 @@ describe("the global prefix and the probes", () => {
 
 	it("keeps the OpenAPI path where it was, and lists the prefixed routes", async () => {
 		await using api = await boot((b) =>
-			b
-				.withHealth()
-				.withGlobalPrefix("/api")
-				.withOpenApi({ info: { title: "t", version: "1" } }),
+			b.use(health()).use(
+				configureHttp({
+					globalPrefix: "/api",
+					openApi: { info: { title: "t", version: "1" } },
+				}),
+			),
 		);
 
 		expect(await status(api, "/openapi.json")).toBe(200);
@@ -162,7 +169,7 @@ describe("the global prefix and the probes", () => {
 	});
 
 	it("changes nothing without a global prefix", async () => {
-		await using api = await boot((b) => b.withHealth());
+		await using api = await boot((b) => b.use(health()));
 
 		expect(await status(api, "/health")).toBe(200);
 		expect(await status(api, "/ready")).toBe(200);
@@ -173,7 +180,9 @@ describe("the global prefix and the probes", () => {
 
 describe("the static fallback with a global prefix", () => {
 	const withUi = (b: TestBuilder) =>
-		b.withHealth().withGlobalPrefix("/api").withStatic("/", ui);
+		b
+			.use(health())
+			.use(configureHttp({ statics: [{ prefix: "/", directory: ui }], globalPrefix: "/api" }));
 
 	it("gives the app to a UI route that shares a first segment with a prefixed controller", async () => {
 		await using api = await boot(withUi);
@@ -186,7 +195,12 @@ describe("the static fallback with a global prefix", () => {
 	it("keeps the JSON 404 at and below a route outside the prefix, even to a browser", async () => {
 		await using api = await bootModule({
 			controllers: [PortfolioController, WebhookController],
-			configure: (b) => b.withHealth().withGlobalPrefix("/api").withStatic("/", ui),
+			configure: (b) =>
+				b
+					.use(health())
+					.use(
+						configureHttp({ statics: [{ prefix: "/", directory: ui }], globalPrefix: "/api" }),
+					),
 		});
 
 		for (const url of ["/health/x", "/ready/", "/webhooks", "/webhooks/stripe/x"]) {
@@ -201,7 +215,11 @@ describe("the static fallback with a global prefix", () => {
 	});
 
 	it("gives the app to a UI route that shares a first segment with the prefix", async () => {
-		await using api = await boot((b) => b.withGlobalPrefix("/api/v1").withStatic("/", ui));
+		await using api = await boot((b) =>
+			b.use(
+				configureHttp({ statics: [{ prefix: "/", directory: ui }], globalPrefix: "/api/v1" }),
+			),
+		);
 
 		const page = await fetch(`${api.baseUrl}/api/docs`, { headers: browser });
 		expect(page.status).toBe(200);
@@ -222,7 +240,10 @@ describe("the static fallback with a global prefix", () => {
 	it("keeps the JSON 404 under the prefix when no controller is under it", async () => {
 		await using api = await bootModule({
 			controllers: [],
-			configure: (b) => b.withGlobalPrefix("/api").withStatic("/", ui),
+			configure: (b) =>
+				b.use(
+					configureHttp({ statics: [{ prefix: "/", directory: ui }], globalPrefix: "/api" }),
+				),
 		});
 
 		expect(await status(api, "/api/anything", browser)).toBe(404);
@@ -239,10 +260,14 @@ describe("the static fallback with a global prefix", () => {
 
 	it("keeps the OpenAPI path out of the fallback", async () => {
 		await using api = await boot((b) =>
-			withUi(b).withOpenApi({
-				info: { title: "t", version: "1" },
-				path: "/spec/openapi.json",
-			}),
+			withUi(b).use(
+				configureHttp({
+					openApi: {
+						info: { title: "t", version: "1" },
+						path: "/spec/openapi.json",
+					},
+				}),
+			),
 		);
 
 		expect(await status(api, "/spec/openapi.json", browser)).toBe(200);
@@ -252,7 +277,12 @@ describe("the static fallback with a global prefix", () => {
 
 	it("keeps the other rules: method, extension, Accept and exclude", async () => {
 		await using api = await boot((b) =>
-			b.withGlobalPrefix("/api").withStatic("/", ui, { exclude: ["/docs/**"] }),
+			b.use(
+				configureHttp({
+					statics: [{ prefix: "/", directory: ui, exclude: ["/docs/**"] }],
+					globalPrefix: "/api",
+				}),
+			),
 		);
 		const call = (method: string) =>
 			fetch(`${api.baseUrl}/lp/positions`, { method, headers: browser }).then((r) => r.status);
@@ -274,7 +304,9 @@ describe("the static fallback with a global prefix", () => {
 	});
 
 	it("keeps the first-segment rule without a global prefix", async () => {
-		await using api = await boot((b) => b.withHealth().withStatic("/", ui));
+		await using api = await boot((b) =>
+			b.use(health()).use(configureHttp({ statics: [{ prefix: "/", directory: ui }] })),
+		);
 
 		expect(await status(api, "/lp/positions", browser)).toBe(404);
 		expect(await status(api, "/health/x", browser)).toBe(404);

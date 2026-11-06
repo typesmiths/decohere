@@ -1,8 +1,8 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get, Query } from "../src/routing/index.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
@@ -24,8 +24,7 @@ describe("BooleanPipe over HTTP query", () => {
 
 	async function start() {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withControllers(FlagController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [FlagController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 	}

@@ -1,8 +1,8 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import {
 	Controller,
@@ -72,12 +72,16 @@ describe("OpenAPI integration", () => {
 
 	it("serves the OpenAPI document and rejects invalid bodies with typed 400", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withOpenApi({
-				info: { title: "Widgets API", version: "1.0.0" },
-				path: "/openapi.json",
-			})
-			.withHttpProvider(FastifyProvider)
-			.withControllers(WidgetController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [WidgetController],
+					openApi: {
+						info: { title: "Widgets API", version: "1.0.0" },
+						path: "/openapi.json",
+					},
+				}),
+			)
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -152,11 +156,15 @@ describe("OpenAPI integration", () => {
 
 	it("dogfoods Hello routes: fail-closed body validation with typed 400", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withOpenApi({
-				info: { title: "hello.api", version: "1.0.0" },
-			})
-			.withHttpProvider(FastifyProvider)
-			.withControllers(HelloController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [HelloController],
+					openApi: {
+						info: { title: "hello.api", version: "1.0.0" },
+					},
+				}),
+			)
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 

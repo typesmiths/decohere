@@ -1,20 +1,12 @@
+import type { BuilderPlugin } from "@decohere/core/hosting";
 import { DatabaseConfig } from "@decohere/data";
-import { Builder } from "@decohere/core/hosting";
-import { extension } from "@decohere/core/extensibility";
-import type { Logger } from "typeorm";
 import type { ModuleConfig } from "./database-options.js";
 import { typeOrmDataSourceToken } from "./inject-data-source.js";
 import { TypeOrmModule } from "./type-orm.module.js";
 
-declare module "@decohere/core/hosting" {
-	interface Builder {
-		withTypeOrm(options?: ModuleConfig[] | ModuleConfig, logger?: Logger): Builder;
-	}
-}
-
-export class BuilderExtensions {
-	@extension(Builder)
-	public static withTypeOrm(builder: Builder, config: ModuleConfig[] | ModuleConfig) {
+/** Connect to the databases in the `database` config section. Requires `config(...)` on the builder. */
+export function typeOrm(config: ModuleConfig[] | ModuleConfig): BuilderPlugin {
+	return (builder) => {
 		const names: (string | symbol)[] = [];
 		builder.registerPreBuildStep(async (configService, containerBuilder) => {
 			const databaseConfig = await configService.get(DatabaseConfig);
@@ -37,6 +29,5 @@ export class BuilderExtensions {
 		builder.registerPostBuildStep((container) => {
 			for (const name of names) container.resolve(typeOrmDataSourceToken(name));
 		});
-		return builder;
-	}
+	};
 }

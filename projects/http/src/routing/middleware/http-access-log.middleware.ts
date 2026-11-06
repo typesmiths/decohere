@@ -6,7 +6,7 @@ import { REQUEST_ID_HEADER } from "./request-id.js";
 
 /**
  * Echoes `x-request-id` on the response and writes an HTTP access line via Scribe
- * (method, path, status, durationMs, requestId). Enabled by default through `withHttp`.
+ * (method, path, status, durationMs, requestId). Enabled by default through `http(...)`.
  */
 @injectable()
 export class HttpAccessLogMiddleware implements Middleware {
