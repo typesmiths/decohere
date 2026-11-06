@@ -43,7 +43,7 @@ export class ApiPackageJson implements KeyedModel {
 			type: "module",
 			main: "src/main.ts",
 			scripts: {
-				lint: "biome check --write .",
+				lint: "oxlint --fix && prettier --write .",
 			},
 			dependencies: sortStringMap(this._dependencies),
 		};

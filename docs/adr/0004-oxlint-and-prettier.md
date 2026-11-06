@@ -19,8 +19,9 @@ Biome did both jobs but needed 59 `biome-ignore` comments. 23 were `useImportTyp
 - Two tools instead of one, both fast and barely configured.
 - Imports are not sorted automatically. Add a Prettier plugin if that is missed.
 - Explicit `public`/`private` (Biome's `useConsistentMemberAccessibility`) is not enforced.
-- The scaffolder still generates Biome config for new projects. That is for Scaffolder v2 (M6) to decide.
+- New projects get the same two tools and the same settings, so we work in and test what we ship.
 
 ## History
 
 - 2026-10-11: Decided; replaces Biome.
+- 2026-11-06: New projects moved from Biome to these tools too.

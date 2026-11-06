@@ -22,7 +22,7 @@ RUN curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/v1.39.0/install
 
 # Bare minimum: plain Alpine, with only the Node binary and what it links against, the scaffolder
 # and the Auth0 CLI. It never installs anything, so it has no npm. Formatting happens in the
-# project, which installs Biome itself. Copying Node is what keeps npm out: deleting it in a later
+# project, which installs Prettier itself. Copying Node is what keeps npm out: deleting it in a later
 # layer wouldn't make the image smaller.
 FROM alpine:3.24
 

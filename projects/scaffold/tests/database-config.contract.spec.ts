@@ -29,7 +29,7 @@ vi.mock(import("../../devkit/src/interop/index.js"), async (importOriginal) => {
 	};
 });
 
-vi.mock("../src/webapi/features/biome-format.js", () => ({
+vi.mock("../src/webapi/features/format-files.js", () => ({
 	formatScaffoldedFiles: vi.fn(),
 }));
 

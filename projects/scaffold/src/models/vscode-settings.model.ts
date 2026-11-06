@@ -14,6 +14,8 @@ export class VSCodeSettings implements KeyedModel {
 					{
 						"window.title": `${this.title}\${separator}\${activeEditorShort}`,
 						"window.titleSeparator": " | ",
+						"editor.defaultFormatter": "esbenp.prettier-vscode",
+						"editor.formatOnSave": true,
 					},
 					null,
 					2,

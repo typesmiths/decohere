@@ -73,7 +73,7 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 	};
 });
 
-vi.mock("../src/webapi/features/biome-format.js", () => ({
+vi.mock("../src/webapi/features/format-files.js", () => ({
 	formatScaffoldedFiles: vi.fn(),
 }));
 
