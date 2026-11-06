@@ -339,7 +339,7 @@ describe.skipIf(!registry || !version)(
 						root,
 					);
 					for (const id of containers.output.split("\n").filter(Boolean)) {
-						// It and Postgres wrote files the runner's user can't delete.
+						// It wrote files the runner's user can't delete.
 						expectOk(
 							await run(
 								"docker",
@@ -394,6 +394,16 @@ done
 cat /tmp/dev.log
 exit 1`),
 					);
+				});
+
+				it("leaves Postgres's files owned by you, so you can delete them", async () => {
+					const owner = await run(
+						"stat",
+						["-c", "%u", ".devcontainer/postgres-data/PG_VERSION"],
+						dir,
+					);
+					expectOk(owner);
+					expect(owner.output.trim()).toBe(String(process.getuid?.()));
 				});
 
 				it("runs add right there, without starting another container", async () => {

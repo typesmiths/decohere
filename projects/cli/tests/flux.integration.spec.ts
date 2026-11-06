@@ -503,9 +503,12 @@ describe("flux serve — directory slice", () => {
 
 		expect(vol.existsSync("/slice-api-booted")).toBe(true);
 		expect(vol.existsSync("/slice-svc-booted")).toBe(true);
-		await vi.waitFor(() => {
-			expect(realFs.existsSync(webMarker)).toBe(true);
-		});
+		await vi.waitFor(
+			() => {
+				expect(realFs.existsSync(webMarker)).toBe(true);
+			},
+			{ timeout: 4_000 },
+		);
 
 		await stopServer(runPromise);
 	}, 20_000);

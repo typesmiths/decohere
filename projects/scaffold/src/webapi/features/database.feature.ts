@@ -22,8 +22,10 @@ const POSTGRES_DATA_BIND = "./postgres-data:/var/lib/postgresql/data";
 const POSTGRES_DATA_GITIGNORE = ".devcontainer/postgres-data";
 /** The standard image's superuser. Only bootstraps the local server; no API connects as it. */
 const POSTGRES_SUPERUSER = "postgres";
-const DB_RESET_SCRIPT =
-	"rm -rf .devcontainer/postgres-data && docker compose -f .devcontainer/docker-compose.yml down && docker compose -f .devcontainer/docker-compose.yml up -d postgres";
+/** Sets up the data folder as you first, so Docker doesn't create it as root. */
+const DB_UP_SCRIPT =
+	"bash .devcontainer/initialize.sh && docker compose -f .devcontainer/docker-compose.yml up -d postgres";
+const DB_RESET_SCRIPT = `docker compose -f .devcontainer/docker-compose.yml down && rm -rf .devcontainer/postgres-data && ${DB_UP_SCRIPT}`;
 
 export type DatabaseOptions = {
 	databaseProvider?: "none" | "postgres/typeorm";
@@ -251,15 +253,18 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 	if (compose && !compose.hasService("postgres")) {
 		// One shared instance. Each API owns a database on it (created at bootstrap).
 		// Point `{PREFIX}_DB_HOST` / `{PREFIX}_DB_PORT` at another server to split later.
-		// Default data is a bind mount under the project so `rm -rf` the tree removes it.
+		// Default data is a bind mount under the project so `rm -rf` the tree removes it. Postgres
+		// runs as you, from the IDs initialize.sh writes, or that delete would need sudo.
 		compose
 			.addHeaderComment(
 				"Postgres data defaults to ./postgres-data under this folder (bind mount; dies with the working tree).",
+				"It runs as you, using the IDs initialize.sh writes to .env here, so you can delete those files.",
 				`For data that outlives the checkout, replace the postgres volumes entry with a named volume`,
 				`e.g. "${name}-postgres-data:/var/lib/postgresql/data" and declare it under top-level volumes:.`,
 			)
 			.addService("postgres", {
 				image: "postgres:16",
+				user: "${DECOHERE_UID:-1000}:${DECOHERE_GID:-1000}",
 				environment: { POSTGRES_HOST_AUTH_METHOD: "trust", POSTGRES_DB: ident },
 				container_name: `samples-${name}-postgres`,
 				restart: "unless-stopped",
@@ -290,7 +295,7 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 		.addDependency("typeorm", "^0.3.28")
 		.addDependency("@decohere/data-typeorm", CREATE_VERSION)
 		.addDependency("tsx", "^4.20.5")
-		.addScript("db:up", "docker compose -f .devcontainer/docker-compose.yml up -d postgres")
+		.addScript("db:up", DB_UP_SCRIPT)
 		.addScript("db:down", "docker compose -f .devcontainer/docker-compose.yml down")
 		.addScript("db:reset", DB_RESET_SCRIPT);
 

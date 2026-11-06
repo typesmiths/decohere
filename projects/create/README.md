@@ -42,7 +42,7 @@ Target directory is `webapi`'s optional argument or `-d` (default `.`). `npm cre
 
 A first token that isn't a command (`webapi`, `create`, `add`, `auth0`, `help`) or a flag is the project's folder, so a mistyped command starts a project with that name.
 
-The scaffolded Dev Container asks no questions. `gh` is installed in it: run `gh auth login` yourself if you want it, and the login persists in `.devcontainer/gh-auth/` (gitignored).
+The scaffolded Dev Container asks no questions. `gh` is installed in it: run `gh auth login` yourself if you want it, and the login persists in `~/.config/decohere/gh/<project>/`, outside the project and readable only by you. Each project has its own, so a project can use a different GitHub account. To use a token instead, put `GH_TOKEN=…` in `~/.config/decohere/gh/<project>.env`.
 
 ## Commands
 
@@ -90,6 +90,14 @@ my-app/
 Every API gets its own `projects/<name>/Dockerfile`; that folder is the Docker build context. The Dockerfile copies `.package/`, which `forge package` writes (see below).
 
 The app Dev Container is a thin `FROM ghcr.io/typesmiths/decohere/devcontainer:<version>` (pinned to the scaffolder version). Shared layers (bash history, pnpm, `gh`, js-debug bootloader fix) update via `docker pull` / Dev Container rebuild — Compose mounts and lifecycle scripts stay in the app repo. Rebuild with pull after upgrading `@decohere/create`.
+
+The base image is `node:24-trixie-slim`, with no compilers. If an npm package has to compile on install because it has no prebuilt binary, add what it needs to your project's `.devcontainer/Dockerfile`:
+
+```dockerfile
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends g++ make python3 && rm -rf /var/lib/apt/lists/*
+USER node
+```
 
 #### Scripts
 
