@@ -204,6 +204,13 @@ describe.skipIf(!registry || !version)(
 					expect(result.output).not.toContain("Ignored build scripts");
 				});
 
+				// What post-create.sh does in the Dev Container. The scaffolder image has no Biome.
+				it("formats the new project", async () => {
+					expectOk(
+						await run(pnpm, ["exec", "biome", "check", "--write", "."], dir, { PATH: path }),
+					);
+				});
+
 				it.each(["typecheck", "build", "test", "lint:check"])("passes %s", async (script) => {
 					expectOk(await run(pnpm, ["run", script], dir, { PATH: path }));
 				});

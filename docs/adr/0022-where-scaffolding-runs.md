@@ -11,6 +11,7 @@ Scaffolding needs tools, such as the Auth0 CLI, that shouldn't have to be instal
 
 - **Inside a Decohere Dev Container, every command runs right there.** Its image sets `DECOHERE_TOOLS=1` and has the tools, so no second container starts.
 - **Anywhere else, `create` uses the scaffolder image with nothing shared.** It runs as a non-root user in its own folder. The launcher copies the project out with `docker cp`, through a temporary folder, only after a successful run. It removes the container on success, failure and signals.
+- **The scaffolder image is the bare minimum:** plain Alpine with the Node binary, the scaffolder and the Auth0 CLI, and no npm, Biome or curl. A new project formats itself on its first install in the Dev Container, because it installs Biome anyway.
 - **A new project goes only into an empty folder** (`.git` is allowed), so a copy can't overwrite anyone's files.
 - **Commands on an existing project (`add`, `auth0`) run only in its Dev Container.** Anywhere else they stop and say so.
 - **The Auth0 CLI login is kept per project, in a folder you can see:** `$XDG_RUNTIME_DIR/decohere-auth0/<project>` on Linux, held in memory, and under `~/.config/decohere` elsewhere. `initialize.sh` creates it first on the host. A project can't act on another's tenant, and `configure` and `add auth0` stop if the active tenant differs from the one in `.env`.
@@ -27,4 +28,5 @@ Scaffolding needs tools, such as the Auth0 CLI, that shouldn't have to be instal
 ## History
 
 - 2026-11-06: Decided.
+- 2026-11-06: The scaffolder image became the bare minimum, and formatting moved to the project's first install.
 - 2026-11-06: The Auth0 login moved from a named volume, which was opaque, to a folder per project on the host.

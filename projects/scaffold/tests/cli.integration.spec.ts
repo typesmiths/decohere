@@ -190,6 +190,7 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	const postCreate = readFileSync(join(root, ".devcontainer/post-create.sh"), "utf8");
 	expect(postCreate).toContain("pnpm install --frozen-lockfile");
 	expect(postCreate).toContain("pnpm install");
+	expect(postCreate).toContain("pnpm exec biome check --write .");
 
 	const initialize = readFileSync(join(root, ".devcontainer/initialize.sh"), "utf8");
 	expect(initialize).toContain('gh_dir="$root/.devcontainer/gh-auth"');

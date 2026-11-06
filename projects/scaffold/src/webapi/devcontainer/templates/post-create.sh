@@ -29,6 +29,12 @@ else
 	pnpm install
 fi
 
+# The scaffolder has no Biome, so a new project's files get formatted on the first install.
+if [[ ! -f "$stamp" ]]; then
+	echo "Formatting the project with Biome..."
+	pnpm exec biome check --write .
+fi
+
 if [[ -n "$current_hash" ]]; then
 	mkdir -p node_modules
 	printf '%s\n' "$current_hash" >"$stamp"

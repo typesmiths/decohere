@@ -13,23 +13,27 @@
 #     --build-arg CREATE_VERSION=0.0.1-dev.44 \
 #     -t ghcr.io/typesmiths/decohere/create:0.0.1-dev.44 .
 
-FROM node:24-slim
+# Tools used only while building stay in this stage, so curl never reaches the image.
+FROM node:24-alpine AS auth0-cli
+RUN apk add --no-cache curl
+# Keep this version the same as the Dev Container's (a test checks).
+RUN curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/v1.39.0/install.sh \
+    | sh -s -- -b /usr/local/bin v1.39.0
+
+# Bare minimum: plain Alpine, with only the Node binary and what it links against, the scaffolder
+# and the Auth0 CLI. It never installs anything, so it has no npm. Formatting happens in the
+# project, which installs Biome itself. Copying Node is what keeps npm out: deleting it in a later
+# layer wouldn't make the image smaller.
+FROM alpine:3.24
 
 ARG CREATE_VERSION
 ENV CREATE_VERSION=$CREATE_VERSION
 RUN test -n "$CREATE_VERSION" || (echo "ERROR: --build-arg CREATE_VERSION is required" && exit 1)
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache libstdc++ libgcc && addgroup -g 1000 node && adduser -u 1000 -G node -s /bin/sh -D node
 
-# Install auth0 CLI into /usr/local/bin so it is available on PATH.
-# Keep this version the same as the Dev Container's (a test checks).
-RUN curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/v1.39.0/install.sh \
-    | sh -s -- -b /usr/local/bin v1.39.0
-
-# Install Biome globally so scaffolded files can be linted before handoff.
-RUN npm install -g @biomejs/biome
+COPY --from=auth0-cli /usr/local/bin/node /usr/local/bin/node
+COPY --from=auth0-cli /usr/local/bin/auth0 /usr/local/bin/auth0
 
 COPY create.tgz /tmp/create.tgz
 RUN mkdir -p /usr/local/lib/node_modules/@decohere/scaffold \
