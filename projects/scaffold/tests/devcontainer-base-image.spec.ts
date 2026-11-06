@@ -43,6 +43,12 @@ describe("published app Dev Container base image", () => {
 		expect(tools).toBeLessThan(content.indexOf("auth0-cli/"));
 	});
 
+	it("leaves its volumes writable by any user ID, because a Dev Container can change node's", () => {
+		const content = new AppDevContainerBaseImage(BASE).build();
+		expect(content).toContain("chmod 777 /workspace/node_modules");
+		expect(content).toContain("chmod -R a+rwX /commandhistory");
+	});
+
 	it("includes writable bash history, pnpm, gh, and node user", () => {
 		const content = new AppDevContainerBaseImage(BASE).build();
 		expect(content).toContain("ENV HISTFILE=/commandhistory/.bash_history");

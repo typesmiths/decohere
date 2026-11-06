@@ -61,6 +61,11 @@ export const commandHistory = {
 	histFile: "/commandhistory/.bash_history",
 } as const;
 
+/**
+ * Volumes copy the owner and mode of the folder they're mounted over, and a Dev Container changes
+ * node's user ID to match the host's. So these folders are writable by any user ID: only the owner
+ * would be left out otherwise. They hold nothing shared outside this container.
+ */
 export function withCommandHistory(options?: {
 	historyDir?: string;
 	historyFileName?: string;
@@ -78,7 +83,7 @@ export function withCommandHistory(options?: {
 			.addStep(
 				DockerStep.run(
 					"history-dir",
-					`mkdir -p ${historyDir} && touch ${historyFile} && chown -R ${username} ${historyDir}`,
+					`mkdir -p ${historyDir} && touch ${historyFile} && chown -R ${username} ${historyDir} && chmod -R a+rwX ${historyDir}`,
 					order,
 				),
 			)
@@ -251,7 +256,7 @@ export function withWorkspaceNodeModulesOwnership(options?: {
 		dockerfile.addStep(
 			DockerStep.raw(
 				"workspace-node-modules",
-				`RUN mkdir -p ${workspaceDir}/node_modules && chown ${usernameExpr}:${usernameExpr} ${workspaceDir}/node_modules`,
+				`RUN mkdir -p ${workspaceDir}/node_modules && chown ${usernameExpr}:${usernameExpr} ${workspaceDir}/node_modules && chmod 777 ${workspaceDir}/node_modules`,
 				order + 1,
 			),
 		);

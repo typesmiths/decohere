@@ -271,6 +271,19 @@ describe.skipIf(!registry || !version)(
 					},
 				);
 
+				it("can write to its volumes on any user ID", async () => {
+					expectOk(
+						await devcontainer(
+							"exec",
+							"--workspace-folder",
+							dir,
+							"test",
+							"-w",
+							"/commandhistory/.bash_history",
+						),
+					);
+				});
+
 				it("keeps the Auth0 login through a rebuild", async () => {
 					const exec = (...args: string[]) =>
 						devcontainer("exec", "--workspace-folder", dir, ...args);

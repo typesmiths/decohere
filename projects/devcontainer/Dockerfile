@@ -10,7 +10,7 @@
 
 FROM node:24-trixie-slim
 
-RUN mkdir -p /commandhistory && touch /commandhistory/.bash_history && chown -R node /commandhistory
+RUN mkdir -p /commandhistory && touch /commandhistory/.bash_history && chown -R node /commandhistory && chmod -R a+rwX /commandhistory
 
 ENV HISTFILE=/commandhistory/.bash_history
 
@@ -33,7 +33,7 @@ RUN mkdir -p /home/${USERNAME}/.config/auth0 && chown -R ${USERNAME}:${USERNAME}
 
 ENV DECOHERE_TOOLS=1
 
-RUN mkdir -p /workspace/node_modules && chown ${USERNAME}:${USERNAME} /workspace/node_modules
+RUN mkdir -p /workspace/node_modules && chown ${USERNAME}:${USERNAME} /workspace/node_modules && chmod 777 /workspace/node_modules
 
 # VS Code / Cursor js-debug Auto Attach injects --require …/bootloader.js into
 # NODE_OPTIONS. On a fresh Dev Container that path often does not exist yet
