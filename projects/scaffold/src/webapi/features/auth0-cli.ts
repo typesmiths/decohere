@@ -449,10 +449,6 @@ export type AdminDatabaseUser = {
 };
 
 /** Strong default password when the scaffolder caller leaves password blank. */
-export function generateAdminPassword(): string {
-	return `${randomBytes(12).toString("base64url")}aA1!`;
-}
-
 function isUserAlreadyExistsError(err: unknown): boolean {
 	const text = err instanceof Error ? err.message : String(err);
 	return /already exists|user exists|Conflict|409/i.test(text);

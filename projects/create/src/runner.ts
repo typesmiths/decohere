@@ -1,5 +1,16 @@
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, renameSync, rmSync } from "node:fs";
+import {
+	chmodSync,
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
+import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 import { join } from "node:path";
 import { type LaunchPlan, resolveLaunch } from "./resolve-launch.js";
@@ -9,6 +20,9 @@ import { CREATE_IMAGE_REPOSITORY, CREATE_VERSION } from "./version.js";
 const BUILDER_IMAGE = `${CREATE_IMAGE_REPOSITORY}:${CREATE_VERSION}`;
 const SCAFFOLD_PACKAGE = `@decohere/scaffold@${CREATE_VERSION}`;
 const WORKSPACE = "/workspace";
+
+/** Passed by name only, so the value is never on a command line. */
+const ADMIN_PASSWORD_ENV = "DECOHERE_ADMIN_PASSWORD";
 
 const SIGNAL_EXIT_CODES = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 } as const;
 
@@ -43,6 +57,37 @@ function refuseFolderWithFiles(targetDir: string): void {
 	process.exit(1);
 }
 
+/** Meets Auth0's password rules whichever policy the tenant uses. */
+function generateAdminPassword(): string {
+	return `${randomBytes(18).toString("base64url")}aA1!`;
+}
+
+/**
+ * After a successful run, save the generated password in one private file outside the project.
+ * It's only for logging in, so nothing in the app reads it. Nothing is saved if no admin was made.
+ */
+function saveAdminPassword(targetDir: string, projectName: string, password: string): void {
+	const env = join(targetDir, ".env");
+	const email = existsSync(env)
+		? readFileSync(env, "utf8").match(/^AUTH0_ADMIN_USER_EMAIL=(.+)$/m)?.[1]
+		: undefined;
+	if (email == null) return;
+
+	const folder = join(homedir(), ".config", "decohere");
+	const file = join(folder, `${projectName}.env`);
+	mkdirSync(folder, { recursive: true, mode: 0o700 });
+	writeFileSync(
+		file,
+		`AUTH0_ADMIN_USER_EMAIL=${email}\nAUTH0_ADMIN_USER_PASSWORD=${password}\n`,
+		{ mode: 0o600 },
+	);
+	chmodSync(file, 0o600);
+	console.log(`\n  Auth0 admin password saved on this machine: ${file}`);
+	if (isInContainer()) {
+		console.log("  That's inside this container, so copy it if the container may be rebuilt.");
+	}
+}
+
 function printNextSteps(targetDir: string): void {
 	const open = isInContainer()
 		? `    cd ${targetDir}\n    pnpm install\n    pnpm dev\n`
@@ -59,16 +104,25 @@ function runHere(plan: LaunchPlan): never {
 		mkdirSync(targetDir, { recursive: true });
 	}
 
+	const adminPassword = generateAdminPassword();
 	const result = spawnSync("npx", ["--yes", SCAFFOLD_PACKAGE, ...containerArgv], {
 		cwd: targetDir,
 		stdio: "inherit",
-		env: { ...process.env, DECOHERE_BUILDER: "1", DECOHERE_PROJECT_NAME: projectName },
+		env: {
+			...process.env,
+			DECOHERE_BUILDER: "1",
+			DECOHERE_PROJECT_NAME: projectName,
+			[ADMIN_PASSWORD_ENV]: adminPassword,
+		},
 	});
 	if (result.error != null) {
 		console.error(`\n  Could not start the scaffolder: ${result.error.message}\n`);
 		process.exit(1);
 	}
-	if (result.status === 0 && creating) printNextSteps(targetDir);
+	if (result.status === 0 && creating) {
+		saveAdminPassword(targetDir, projectName, adminPassword);
+		printNextSteps(targetDir);
+	}
 	process.exit(result.status ?? 1);
 }
 
@@ -145,6 +199,7 @@ export async function runInBuilder(argv: string[]): Promise<never> {
 	assertDockerAvailable();
 
 	const name = `decohere-create-${randomBytes(6).toString("hex")}`;
+	const adminPassword = generateAdminPassword();
 	const ttyFlags = process.stdin.isTTY ? ["--interactive", "--tty"] : ["--interactive"];
 	const created = spawnSync(
 		"docker",
@@ -157,12 +212,17 @@ export async function runInBuilder(argv: string[]): Promise<never> {
 			"DECOHERE_BUILDER=1",
 			"--env",
 			`DECOHERE_PROJECT_NAME=${projectName}`,
+			"--env",
+			ADMIN_PASSWORD_ENV,
 			"--workdir",
 			WORKSPACE,
 			BUILDER_IMAGE,
 			...containerArgv,
 		],
-		{ stdio: ["ignore", "ignore", "inherit"] },
+		{
+			stdio: ["ignore", "ignore", "inherit"],
+			env: { ...process.env, [ADMIN_PASSWORD_ENV]: adminPassword },
+		},
 	);
 	if (created.status !== 0) process.exit(created.status ?? 1);
 
@@ -180,6 +240,7 @@ export async function runInBuilder(argv: string[]): Promise<never> {
 		exitCode = await attach(name);
 		if (exitCode === 0 && copyOut) {
 			copyProjectOut(name, targetDir);
+			saveAdminPassword(targetDir, projectName, adminPassword);
 			printNextSteps(targetDir);
 		}
 	} catch (reason) {

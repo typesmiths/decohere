@@ -12,6 +12,8 @@ Scaffolding always runs somewhere that already has its tools, so nothing gets in
 
 The scaffolder image gets no folders from your machine, and it can't see `~/.npmrc` or your Auth0 login. It works in its own folder, and the project is copied out only if it succeeds, so a failed run or Ctrl-C leaves your folder as it was. The container is always removed. A new project needs an empty folder (a `.git` folder is fine). This works the same from your machine, from inside a container, and against a remote Docker.
 
+With Auth0 and Postgres, `create` also makes an admin user with a generated password. The password isn't printed or kept in the project: it's saved in `~/.config/decohere/<project>.env`, readable only by you, and it's only for logging in. If you run `create` inside a container, that file is in the container, so copy it if the container may be rebuilt.
+
 Choosing Auth0 during `create` means logging in there. That login goes away with the container, so your first `auth0` command in the Dev Container asks you to log in once more.
 
 ## Usage

@@ -70,7 +70,6 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 		createAdminDatabaseUser: mockCreateAdminDatabaseUser,
 		ensureSpaApp: mockEnsureSpaApp,
 		enableConnectionForClient: mockEnableConnectionForClient,
-		generateAdminPassword: () => "Generated1!",
 	};
 });
 
@@ -93,6 +92,11 @@ type ScaffoldOpts = Parameters<typeof scaffoldApi>[0] & {
 function read(rel: string): string {
 	return readFileSync(join(TARGET, rel), "utf8");
 }
+
+const withoutPassword = (): ScaffoldOpts => {
+	const { adminPassword: _adminPassword, ...options } = baseOpts();
+	return options;
+};
 
 const baseOpts = (): ScaffoldOpts => ({
 	d: TARGET,
@@ -138,7 +142,8 @@ describe("scaffoldApi auth0 wiring", () => {
 		const env = read(".env");
 		expect(env).toContain("AUTH0_ADMIN_USER_SUB=auth0|admin");
 		expect(env).toContain("AUTH0_ADMIN_USER_EMAIL=admin@my-api.example.com");
-		expect(env).toContain("AUTH0_ADMIN_USER_PASSWORD=Generated1!");
+		expect(env).not.toContain("PASSWORD");
+		expect(env).not.toContain("Generated1!");
 		expect(env).toContain("AUTH0_ADMIN_USERNAME=admin");
 
 		expect(mockCreateAdminDatabaseUser).toHaveBeenCalledOnce();
@@ -149,6 +154,30 @@ describe("scaffoldApi auth0 wiring", () => {
 		expect(readme).toContain("pnpm decohere auth0 login");
 		expect(readme).toContain("pnpm decohere auth0 configure");
 		expect(readme).toContain("@Authorize");
+	});
+
+	it("uses the launcher's password, and writes and prints it nowhere", async () => {
+		process.env.DECOHERE_ADMIN_PASSWORD = "From-the-launcher1!";
+		const printed: string[] = [];
+		vi.spyOn(console, "log").mockImplementation((msg?: unknown) => {
+			printed.push(String(msg ?? ""));
+		});
+
+		await scaffoldApi(withoutPassword());
+		delete process.env.DECOHERE_ADMIN_PASSWORD;
+
+		expect(mockCreateAdminDatabaseUser).toHaveBeenCalledWith(
+			expect.objectContaining({ password: "From-the-launcher1!" }),
+		);
+		expect(read(".env")).not.toContain("From-the-launcher1!");
+		expect(printed.join("\n")).not.toContain("From-the-launcher1!");
+		expect(mockAsk).not.toHaveBeenCalledWith(expect.stringContaining("password"));
+	});
+
+	it("creates no admin user when there's no password", async () => {
+		await scaffoldApi(withoutPassword());
+
+		expect(mockCreateAdminDatabaseUser).not.toHaveBeenCalled();
 	});
 
 	it("still writes admin env when Auth0 returns an existing user identity", async () => {
@@ -163,7 +192,8 @@ describe("scaffoldApi auth0 wiring", () => {
 
 		const env = read(".env");
 		expect(env).toContain("AUTH0_ADMIN_USER_SUB=auth0|existing");
-		expect(env).toContain("AUTH0_ADMIN_USER_PASSWORD=Generated1!");
+		expect(env).not.toContain("PASSWORD");
+		expect(env).not.toContain("Generated1!");
 	});
 
 	it("creates the token app and writes its client id to .env", async () => {

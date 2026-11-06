@@ -9,8 +9,11 @@ const mocks = vi.hoisted(() => ({
 	mkdirSync: vi.fn(),
 	mkdtempSync: vi.fn(),
 	readdirSync: vi.fn(),
+	readFileSync: vi.fn(),
 	renameSync: vi.fn(),
 	rmSync: vi.fn(),
+	writeFileSync: vi.fn(),
+	chmodSync: vi.fn(),
 }));
 
 vi.mock("node:child_process", () => ({
@@ -24,8 +27,11 @@ vi.mock("node:fs", () => ({
 	mkdirSync: mocks.mkdirSync,
 	mkdtempSync: mocks.mkdtempSync,
 	readdirSync: mocks.readdirSync,
+	readFileSync: mocks.readFileSync,
 	renameSync: mocks.renameSync,
 	rmSync: mocks.rmSync,
+	writeFileSync: mocks.writeFileSync,
+	chmodSync: mocks.chmodSync,
 }));
 
 vi.mock(
@@ -432,6 +438,71 @@ describe("launch outside the tools", () => {
 
 		expect(exitCode).toBe(0);
 		expect(dockerCalls("cp")).toHaveLength(1);
+	});
+
+	describe("the generated admin password", () => {
+		const writtenProject = () => {
+			mocks.existsSync.mockImplementation((path: string) => path.endsWith("/.env"));
+			mocks.readFileSync.mockReturnValue(
+				"AUTH0_ADMIN_USER_SUB=auth0|1\nAUTH0_ADMIN_USER_EMAIL=admin@my-app.example\n",
+			);
+		};
+		const createEnv = () =>
+			mocks.spawnSync.mock.calls.find((c) => c[1][0] === "create")?.[2]
+				.env as NodeJS.ProcessEnv;
+
+		it("reaches the container by name only, never on the command line", async () => {
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			const password = createEnv().DECOHERE_ADMIN_PASSWORD!;
+			expect(password.length).toBeGreaterThan(20);
+			expect(createArgs()).toContain("DECOHERE_ADMIN_PASSWORD");
+			expect(createArgs().join(" ")).not.toContain(password);
+		});
+
+		it("is saved in a private file outside the project, and never printed", async () => {
+			writtenProject();
+			const logs = spyOutput("log");
+			const errors = spyOutput("error");
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			const password = createEnv().DECOHERE_ADMIN_PASSWORD!;
+			const [file, content, options] = mocks.writeFileSync.mock.calls[0]!;
+			expect(file).toMatch(/\.config\/decohere\/my-project\.env$/);
+			expect(file).not.toContain("/tmp/my-project/");
+			expect(content).toContain(`AUTH0_ADMIN_USER_PASSWORD=${password}`);
+			expect(content).toContain("AUTH0_ADMIN_USER_EMAIL=admin@my-app.example");
+			expect(options).toEqual({ mode: 0o600 });
+			expect(mocks.chmodSync).toHaveBeenCalledWith(file, 0o600);
+			expect(mocks.mkdirSync).toHaveBeenCalledWith(
+				expect.stringMatching(/\.config\/decohere$/),
+				{
+					recursive: true,
+					mode: 0o700,
+				},
+			);
+			expect(logs.join("\n")).toContain(file);
+			expect([...logs, ...errors].join("\n")).not.toContain(password);
+		});
+
+		it("isn't saved when no admin user was created", async () => {
+			mocks.existsSync.mockImplementation((path: string) => path.endsWith("/.env"));
+			mocks.readFileSync.mockReturnValue("NODE_ENV=dev\n");
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			expect(mocks.writeFileSync).not.toHaveBeenCalled();
+		});
+
+		it("isn't saved after a failed run", async () => {
+			writtenProject();
+			containerExit = 1;
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			expect(mocks.writeFileSync).not.toHaveBeenCalled();
+		});
 	});
 
 	it("copies nothing for --help", async () => {

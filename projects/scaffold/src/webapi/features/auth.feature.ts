@@ -228,13 +228,6 @@ async function getAuth0Options(
 		adminUsername =
 			cliOptions.adminUsername ?? (await ask("\n  Admin username [admin]: ", "admin"));
 		adminPassword = cliOptions.adminPassword;
-		if (adminPassword == null) {
-			adminPassword = await ask("  Admin password (leave blank to generate): ");
-			if (!adminPassword) {
-				adminPassword = auth0Cli.generateAdminPassword();
-				console.log(`  ✓ Generated admin password (written to .env): ${adminPassword}`);
-			}
-		}
 	}
 
 	return {
@@ -257,8 +250,12 @@ function createAuth0AdminUser(
 	authConfig: AuthConfigModel,
 ): void {
 	const username = options.adminUsername ?? "admin";
-	const password = options.adminPassword;
-	if (!password) return;
+	// The launcher generates this and saves it after a successful run. It's never written here.
+	const password = options.adminPassword ?? process.env.DECOHERE_ADMIN_PASSWORD;
+	if (!password) {
+		console.log("  No admin password was provided, so no Auth0 admin user was created.");
+		return;
+	}
 
 	const email = adminEmail(workspace.name, username);
 	try {
@@ -266,18 +263,15 @@ function createAuth0AdminUser(
 		authConfig.setAdminUser({
 			sub: admin.user_id,
 			email: admin.email,
-			password: admin.password,
 			username: admin.username,
 		});
 		workspace
 			.getModel<EnvFile>(WELL_KNOWN_FILES.ENV_FILE)
 			?.addEntry("AUTH0_ADMIN_USER_SUB", admin.user_id)
 			.addEntry("AUTH0_ADMIN_USER_EMAIL", admin.email)
-			.addEntry("AUTH0_ADMIN_USER_PASSWORD", admin.password)
 			.addEntry("AUTH0_ADMIN_USERNAME", admin.username);
 		console.log(`  ✓ Auth0 admin user ready: ${admin.email} (role: ${ADMIN_ROLE})`);
 		console.log(`    Login with EMAIL (not username): ${admin.email}`);
-		console.log(`    Password: see AUTH0_ADMIN_USER_PASSWORD in .env`);
 	} catch (err) {
 		console.error(
 			`  ✗ Failed to ensure Auth0 admin user (${email}): ${err instanceof Error ? err.message : err}`,
@@ -454,7 +448,7 @@ function scaffold(workspace: WorkspaceScaffold, options: AuthOptions): void {
 	});
 	workspace.addModel(authConfig);
 
-	if (withLocalUsers && options.adminPassword) {
+	if (withLocalUsers) {
 		createAuth0AdminUser(workspace, options, authConfig);
 	}
 }

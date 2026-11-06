@@ -24,6 +24,7 @@ Secrets in files on disk get copied, committed by accident and go stale. An impo
 - One rule everywhere: a value is in `process.env` or it isn't. Tests set environment variables directly.
 - Scaffolded apps ask for their `.env` explicitly: their `dev` script is `flux serve --env-file-if-exists .env`, until a later release stops generating `.env` files. That is deferred until there is a real secret store (OS key stores or a built-in Bitwarden provider).
 - This repo's CI stores no secrets: tests use fixtures, npm publishing uses Trusted Publishing (OIDC), and GHCR and `gh` use the workflow's `GITHUB_TOKEN`.
+- The generated Auth0 admin password is the one value kept outside this rule, because no app reads it: it's only for logging in. The launcher saves it in a private file outside the project, as plain text, until there is a secret store.
 - There is no Bitwarden integration in the framework. `bws run` sits outside the app, so any secret manager that sets environment variables works the same way.
 
 ## History
@@ -31,3 +32,4 @@ Secrets in files on disk get copied, committed by accident and go stale. An impo
 - 2026-10-03: Secrets come from the environment; Bitwarden supplies them (accepted 2026-10-04).
 - 2026-11-04: The repo's CI stores no secrets: npm publishes through Trusted Publishing and GHCR through `GITHUB_TOKEN`.
 - 2026-11-06: Removing `.env` from scaffolded apps moved out of Scaffolder v2 and deferred.
+- 2026-11-06: The generated Auth0 admin password moved from `.env` to a private file outside the project.
