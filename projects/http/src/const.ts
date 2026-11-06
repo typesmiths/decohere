@@ -1,9 +1,10 @@
+import { AppServerToken } from "@decohere/core/hosting";
 import type { Metadata } from "./routing/http.types.js";
 
 const RoutingKey = "http:Routing";
 
 export const RouteRegistryToken = Symbol("RouteRegistryToken");
-export const HttpProviderToken = Symbol("HttpProviderToken");
+export const HttpProviderToken = AppServerToken;
 export const RouterToken = Symbol("RouterToken");
 export const PrincipalToken = Symbol("PrincipalToken");
 export const IPrincipalProviderToken = Symbol("IPrincipalProvider");
@@ -11,9 +12,7 @@ export const TokenServiceToken = Symbol("TokenService");
 export const AuthorizationServiceToken = Symbol("AuthorizationService");
 export const HttpOptionsToken = Symbol("HttpOptions");
 export const ExceptionFilterHostToken = Symbol("ExceptionFilterHost");
-export const ReadinessCheckToken = Symbol("ReadinessCheck");
 export const ReadinessServiceToken = Symbol("ReadinessService");
-export const HostedServiceHostToken = Symbol("HostedServiceHost");
 export type HTTPMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "OPTIONS";
 export const HTTPMethods = {
 	GET: "GET",

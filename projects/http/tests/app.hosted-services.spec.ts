@@ -1,8 +1,8 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import { inject, injectable } from "@decohere/crucible/decorators";
 import { afterEach, describe, expect, it } from "vitest";
-import type { App } from "../src/app/app.js";
-import { Builder } from "../src/builder/builder.js";
-import type { HostedService } from "../src/hosting/hosted-service.js";
+import { type App, Builder } from "@decohere/core/hosting";
+import type { HostedService } from "@decohere/core/hosting";
 import "../src/health/health.extensions.js";
 import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
@@ -62,7 +62,9 @@ class Ticker implements HostedService {
 }
 
 function builder() {
-	return Builder.create().withServices((c) => c.registerSingleton(DbToken, Db));
+	return Builder.create(new ServiceContainerBuilder()).withServices((c) =>
+		c.registerSingleton(DbToken, Db),
+	);
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));

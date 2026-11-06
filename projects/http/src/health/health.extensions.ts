@@ -1,12 +1,11 @@
 import type { ContainerBuilder } from "@decohere/crucible";
 import { extension } from "@decohere/core/extensibility";
-import { Builder } from "../builder/builder.js";
-import { ReadinessCheckToken, ReadinessServiceToken } from "../const.js";
+import { Builder, type IReadinessCheck, ReadinessCheckToken } from "@decohere/core/hosting";
+import { ReadinessServiceToken } from "../const.js";
 import "../http/http.extensions.js";
 import { getOrCreateHttpOptions } from "../http/http.options.store.js";
 import { HealthController } from "./health.controller.js";
 import { ReadinessService } from "./readiness.service.js";
-import type { IReadinessCheck } from "./readiness.types.js";
 
 export type WithHealthOptions = {
 	/** Extra readiness probes (e.g. custom dependency checks). */
@@ -18,7 +17,7 @@ export type WithHealthOptions = {
 	underGlobalPrefix?: boolean;
 };
 
-declare module "@decohere/http" {
+declare module "@decohere/core/hosting" {
 	interface Builder {
 		/**
 		 * Register anonymous `/health` (liveness) and `/ready` (readiness) routes.

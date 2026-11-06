@@ -32,7 +32,6 @@
   },
   "dependencies": {
     "@decohere/data": "0.0.1-dev.5",
-    "@decohere/http": "0.0.1-dev.5",
     "@decohere/crucible": "0.0.1-dev.5",
     "@decohere/core": "0.0.1-dev.5",
     "@decohere/scribe": "0.0.1-dev.5",

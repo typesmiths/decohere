@@ -1,4 +1,4 @@
-import type { App } from "../../src/app/app.js";
+import type { App } from "@decohere/core/hosting";
 
 /**
  * Bind an OS-assigned port (`listen(0)`) on loopback and return the advertised origin.

@@ -32,6 +32,9 @@
       "@decohere/core/extensibility": [
         "./projects/core/src/extensibility/index.ts"
       ],
+      "@decohere/core/hosting": [
+        "./projects/core/src/hosting/index.ts"
+      ],
       "@decohere/core/io": [
         "./projects/core/src/io/index.ts"
       ],

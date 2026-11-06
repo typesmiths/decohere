@@ -1,32 +1,34 @@
-import {
-	type ContainerBuilder,
-	ServiceContainerBuilder,
-	type IContainer,
-} from "@decohere/crucible";
+import { type Logger, scribe } from "@decohere/scribe";
+import type { ContainerBuilder, IContainer } from "../composition/index.js";
 import {
 	ConfigurationServiceToken,
 	type IConfigurationService,
-} from "@decohere/core/configuration";
-import type { Constructable } from "@decohere/core/reflection";
-import { type Logger, scribe } from "@decohere/scribe";
-import { App } from "../app/app.js";
-import { HostedServiceHostToken } from "../const.js";
-import type { HostedService } from "../hosting/hosted-service.js";
-import { HostedServiceHost } from "../hosting/hosted-service-host.js";
+} from "../configuration/index.js";
+import type { Constructable } from "../reflection/index.js";
+import { App } from "./app.js";
+import { HostedServiceHostToken } from "./const.js";
+import type { HostedService } from "./hosted-service.js";
+import { HostedServiceHost } from "./hosted-service-host.js";
 
 export type BuilderOptions = {
-	containerBuilder?: ServiceContainerBuilder;
 	applicationName?: string;
 };
 
 export class Builder<T extends App = App> {
-	public static create<T extends App = App>(options?: BuilderOptions) {
-		return new Builder<T>(options);
+	/**
+	 * @param containerBuilder The container the app runs on: `new ServiceContainerBuilder()` from
+	 * `@decohere/crucible`. It is an argument because `core` sits below the container that implements it.
+	 */
+	public static create<T extends App = App>(
+		containerBuilder: ContainerBuilder,
+		options?: BuilderOptions,
+	) {
+		return new Builder<T>(containerBuilder, options);
 	}
 
-	public readonly containerBuilder: ServiceContainerBuilder;
+	public readonly containerBuilder: ContainerBuilder;
 	public readonly applicationName?: string;
-	private readonly logger: Logger = scribe.logger("name");
+	private readonly logger: Logger = scribe.logger(Builder.name);
 	private userServices: ((containerBuilder: ContainerBuilder) => void)[] = [];
 	private preBuildSteps: ((
 		config: IConfigurationService,
@@ -35,8 +37,8 @@ export class Builder<T extends App = App> {
 	private postBuildSteps: ((container: IContainer) => Promise<void> | void)[] = [];
 	private readonly hostedServices = new HostedServiceHost();
 
-	public constructor(options?: BuilderOptions) {
-		this.containerBuilder = options?.containerBuilder ?? new ServiceContainerBuilder();
+	public constructor(containerBuilder: ContainerBuilder, options?: BuilderOptions) {
+		this.containerBuilder = containerBuilder;
 		this.applicationName = options?.applicationName;
 	}
 
@@ -46,7 +48,7 @@ export class Builder<T extends App = App> {
 	}
 
 	/**
-	 * Run {@link HostedService}s for the life of the app: started in this order before the HTTP
+	 * Run {@link HostedService}s for the life of the app: started in this order before the
 	 * server listens, stopped in reverse when the app stops (including SIGTERM and Flux reboots).
 	 * Each is registered as a singleton, so other services can inject it by its class.
 	 */

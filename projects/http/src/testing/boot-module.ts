@@ -1,7 +1,7 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import type { ContainerBuilder } from "@decohere/crucible";
 import type { Constructable } from "@decohere/core/reflection";
-import type { App } from "../app/app.js";
-import { Builder } from "../builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import "../http/http.extensions.js";
 import { FastifyProvider } from "../providers/fastify.provider.js";
 import type { HttpProvider } from "../routing/http.types.js";
@@ -40,7 +40,7 @@ export type BootedModule = AsyncDisposable & {
  * const { events } = await api.readEvents("/prices/stream", { count: 3 });
  */
 export async function bootModule(options: BootModuleOptions): Promise<BootedModule> {
-	let builder = Builder.create()
+	let builder = Builder.create(new ServiceContainerBuilder())
 		.withHttp(options.provider ?? FastifyProvider)
 		.withControllers(...options.controllers);
 	if (options.services) builder = builder.withServices(options.services);

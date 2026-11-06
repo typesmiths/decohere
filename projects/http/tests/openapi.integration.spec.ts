@@ -1,7 +1,7 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
-import type { App } from "../src/app/app.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import {
@@ -71,7 +71,7 @@ describe("OpenAPI integration", () => {
 	});
 
 	it("serves the OpenAPI document and rejects invalid bodies with typed 400", async () => {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withOpenApi({
 				info: { title: "Widgets API", version: "1.0.0" },
 				path: "/openapi.json",
@@ -151,7 +151,7 @@ describe("OpenAPI integration", () => {
 	});
 
 	it("dogfoods Hello routes: fail-closed body validation with typed 400", async () => {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withOpenApi({
 				info: { title: "hello.api", version: "1.0.0" },
 			})

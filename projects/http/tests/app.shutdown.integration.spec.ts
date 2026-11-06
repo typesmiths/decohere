@@ -1,9 +1,9 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import { createConnection } from "node:net";
 import { inject, injectable } from "@decohere/crucible/decorators";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { App } from "../src/app/app.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get } from "../src/routing/index.js";
@@ -64,7 +64,7 @@ function connect(baseURL: string): Promise<void> {
 }
 
 async function buildApp(): Promise<App> {
-	return Builder.create()
+	return Builder.create(new ServiceContainerBuilder())
 		.withHttp(FastifyProvider)
 		.withServices((c) => c.registerSingleton(DbToken, Db))
 		.withControllers(SlowController)
@@ -155,7 +155,7 @@ describe("graceful shutdown on SIGTERM / SIGINT", () => {
 				return new Promise(() => {});
 			}
 		}
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttp(FastifyProvider)
 			.withControllers(HangController)
 			.build();

@@ -1,13 +1,6 @@
 import type { Scope } from "./types/types.js";
 
-const Container = "Container";
-type ContainerMeta = "injecttoken";
-
-export const LifetimeScopeToken = Symbol("LifetimeScope");
-
-export const ContainerMeta = {
-	injecttoken: `${Container}:injecttoken`,
-} satisfies Record<ContainerMeta, string>;
+export { ContainerMeta, LifetimeScopeToken } from "@decohere/core/composition";
 
 export const Scopes = {
 	request: "request",

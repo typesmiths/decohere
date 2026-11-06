@@ -1,8 +1,8 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import { scribe } from "@decohere/scribe";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { App } from "../src/app/app.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get, Param, Query } from "../src/routing/index.js";
 import "../src/http/http.extensions.js";
@@ -35,7 +35,7 @@ describe("App HTTP routing", () => {
 	let app: App;
 
 	beforeEach(async () => {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withControllers(EchoController)
 			.build();
@@ -79,7 +79,7 @@ describe("App HTTP routing", () => {
 
 	it("starts two apps without a port collision", async () => {
 		const originA = axios.defaults.baseURL;
-		const other = await Builder.create()
+		const other = await Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withControllers(EchoController)
 			.build();
@@ -110,7 +110,7 @@ describe("App container dispose", () => {
 
 	it("closes HTTP and constructed DI services on dispose", async () => {
 		let hub: SocketHub | undefined;
-		const builder = Builder.create()
+		const builder = Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withControllers(EchoController)
 			.withServices((cb) => {

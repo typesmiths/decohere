@@ -6,7 +6,7 @@ import {
 	type Dialect,
 	type Provider,
 } from "@decohere/data";
-import { type IReadinessCheck, ReadinessCheckToken } from "@decohere/http";
+import { type IReadinessCheck, ReadinessCheckToken } from "@decohere/core/hosting";
 import type { ContainerBuilder } from "@decohere/crucible";
 import { memoize } from "@decohere/core/caching";
 import type { DataSource, Logger } from "typeorm";

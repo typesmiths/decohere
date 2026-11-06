@@ -1,7 +1,7 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
-import type { App } from "../src/app/app.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get, Query } from "../src/routing/index.js";
@@ -23,7 +23,7 @@ describe("BooleanPipe over HTTP query", () => {
 	});
 
 	async function start() {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withControllers(FlagController)
 			.build();

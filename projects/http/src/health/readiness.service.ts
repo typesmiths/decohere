@@ -1,7 +1,11 @@
 import { inject, injectable } from "@decohere/crucible/decorators";
-import { HostedServiceHostToken, ReadinessCheckToken } from "../const.js";
-import type { HostedServiceHost } from "../hosting/hosted-service-host.js";
-import type { IReadinessCheck, ReadinessResult } from "./readiness.types.js";
+import {
+	type HostedServiceHost,
+	HostedServiceHostToken,
+	type IReadinessCheck,
+	ReadinessCheckToken,
+	type ReadinessResult,
+} from "@decohere/core/hosting";
 
 @injectable()
 export class ReadinessService {

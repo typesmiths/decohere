@@ -1,10 +1,10 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { App } from "../src/app/app.js";
 import { AuthConfig } from "../src/auth/auth.config.js";
 import "../src/auth/auth.extensions.js";
-import { Builder } from "../src/builder/builder.js";
-import type { IReadinessCheck } from "../src/health/readiness.types.js";
+import { type App, Builder } from "@decohere/core/hosting";
+import type { IReadinessCheck } from "@decohere/core/hosting";
 import "../src/http/http.extensions.js";
 import "../src/health/health.extensions.js";
 import type { IConfigurationService } from "@decohere/core/configuration";
@@ -46,7 +46,10 @@ describe("health / ready probes", () => {
 	});
 
 	it("GET /health returns 200 { status: ok } without auth", async () => {
-		app = await Builder.create().withHttpProvider(FastifyProvider).withHealth().build();
+		app = await Builder.create(new ServiceContainerBuilder())
+			.withHttpProvider(FastifyProvider)
+			.withHealth()
+			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
 		const res = await axios.get("/health");
@@ -55,7 +58,10 @@ describe("health / ready probes", () => {
 	});
 
 	it("GET /ready returns 200 when no readiness checks are registered", async () => {
-		app = await Builder.create().withHttpProvider(FastifyProvider).withHealth().build();
+		app = await Builder.create(new ServiceContainerBuilder())
+			.withHttpProvider(FastifyProvider)
+			.withHealth()
+			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
 		const res = await axios.get("/ready");
@@ -71,7 +77,7 @@ describe("health / ready probes", () => {
 			},
 		};
 
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withHealth({ checks: [failing] })
 			.build();
@@ -85,7 +91,7 @@ describe("health / ready probes", () => {
 	it("GET /health and /ready stay anonymous when withAuth is enabled", async () => {
 		vi.stubEnv("NODE_ENV", "development");
 
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new DevStaticConfigService());

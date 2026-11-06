@@ -14,7 +14,7 @@ Apps need work that runs for the life of the app outside a request, such as load
 - **Warm-up is readiness**: a started service that cannot serve yet throws from `check()`, and `GET /ready` answers 503. There is no separate "starting" state.
 - **Stopping is one path** (`app.dispose()`: stop, SIGTERM/SIGINT, Flux reboot): abort the signal at once (also during a running `start()`), drain HTTP, await each `stop()` in reverse order (after a running `start()` settles; all run even if one throws), then dispose the container. Services stop while what they use is still open.
 - **The container closes DataSources**: `withTypeOrm` creates a `ManagedDataSource` (with `Symbol.asyncDispose`) and resolves it right after build, so the root container owns it among its first instances and closes it last.
-- Hosting lives in `@decohere/http` (`src/hosting/`, with `Builder` and `App`) for now, and moves with them to `@decohere/core` ([ADR 0014](0014-package-names.md)).
+- Hosting lives in `@decohere/core/hosting`, with `Builder` and `App` ([ADR 0014](0014-package-names.md)).
 
 ## Consequences
 
@@ -29,3 +29,4 @@ Apps need work that runs for the life of the app outside a request, such as load
 - 2026-10-14: Decided.
 - 2026-10-21: Same-named hosted service classes no longer collide, since the container keys services by identity ([ADR 0013](0013-container-keys-and-lifetimes.md)).
 - 2026-11-04: `Builder`, `App` and hosted services move to `@decohere/core` rather than a new `@decohere/host` package ([ADR 0014](0014-package-names.md)).
+- 2026-11-06: They moved. A worker needs neither `http` nor Fastify.

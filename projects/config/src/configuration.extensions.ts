@@ -1,4 +1,4 @@
-import { Builder } from "@decohere/http";
+import { Builder } from "@decohere/core/hosting";
 import {
 	ConfigurationServiceToken,
 	type IConfigurationService,
@@ -14,7 +14,7 @@ export type ConfigurationOptions = {
 	dataSources?: Constructable<ConfigurationDataSource>[];
 };
 
-declare module "@decohere/http" {
+declare module "@decohere/core/hosting" {
 	interface Builder {
 		withConfiguration(...dataSources: Constructable<ConfigurationDataSource>[]): Builder;
 	}

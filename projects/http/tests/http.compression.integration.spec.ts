@@ -23,7 +23,7 @@ import {
 } from "../src/index.js";
 import { HttpError } from "../src/routing/http.types.js";
 import { bootModule } from "../src/testing/index.js";
-import type { Builder } from "../src/builder/builder.js";
+import type { Builder } from "@decohere/core/hosting";
 
 // Static files are read by the real server from real disk (the suite's fs is an in-memory fake).
 vi.unmock("fs");
