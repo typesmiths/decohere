@@ -1,5 +1,4 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
 
 /** Management API scopes needed for API, SPA, connections, and admin users. */
 const REQUIRED_SCOPES = [
