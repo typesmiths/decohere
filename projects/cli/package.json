@@ -22,10 +22,7 @@
   "author": "Typesmiths",
   "type": "module",
   "exports": {
-    ".": {
-      "types": "./types/src/index.d.ts",
-      "import": "./es6/src/index.js"
-    }
+    "./package.json": "./package.json"
   },
   "bin": {
     "decohere": "./es6/src/cli.js",

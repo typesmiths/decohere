@@ -22,7 +22,6 @@
   "license": "ISC",
   "author": "Typesmiths",
   "type": "module",
-  "main": "index.js",
   "exports": {
     "./collections": {
       "types": "./types/src/collections/index.d.ts",

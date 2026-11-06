@@ -84,7 +84,7 @@ npx forge publish --channel latest --dry-run
 npx forge publish --channel latest    # after npm login
 ```
 
-`--channel` is the npm dist-tag and defaults to `beta`. Forge skips private packages and versions already on npm; it does not write the name, version or `exports` for you.
+`forge publish` stops before publishing anything if `exports`, `main`, `types` or `bin` names a file the build doesn't contain, including on a dry run. `--channel` is the npm dist-tag and defaults to `beta`. Forge skips private packages and versions already on npm; it does not write the name, version or `exports` for you.
 
 ## Shut down without dropping requests
 
