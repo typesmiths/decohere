@@ -4,12 +4,14 @@ HTTP/API platform for Decohere: decorator-based controllers, auth, OpenAPI, heal
 
 Controllers and services depend on the contracts exported from `@decohere/http`. Fastify stays inside `FastifyProvider`.
 
+The app itself is built with `Builder`, from `@decohere/core/hosting`, on a container from `@decohere/crucible`. `http` adds the web server to it, so an app with no web API doesn't need this package.
+
 ## Serving a built UI
 
 A module can serve its UI's build from its own API: one image, one origin, no CORS.
 
 ```ts
-Builder.create()
+Builder.create(new ServiceContainerBuilder())
 	.withHttp(FastifyProvider)
 	.withControllers(PortfolioController)
 	.withStatic("/ui/", "ui"); // https://host/ui/ serves ./ui/index.html
@@ -43,7 +45,7 @@ Builder.create()
 ### Serving the UI from the root
 
 ```ts
-Builder.create()
+Builder.create(new ServiceContainerBuilder())
 	.withHttp(FastifyProvider)
 	.withControllers(PortfolioController) // /lp/portfolio, /module/manifest, ...
 	.withHealth()
@@ -63,7 +65,7 @@ Why this shape, and what is left (running the UI's own build): [ADR 0007](../../
 ## Global prefix
 
 ```ts
-Builder.create()
+Builder.create(new ServiceContainerBuilder())
 	.withHttp(FastifyProvider)
 	.withControllers(PortfolioController) // /lp/portfolio -> /api/lp/portfolio
 	.withHealth()                         // /health and /ready stay at the root
@@ -225,7 +227,7 @@ export class PositionFeed implements HostedService {
 	}
 }
 
-Builder.create()
+Builder.create(new ServiceContainerBuilder())
 	.withHttp(FastifyProvider)
 	.withHealth()
 	.withTypeOrm(lp)

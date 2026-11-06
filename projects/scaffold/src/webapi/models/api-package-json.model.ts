@@ -20,6 +20,7 @@ export class ApiPackageJson implements KeyedModel {
 		private readonly apiName = "api",
 	) {
 		this._dependencies = {
+			"@decohere/core": CREATE_VERSION,
 			"@decohere/http": CREATE_VERSION,
 			"@decohere/crucible": CREATE_VERSION,
 		};

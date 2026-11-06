@@ -2,7 +2,7 @@
 
 Lightweight dependency injection for Decohere. Register classes (or tokens) on a `ServiceContainerBuilder`, `build()` a container, then `resolve()` graphs of constructor-injected services.
 
-Higher layers (for example `@decohere/http`'s `Builder.withServices`) register on a `ServiceContainerBuilder`. You can also build and resolve from a container yourself.
+Higher layers (for example `Builder.withServices`, from `@decohere/core/hosting`) register on a `ServiceContainerBuilder`. You can also build and resolve from a container yourself.
 
 ## When to use
 
@@ -269,12 +269,13 @@ export class App {
 ### HTTP apps
 
 ```ts
-import { Builder } from "@decohere/http";
+import { Builder } from "@decohere/core/hosting";
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import { FastifyProvider } from "@decohere/http/providers";
 import { SampleService } from "./services/sample.service.js";
 import { HelloController } from "./controllers/hello.controller.js";
 
-await Builder.create()
+await Builder.create(new ServiceContainerBuilder())
   .withHttp(FastifyProvider)
   .withControllers(HelloController)
   .withServices((cb) => {

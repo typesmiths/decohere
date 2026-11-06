@@ -1,13 +1,16 @@
-import { type LifetimeScope, LifetimeScopeToken } from "@decohere/crucible";
-import { inject, optional } from "@decohere/crucible/decorators";
+import { scribe } from "@decohere/scribe";
+import {
+	inject,
+	type LifetimeScope,
+	LifetimeScopeToken,
+	optional,
+} from "../composition/index.js";
 import {
 	ConfigurationServiceToken,
 	type IConfigurationService,
-} from "@decohere/core/configuration";
-import { scribe } from "@decohere/scribe";
-import { HostedServiceHostToken, HttpProviderToken } from "../const.js";
-import type { HostedServiceHost } from "../hosting/hosted-service-host.js";
-import type { HttpProvider, StartResponse } from "../routing/http.types.js";
+} from "../configuration/index.js";
+import { AppServerToken, HostedServiceHostToken } from "./const.js";
+import type { HostedServiceHost } from "./hosted-service-host.js";
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_SHUTDOWN_SIGNALS: readonly NodeJS.Signals[] = ["SIGTERM", "SIGINT"];
@@ -15,6 +18,16 @@ const DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000;
 
 export class ApiConfiguration {
 	public port: number;
+}
+
+export type AppServerStartOptions = { port: number; host?: string };
+
+export type AppServerStartResponse = { addresses: string[] };
+
+/** What serves traffic, if anything does. The HTTP provider is one; a worker has none. */
+export interface AppServer {
+	start(options: AppServerStartOptions): Promise<AppServerStartResponse>;
+	stop(): Promise<unknown>;
 }
 
 export type StartOptions = {
@@ -43,7 +56,7 @@ export class App {
 		@inject(ConfigurationServiceToken)
 		@optional()
 		private configurationService?: IConfigurationService,
-		@inject(HttpProviderToken) @optional() private httpProvider?: HttpProvider,
+		@inject(AppServerToken) @optional() private server?: AppServer,
 		@inject(HostedServiceHostToken) @optional() private hostedServices?: HostedServiceHost,
 	) {}
 
@@ -51,20 +64,20 @@ export class App {
 		return this._addresses;
 	}
 
-	public async start(options?: StartOptions): Promise<StartResponse> {
+	public async start(options?: StartOptions): Promise<AppServerStartResponse | undefined> {
 		this.logger.info("Starting app");
-		// Before HTTP, so a request never reaches a service that has not started.
+		// Before the server, so a request never reaches a service that has not started.
 		await this.hostedServices?.start(this.container);
 		// The app was stopped while a hosted service was still starting.
-		if (this.disposing != null) return;
+		if (this.disposing != null) return undefined;
 		const hasHostedServices = this.hostedServices != null && !this.hostedServices.isEmpty;
-		if (!this.httpProvider) {
+		if (!this.server) {
 			if (hasHostedServices) this.stopOnSignals(options);
-			return;
+			return undefined;
 		}
 		const port = await this.getPort(options);
-		this.logger.info(`Starting http on port ${port}`);
-		const startResponse = await this.httpProvider?.start({
+		this.logger.info(`Starting server on port ${port}`);
+		const startResponse = await this.server.start({
 			port,
 			...(options?.host != null ? { host: options.host } : {}),
 		});
@@ -91,12 +104,12 @@ export class App {
 		// Removed first, so a second Ctrl+C / SIGTERM gets Node's default: exit now.
 		this.removeSignalHandlers();
 		this.logger.info("Stopping");
-		// Hosted services hear the signal at once, so background work winds down while HTTP drains.
+		// Hosted services hear the signal at once, so background work winds down while the server drains.
 		this.hostedServices?.abort();
 		try {
-			// HTTP first: in-flight requests still need the services (DB pools etc.) that
+			// The server first: in-flight requests still need the services (DB pools etc.) that
 			// disposing the container would close.
-			await this.httpProvider?.stop();
+			await this.server?.stop();
 			// Hosted services next, while what they use is still open.
 			await this.hostedServices?.stop();
 		} finally {

@@ -124,7 +124,8 @@ export class MainSourceFile implements KeyedModel {
 		imports.push(
 			'import "@decohere/config";',
 			'import { YamlDataSource } from "@decohere/config";',
-			'import { Builder } from "@decohere/http";',
+			'import { Builder } from "@decohere/core/hosting";',
+			'import { ServiceContainerBuilder } from "@decohere/crucible";',
 			'import { FastifyProvider } from "@decohere/http/providers";',
 			'import { scribe } from "@decohere/scribe";',
 			'import { SampleService } from "./services/sample.service.js";',
@@ -188,7 +189,7 @@ export class MainSourceFile implements KeyedModel {
 			"",
 			`scribe.withPinoPretty().and.withPinoRoll({ file: "logs/${this.appName}.log" });`,
 			"",
-			`const app = await Builder.create({ applicationName: "${this.appName}" })`,
+			`const app = await Builder.create(new ServiceContainerBuilder(), { applicationName: "${this.appName}" })`,
 			...builderCalls,
 			`\t.build();`,
 			"",

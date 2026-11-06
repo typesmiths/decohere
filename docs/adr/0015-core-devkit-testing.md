@@ -14,9 +14,9 @@ Two more problems sat in `core`: `diagnostics` reconfigured scribe on import whe
 - **`@decohere/core` is the runtime base**, and nothing else:
   - `reflection`, `composition`, `configuration`, `extensibility`, `objects`, `collections`, `system`, `caching`;
   - `io`'s basic file operations (`fileExists`, `readFile`, `writeFile`, `copyFile`, `removeDir`, …) and the shared file types (`File`, `FileEx`, `Directory`, `Watcher`);
-  - hosting (`Builder`, `App`, hosted services), when it moves from `http` ([ADR 0014](0014-package-names.md)).
+  - `hosting`: `Builder`, `App`, hosted services and the readiness contract ([ADR 0014](0014-package-names.md)).
 
-  Its only third-party dependency is `reflect-metadata`, and no module has a side effect on import.
+  Its only third-party dependency is `reflect-metadata`; of Decohere's packages it depends only on `scribe`, for hosting's logs, and no module has a side effect on import.
 - **`@decohere/devkit` is the base for Decohere's CLIs**, and nothing in it runs in a production app:
   - `cli`: the command/action framework on `commander`;
   - `interop`: wrappers for `git`, `npm`, `pnpm`, `yarn`, `docker` and `node`;
@@ -44,3 +44,4 @@ Rejected:
 - 2026-10-22: Decided.
 - 2026-10-23: `@decohere/testing` declares `vitest` and `memfs` as peers now that the dependency sync writes peers ([ADR 0017](0017-dependency-manifests-from-imports.md)).
 - 2026-11-04: Hosting is planned to move into `core` from `http` ([ADR 0014](0014-package-names.md)).
+- 2026-11-06: Hosting moved.

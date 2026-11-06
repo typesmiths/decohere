@@ -1,10 +1,10 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { App } from "../src/app/app.js";
 import { AuthConfig } from "../src/auth/auth.config.js";
 import "../src/auth/auth.extensions.js";
 import type { IPrincipalProvider } from "../src/auth/principal-provider.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import { IPrincipalProviderToken } from "../src/const.js";
 import "../src/http/http.extensions.js";
 import { inject } from "@decohere/crucible/decorators";
@@ -105,7 +105,7 @@ describe("Auth integration — devStatic", () => {
 	beforeEach(async () => {
 		vi.stubEnv("NODE_ENV", "development");
 
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new DevStaticConfigService());

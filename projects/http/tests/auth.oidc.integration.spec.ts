@@ -1,9 +1,9 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { App } from "../src/app/app.js";
 import { AuthConfig } from "../src/auth/auth.config.js";
 import "../src/auth/auth.extensions.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import "../src/http/http.extensions.js";
 import type { IConfigurationService } from "@decohere/core/configuration";
 import { ConfigurationServiceToken } from "@decohere/core/configuration";
@@ -53,7 +53,7 @@ describe("Auth integration — discoveryUrl + real RS256 tokens", () => {
 	let app: App;
 
 	beforeEach(async () => {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new OidcConfigService());
@@ -114,7 +114,7 @@ describe("Auth integration — principalMapper", () => {
 
 	beforeEach(async () => {
 		// Map Keycloak-style realm_access.roles to scopes
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttpProvider(FastifyProvider)
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new OidcConfigService());

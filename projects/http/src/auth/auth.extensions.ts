@@ -1,6 +1,6 @@
 import type { ContainerBuilder } from "@decohere/crucible";
 import { extension } from "@decohere/core/extensibility";
-import { Builder } from "../builder/builder.js";
+import { Builder } from "@decohere/core/hosting";
 import { AuthorizationServiceToken, TokenServiceToken } from "../const.js";
 import { defineAbilitiesFor } from "./ability.js";
 import { AuthConfig } from "./auth.config.js";
@@ -30,7 +30,7 @@ export type WithAuthOptions = {
 	principalMapper?: PrincipalMapper;
 };
 
-declare module "@decohere/http" {
+declare module "@decohere/core/hosting" {
 	interface Builder {
 		/**
 		 * Configure JWT authentication from the `auth` config section and wire

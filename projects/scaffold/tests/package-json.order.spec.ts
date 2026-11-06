@@ -50,6 +50,7 @@ describe("ApiPackageJson dependency order", () => {
 		};
 		expect(Object.keys(rendered.dependencies)).toEqual([
 			"@casl/ability",
+			"@decohere/core",
 			"@decohere/crucible",
 			"@decohere/data",
 			"@decohere/data-typeorm",

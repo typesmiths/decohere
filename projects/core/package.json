@@ -39,6 +39,10 @@
       "types": "./types/src/extensibility/index.d.ts",
       "import": "./es6/src/extensibility/index.js"
     },
+    "./hosting": {
+      "types": "./types/src/hosting/index.d.ts",
+      "import": "./es6/src/hosting/index.js"
+    },
     "./io": {
       "types": "./types/src/io/index.d.ts",
       "import": "./es6/src/io/index.js"

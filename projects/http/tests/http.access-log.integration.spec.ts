@@ -1,8 +1,8 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import { scribe } from "@decohere/scribe";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { App } from "../src/app/app.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import {
@@ -52,7 +52,7 @@ describe("withHttp request id + access logging", () => {
 	});
 
 	it("echoes inbound x-request-id and logs access via Scribe", async () => {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttp(FastifyProvider)
 			.withControllers(PingController)
 			.build();
@@ -78,7 +78,7 @@ describe("withHttp request id + access logging", () => {
 	});
 
 	it("generates a request id when the client omits the header", async () => {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttp(FastifyProvider)
 			.withControllers(PingController)
 			.build();
@@ -98,7 +98,7 @@ describe("withHttp request id + access logging", () => {
 	});
 
 	it("does not write access logs when withHttp({ accessLog: false })", async () => {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttp(FastifyProvider, { accessLog: false })
 			.withControllers(PingController)
 			.build();

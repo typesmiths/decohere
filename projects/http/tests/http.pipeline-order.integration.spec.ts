@@ -1,13 +1,13 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import type { IConfigurationService } from "@decohere/core/configuration";
 import { ConfigurationServiceToken } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
 import { scribe } from "@decohere/scribe";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { App } from "../src/app/app.js";
 import { AuthConfig } from "../src/auth/auth.config.js";
 import "../src/auth/auth.extensions.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import {
@@ -60,7 +60,7 @@ describe("request pipeline order", () => {
 		vi.spyOn(scribe, "logger").mockImplementation((name: string) =>
 			name === HttpAccessLogMiddleware.name ? (accessLog as never) : original(name),
 		);
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withOpenApi({ info: { title: "Orders", version: "1.0.0" }, path: "/openapi.json" })
 			.withHttp(FastifyProvider)
 			.withServices((c) => {

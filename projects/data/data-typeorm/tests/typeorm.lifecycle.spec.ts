@@ -1,6 +1,7 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import "reflect-metadata";
 import { type ConnectionInfo, DatabaseConfig } from "@decohere/data";
-import { Builder, type HostedService } from "@decohere/http";
+import { Builder, type HostedService } from "@decohere/core/hosting";
 import { injectable } from "@decohere/crucible/decorators";
 import {
 	ConfigurationServiceToken,
@@ -70,7 +71,7 @@ describe("withTypeOrm lifecycle", () => {
 
 	it("destroys the DataSource when the app stops, after hosted services have stopped", async () => {
 		const destroy = stubConnections();
-		const app = await Builder.create()
+		const app = await Builder.create(new ServiceContainerBuilder())
 			.withServices((c) => c.registerSingleton(ConfigurationServiceToken, new StaticConfig()))
 			.withTypeOrm({ entities: [] })
 			.withHostedService(UsesTheDatabase)
@@ -85,7 +86,7 @@ describe("withTypeOrm lifecycle", () => {
 
 	it("destroys a DataSource nothing resolved (no request ever used it)", async () => {
 		const destroy = stubConnections();
-		const app = await Builder.create()
+		const app = await Builder.create(new ServiceContainerBuilder())
 			.withServices((c) => c.registerSingleton(ConfigurationServiceToken, new StaticConfig()))
 			.withTypeOrm({ entities: [] })
 			.build();

@@ -1,11 +1,6 @@
-import type { Constructable, FunctionType } from "@decohere/core/reflection";
+import type { ServiceKey } from "@decohere/core/composition";
 
-/**
- * What a service is registered and resolved under, compared by identity: the class (or factory)
- * itself, a symbol, or a string. A string never matches a class with that name, and two symbols
- * with the same description are different keys.
- */
-export type ServiceKey = string | symbol | Constructable | FunctionType;
+export type { ServiceKey };
 
 /** A readable name for a key, for error messages. */
 export function describeKey(key: ServiceKey): string {

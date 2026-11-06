@@ -1,8 +1,8 @@
+import { ServiceContainerBuilder } from "@decohere/crucible";
 import { inject, injectable } from "@decohere/crucible/decorators";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
-import type { App } from "../src/app/app.js";
-import { Builder } from "../src/builder/builder.js";
+import { type App, Builder } from "@decohere/core/hosting";
 import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get } from "../src/routing/index.js";
@@ -42,7 +42,7 @@ describe("per-request cleanup", () => {
 	});
 
 	it("awaits async cleanup of request-scoped services, even when the handler throws", async () => {
-		app = await Builder.create()
+		app = await Builder.create(new ServiceContainerBuilder())
 			.withHttp(FastifyProvider)
 			.withServices((c) => c.registerRequestScoped(WorkToken, RequestWork))
 			.withControllers(WorkController)

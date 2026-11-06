@@ -1,4 +1,4 @@
-import type { Builder } from "../builder/builder.js";
+import type { Builder } from "@decohere/core/hosting";
 import { HttpOptions } from "./http.options.js";
 
 const httpOptionsStore = new WeakMap<Builder, HttpOptions>();

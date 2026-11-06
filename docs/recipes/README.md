@@ -86,6 +86,52 @@ npx forge publish --channel latest    # after npm login
 
 `forge publish` stops before publishing anything if `exports`, `main`, `types` or `bin` names a file the build doesn't contain, including on a dry run. `--channel` is the npm dist-tag and defaults to `beta`. Forge skips private packages and versions already on npm; it does not write the name, version or `exports` for you.
 
+## Run a worker with no web API
+
+A background worker needs no web server, so it needs no `@decohere/http` and no Fastify.
+
+```bash
+mkdir worker && cd worker
+npm init -y && npm pkg set type=module
+npm i @decohere/core @decohere/crucible @decohere/scribe
+npm i -D @decohere/cli
+```
+
+```ts
+// main.ts
+import { Builder, type HostedService } from "@decohere/core/hosting";
+import { ServiceContainerBuilder } from "@decohere/crucible";
+
+class Heartbeat implements HostedService {
+	private timer?: NodeJS.Timeout;
+
+	public start() {
+		console.log("started");
+		this.timer = setInterval(() => console.log("tick"), 1000);
+	}
+
+	public stop() {
+		clearInterval(this.timer);
+		console.log("stopped");
+	}
+}
+
+const app = await Builder.create(new ServiceContainerBuilder())
+	.withHostedService(Heartbeat)
+	.build();
+await app.start();
+```
+
+```bash
+npx flux run main.ts
+# started
+# tick
+# (Ctrl+C)
+# stopped
+```
+
+The app stops its hosted services on SIGTERM or SIGINT. See [hosted services](../../projects/http/README.md#hosted-services) for the full contract.
+
 ## Shut down without dropping requests
 
 Stop cleanly on SIGTERM or SIGINT; `app.start()` does it by default.

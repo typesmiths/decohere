@@ -1,12 +1,12 @@
 import { DatabaseConfig } from "@decohere/data";
-import { Builder } from "@decohere/http";
+import { Builder } from "@decohere/core/hosting";
 import { extension } from "@decohere/core/extensibility";
 import type { Logger } from "typeorm";
 import type { ModuleConfig } from "./database-options.js";
 import { typeOrmDataSourceToken } from "./inject-data-source.js";
 import { TypeOrmModule } from "./type-orm.module.js";
 
-declare module "@decohere/http" {
+declare module "@decohere/core/hosting" {
 	interface Builder {
 		withTypeOrm(options?: ModuleConfig[] | ModuleConfig, logger?: Logger): Builder;
 	}

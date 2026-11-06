@@ -1,3 +1,4 @@
+import type { AppServer } from "@decohere/core/hosting";
 import type { Constructable, Type } from "@decohere/core/reflection";
 import type { HTTPMethod } from "../const.js";
 import type { SseOptions } from "../sse/sse.types.js";
@@ -32,7 +33,7 @@ export const RequestParts = {
 	lastEventId: "lastEventId",
 } satisfies Record<RequestPart, RequestPart>;
 
-export interface HttpProvider {
+export interface HttpProvider extends AppServer {
 	start<T extends StartOptions>(options: T): Promise<StartResponse>;
 	stop(): Promise<StopResponse>;
 	[Symbol.asyncDispose](): Promise<void>;

@@ -1,7 +1,7 @@
-import type { IContainer } from "@decohere/crucible";
-import type { Constructable } from "@decohere/core/reflection";
 import { scribe } from "@decohere/scribe";
-import type { IReadinessCheck } from "../health/readiness.types.js";
+import type { IContainer } from "../composition/index.js";
+import type { Constructable } from "../reflection/index.js";
+import type { IReadinessCheck } from "./readiness.types.js";
 import type { HostedService } from "./hosted-service.js";
 
 /**

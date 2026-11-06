@@ -3,7 +3,7 @@ import { extension } from "@decohere/core/extensibility";
 import type { Constructable } from "@decohere/core/reflection";
 import { scribe } from "@decohere/scribe";
 import { PrincipalProvider } from "../auth/principal-provider.js";
-import { Builder } from "../builder/builder.js";
+import { Builder } from "@decohere/core/hosting";
 import {
 	ExceptionFilterHostToken,
 	HttpOptionsToken,
@@ -29,7 +29,7 @@ import { type StaticOptions, staticFiles } from "./http.static.js";
 const httpProviderStore = new WeakMap<Builder, Constructable<HttpProvider>>();
 const controllersStore = new WeakMap<Builder, Constructable[]>();
 
-declare module "@decohere/http" {
+declare module "@decohere/core/hosting" {
 	interface Builder {
 		withHttpProvider<Thttp extends Constructable<HttpProvider>>(type: Thttp): Builder;
 		/**
