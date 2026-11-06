@@ -10,7 +10,6 @@ export class Gitignore implements KeyedModel {
 		".package",
 		".pnpm-store",
 		".env",
-		".devcontainer/gh.env",
 		".DS_Store",
 		"logs",
 	];

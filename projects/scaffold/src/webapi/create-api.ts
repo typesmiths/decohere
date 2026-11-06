@@ -100,16 +100,16 @@ function createWorkspace(
 			volumes: [
 				// Repo bind in Compose (survives CLI recreates; Cursor-only mounts do not).
 				`..:${workspaceRoot}`,
-				// Workspace-local (created by initialize.sh as the host user).
-				// Do NOT bind ${HOME}/.npm/... — Docker creates missing host paths as root.
-				"./gh-auth:/home/node/.config/gh",
+				// Outside the project, one per project. initialize.sh creates it first on the host, because
+				// Docker creates a missing host path as root.
+				`\${HOME}/.config/decohere/gh/${name}:/home/node/.config/gh`,
 				`webapi-node-modules:${workspaceRoot}/node_modules`,
 				// Named volume (not a Cursor-only mount) so CLI recreates keep Up-arrow history.
 				`${commandHistory.volumeName}:${commandHistory.dir}`,
 				// A folder on the host, so a rebuild keeps the Auth0 CLI login and you can see it.
 				`${AUTH0_LOGIN_ROOT}/${name}:/home/node/.config/auth0`,
 			],
-			env_file: ["./gh.env"],
+			env_file: [`\${HOME}/.config/decohere/gh/${name}.env`],
 			command: "sleep infinity",
 			networks: [name],
 		})
