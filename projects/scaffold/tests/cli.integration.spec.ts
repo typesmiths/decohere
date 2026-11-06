@@ -192,8 +192,8 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	expect(postCreate).toContain("pnpm install");
 
 	const initialize = readFileSync(join(root, ".devcontainer/initialize.sh"), "utf8");
-	expect(initialize).toContain('gh_dir="$root/.devcontainer/gh-auth"');
-	expect(initialize).toContain('gh_env="$root/.devcontainer/gh.env"');
+	expect(initialize).toContain('gh_root="$HOME/.config/decohere/gh"');
+	expect(initialize).not.toContain("gh-auth");
 	expect(initialize).not.toContain("python3");
 	// Opening the Dev Container asks nothing and never needs a login.
 	expect(initialize).not.toMatch(/prompt_yn|\/dev\/tty|\bread\b|npm|\.cursor/);
@@ -205,8 +205,12 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	expect(compose).not.toContain("codebase-rag");
 	expect(compose).not.toContain("npm-auth");
 	expect(compose).not.toContain("NPM_CONFIG_USERCONFIG");
-	expect(compose).toContain("./gh-auth:/home/node/.config/gh");
-	expect(compose).toContain("./gh.env");
+	expect(compose).toContain(
+		`\${HOME}/.config/decohere/gh/${projectName}:/home/node/.config/gh`,
+	);
+	expect(compose).toContain(`\${HOME}/.config/decohere/gh/${projectName}.env`);
+	expect(compose).not.toContain("gh-auth");
+	expect(compose).not.toContain("./gh.env");
 	expect(compose).toContain("bashhistory:/commandhistory");
 	expect(compose).toMatch(/^ {2}bashhistory:\s*$/m);
 	expect(compose).toContain(
@@ -223,7 +227,7 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	expect(appDevDockerfile).not.toContain("apt-get install -y --no-install-recommends gh");
 
 	const gitignore = readFileSync(join(root, ".gitignore"), "utf8");
-	expect(gitignore).toContain(".devcontainer/gh.env");
+	expect(gitignore).not.toContain("gh.env");
 	expect(gitignore).not.toContain(".cursor");
 
 	for (const removed of [

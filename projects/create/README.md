@@ -42,7 +42,7 @@ Target directory is `webapi`'s optional argument or `-d` (default `.`). `npm cre
 
 A first token that isn't a command (`webapi`, `create`, `add`, `auth0`, `help`) or a flag is the project's folder, so a mistyped command starts a project with that name.
 
-The scaffolded Dev Container asks no questions. `gh` is installed in it: run `gh auth login` yourself if you want it, and the login persists in `.devcontainer/gh-auth/` (gitignored).
+The scaffolded Dev Container asks no questions. `gh` is installed in it: run `gh auth login` yourself if you want it, and the login persists in `~/.config/decohere/gh/<project>/`, outside the project and readable only by you. Each project has its own, so a project can use a different GitHub account. To use a token instead, put `GH_TOKEN=…` in `~/.config/decohere/gh/<project>.env`.
 
 ## Commands
 
