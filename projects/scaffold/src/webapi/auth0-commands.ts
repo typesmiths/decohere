@@ -124,6 +124,14 @@ export function runAuth0Configure(directory = "."): void {
 	const projectName = process.env.DECOHERE_PROJECT_NAME?.trim() || basename(targetDir);
 	const envPath = join(targetDir, ".env");
 	const existing = readEnvFile(envPath);
+	const projectIssuer = existing.AUTH0_ISSUER_BASE_URL?.trim();
+	if (projectIssuer && projectIssuer !== issuerBaseUrl) {
+		fail(
+			`This project is set up for Auth0 tenant ${projectIssuer},\n` +
+				`  but you're logged in to ${issuerBaseUrl}.\n` +
+				"  Log in to the right tenant with: pnpm decohere auth0 login",
+		);
+	}
 	const existingAudience = existing.AUTH0_AUDIENCE?.trim();
 	const discovered = discoverAuthorizeScopes(targetDir);
 	let existingScopes: string[] = [];

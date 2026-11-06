@@ -117,7 +117,7 @@ Each API is a separate deploy: package it (`pnpm run package:billing`) and build
 
 ### `auth0`
 
-Run these in the project's Dev Container, which has the Auth0 CLI. Its login is kept in a Docker volume, so rebuilding the Dev Container doesn't log you out. Use this after a project exists, when a token expires, or when the login app needs to be created or updated.
+Run these in the project's Dev Container, which has the Auth0 CLI. Each project keeps its login in its own folder on your machine: `$XDG_RUNTIME_DIR/decohere-auth0/<project>` on Linux, which is held in memory and readable only by you, and `~/.config/decohere/decohere-auth0/<project>` elsewhere. Rebuilding the Dev Container doesn't log you out, but logging out of your machine or rebooting does on Linux. `configure` and `add auth0` stop if you're logged in to a different tenant from the one in `.env`. Use this after a project exists, when a token expires, or when the login app needs to be created or updated.
 
 ```bash
 # Device/URL login — open the printed URL in your browser

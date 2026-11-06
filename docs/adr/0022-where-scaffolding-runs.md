@@ -13,7 +13,7 @@ Scaffolding needs tools, such as the Auth0 CLI, that shouldn't have to be instal
 - **Anywhere else, `create` uses the scaffolder image with nothing shared.** It runs as a non-root user in its own folder. The launcher copies the project out with `docker cp`, through a temporary folder, only after a successful run. It removes the container on success, failure and signals.
 - **A new project goes only into an empty folder** (`.git` is allowed), so a copy can't overwrite anyone's files.
 - **Commands on an existing project (`add`, `auth0`) run only in its Dev Container.** Anywhere else they stop and say so.
-- **The Auth0 CLI login is kept per project** in a named volume in the Dev Container, not shared from the machine.
+- **The Auth0 CLI login is kept per project, in a folder you can see:** `$XDG_RUNTIME_DIR/decohere-auth0/<project>` on Linux, held in memory, and under `~/.config/decohere` elsewhere. `initialize.sh` creates it first on the host. A project can't act on another's tenant, and `configure` and `add auth0` stop if the active tenant differs from the one in `.env`.
 
 ## Consequences
 
@@ -27,3 +27,4 @@ Scaffolding needs tools, such as the Auth0 CLI, that shouldn't have to be instal
 ## History
 
 - 2026-11-06: Decided.
+- 2026-11-06: The Auth0 login moved from a named volume, which was opaque, to a folder per project on the host.
