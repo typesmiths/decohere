@@ -57,8 +57,9 @@ export class PackageJson implements KeyedModel {
 			dev: namedOrMany
 				? fluxDevScript(workspaceName, first, webapiPort(0))
 				: "flux serve --env-file-if-exists .env",
-			lint: "oxlint --fix && prettier --write .",
-			"lint:check": "oxlint --deny-warnings && prettier --check .",
+			// Prettier reads a folder before ignoring it, and Postgres's data folder isn't readable by everyone.
+			lint: 'oxlint --fix && prettier --write . "!.devcontainer/**"',
+			"lint:check": 'oxlint --deny-warnings && prettier --check . "!.devcontainer/**"',
 			typecheck: "forge typecheck",
 			test: "vitest run --passWithNoTests",
 		};

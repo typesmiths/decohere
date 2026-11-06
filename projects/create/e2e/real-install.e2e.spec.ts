@@ -206,7 +206,11 @@ describe.skipIf(!registry || !version)(
 
 				// What post-create.sh does in the Dev Container. The scaffolder image has no Prettier.
 				it("formats the new project", async () => {
-					expectOk(await run(pnpm, ["exec", "prettier", "--write", "."], dir, { PATH: path }));
+					expectOk(
+						await run(pnpm, ["exec", "prettier", "--write", ".", "!.devcontainer/**"], dir, {
+							PATH: path,
+						}),
+					);
 				});
 
 				it.each(["typecheck", "build", "test", "lint:check"])("passes %s", async (script) => {

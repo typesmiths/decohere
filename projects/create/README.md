@@ -111,7 +111,7 @@ USER node
 | `start:<name>` | same path for that API | Deploy that API (`pnpm run start:billing`) |
 | `dev` | `flux serve --env-file-if-exists .env` (plus `--project @<app>/<first>` when named) | Local HMR for the first API; loads `.env` if present |
 | `dev:<name>` | `PORT=<3000+n> flux serve --env-file-if-exists .env --project @<app>/<name>` | Local HMR for that API |
-| `lint` | `oxlint --fix`, then `prettier --write .` | Fix and format |
+| `lint` | `oxlint --fix`, then `prettier --write .`, skipping `.devcontainer` | Fix and format |
 | `lint:check` / `typecheck` / `test` | oxlint and Prettier / forge typecheck / vitest | CI |
 
 #### Multiple APIs / add later

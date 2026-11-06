@@ -190,7 +190,8 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	const postCreate = readFileSync(join(root, ".devcontainer/post-create.sh"), "utf8");
 	expect(postCreate).toContain("pnpm install --frozen-lockfile");
 	expect(postCreate).toContain("pnpm install");
-	expect(postCreate).toContain("pnpm exec prettier --write .");
+	// Postgres's data folder isn't readable by everyone, and Prettier reads a folder before ignoring it.
+	expect(postCreate).toContain("pnpm exec prettier --write . '!.devcontainer/**'");
 
 	const initialize = readFileSync(join(root, ".devcontainer/initialize.sh"), "utf8");
 	expect(initialize).toContain('gh_root="$HOME/.config/decohere/gh"');
@@ -505,8 +506,10 @@ describe("scaffolder names APIs and can add more later", () => {
 			scripts: Record<string, string>;
 			devDependencies: Record<string, string>;
 		};
-		expect(pkg.scripts.lint).toBe("oxlint --fix && prettier --write .");
-		expect(pkg.scripts["lint:check"]).toBe("oxlint --deny-warnings && prettier --check .");
+		expect(pkg.scripts.lint).toBe('oxlint --fix && prettier --write . "!.devcontainer/**"');
+		expect(pkg.scripts["lint:check"]).toBe(
+			'oxlint --deny-warnings && prettier --check . "!.devcontainer/**"',
+		);
 		expect(pkg.devDependencies.oxlint).toMatch(/^\d+\.\d+\.\d+$/);
 		expect(pkg.devDependencies.prettier).toMatch(/^\d+\.\d+\.\d+$/);
 
