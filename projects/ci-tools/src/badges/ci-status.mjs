@@ -15,7 +15,6 @@ const workflowFileName = "ci.yml";
 
 const branches = [
 	{ branch: "main", label: "CI Main", file: "ci-main.svg" },
-	{ branch: "release", label: "CI Release", file: "ci-release.svg" },
 ];
 
 async function getLatestWorkflowRun(branch) {
