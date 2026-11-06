@@ -95,7 +95,7 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 	};
 });
 
-vi.mock("../src/webapi/features/biome-format.js", () => ({
+vi.mock("../src/webapi/features/format-files.js", () => ({
 	formatScaffoldedFiles: vi.fn(),
 }));
 
@@ -190,7 +190,8 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	const postCreate = readFileSync(join(root, ".devcontainer/post-create.sh"), "utf8");
 	expect(postCreate).toContain("pnpm install --frozen-lockfile");
 	expect(postCreate).toContain("pnpm install");
-	expect(postCreate).toContain("pnpm exec biome check --write .");
+	// Postgres's data folder isn't readable by everyone, and Prettier reads a folder before ignoring it.
+	expect(postCreate).toContain("pnpm exec prettier --write . '!.devcontainer/**'");
 
 	const initialize = readFileSync(join(root, ".devcontainer/initialize.sh"), "utf8");
 	expect(initialize).toContain('gh_root="$HOME/.config/decohere/gh"');
@@ -498,9 +499,50 @@ describe("scaffolder names APIs and can add more later", () => {
 		expect(existsSync("/my-app/projects/billing/Dockerfile")).toBe(true);
 	});
 
+	it("sets a new project up with oxlint and Prettier", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+
+		const pkg = JSON.parse(readFileSync("/my-app/package.json", "utf8")) as {
+			scripts: Record<string, string>;
+			devDependencies: Record<string, string>;
+		};
+		expect(pkg.scripts.lint).toBe('oxlint --fix && prettier --write . "!.devcontainer/**"');
+		expect(pkg.scripts["lint:check"]).toBe(
+			'oxlint --deny-warnings && prettier --check . "!.devcontainer/**"',
+		);
+		expect(pkg.devDependencies.oxlint).toMatch(/^\d+\.\d+\.\d+$/);
+		expect(pkg.devDependencies.prettier).toMatch(/^\d+\.\d+\.\d+$/);
+
+		expect(existsSync("/my-app/.oxlintrc.json")).toBe(true);
+		const prettier = JSON.parse(readFileSync("/my-app/.prettierrc.json", "utf8")) as {
+			useTabs: boolean;
+			printWidth: number;
+		};
+		expect(prettier).toMatchObject({ useTabs: true, printWidth: 95 });
+		expect(readFileSync("/my-app/.prettierignore", "utf8")).toContain("pnpm-lock.yaml");
+
+		const devcontainer = readFileSync("/my-app/.devcontainer/devcontainer.json", "utf8");
+		expect(devcontainer).toContain("oxc.oxc-vscode");
+		expect(devcontainer).toContain("esbenp.prettier-vscode");
+		const settings = JSON.parse(
+			readFileSync("/my-app/.vscode/settings.json", "utf8"),
+		) as Record<string, unknown>;
+		expect(settings["editor.defaultFormatter"]).toBe("esbenp.prettier-vscode");
+		expect(settings["editor.formatOnSave"]).toBe(true);
+
+		// Nothing the project gets still mentions the old tools.
+		expect(existsSync("/my-app/biome.json")).toBe(false);
+		expect(JSON.stringify(pkg)).not.toMatch(/biome/i);
+		expect(devcontainer).not.toMatch(/biome/i);
+		expect(readFileSync("/my-app/.devcontainer/post-create.sh", "utf8")).not.toMatch(/biome/i);
+		const api = readFileSync("/my-app/projects/api/package.json", "utf8");
+		expect(api).not.toMatch(/biome/i);
+		expect(api).toContain('"lint": "oxlint --fix && prettier --write ."');
+	});
+
 	it("adds a named API to an existing workspace without clobbering the first", async () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
-		writeFileSync("/my-app/biome.json", '{ "custom": true }\n');
+		writeFileSync("/my-app/.prettierrc.json", '{ "custom": true }\n');
 		writeFileSync("/my-app/projects/api/Dockerfile", "# keep-api-dockerfile\n");
 		writeFileSync("/my-app/vitest.config.ts", "// keep-vitest-config\n");
 
@@ -508,7 +550,7 @@ describe("scaffolder names APIs and can add more later", () => {
 			resetFs: false,
 		});
 
-		expect(readFileSync("/my-app/biome.json", "utf8")).toContain("custom");
+		expect(readFileSync("/my-app/.prettierrc.json", "utf8")).toContain("custom");
 		expect(readFileSync("/my-app/projects/api/Dockerfile", "utf8")).toBe(
 			"# keep-api-dockerfile\n",
 		);
@@ -1101,7 +1143,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(devcontainer.forwardPorts).toEqual([3000, 3001]);
 		expect(devcontainer.portsAttributes["3001"]?.label).toBe("billing");
 		expect(devcontainer.customizations.vscode.extensions).toContain("mtxr.sqltools");
-		expect(devcontainer.customizations.vscode.extensions).toContain("biomejs.biome");
+		expect(devcontainer.customizations.vscode.extensions).toContain("oxc.oxc-vscode");
 		expect(devcontainer.initializeCommand).toBeDefined();
 
 		expect(readFileSync("/my-app/.devcontainer/Dockerfile", "utf8")).toContain(

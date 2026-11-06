@@ -29,10 +29,10 @@ else
 	pnpm install
 fi
 
-# The scaffolder has no Biome, so a new project's files get formatted on the first install.
+# The scaffolder has no Prettier, so a new project's files get formatted on the first install.
 if [[ ! -f "$stamp" ]]; then
-	echo "Formatting the project with Biome..."
-	pnpm exec biome check --write .
+	echo "Formatting the project with Prettier..."
+	pnpm exec prettier --write . '!.devcontainer/**'
 fi
 
 if [[ -n "$current_hash" ]]; then

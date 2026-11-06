@@ -77,7 +77,7 @@ describe("DependencyPinner", () => {
 		const api = project("@app/api", "api", { devDependencies: { vitest: "^3.0.0" } });
 		installed("/ws", "vitest", "3.0.0");
 
-		const pinned = await pin(none, [api], root({ devDependencies: { biome: "^2.0.0" } }));
+		const pinned = await pin(none, [api], root({ devDependencies: { oxlint: "^1.0.0" } }));
 
 		expect(pinned).toEqual({});
 	});

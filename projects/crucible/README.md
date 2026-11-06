@@ -80,7 +80,7 @@ import { SampleService } from "./sample.service.js";
 
 `import type` is correct for **interfaces** and type-only helpers. Those have no runtime constructor; pair them with `@inject(token)` (see below).
 
-Linters that prefer type-only imports (`import type` / `import { type X }`) will flag a class that appears unused except as a constructor type. Keep the value import and suppress that rule locally — for example with oxlint (or Biome, or ESLint):
+Linters that prefer type-only imports (`import type` / `import { type X }`) will flag a class that appears unused except as a constructor type. Keep the value import and suppress that rule locally — for example with oxlint (or ESLint):
 
 ```ts
 // oxlint-disable-next-line typescript/consistent-type-imports -- constructor injection needs the class at runtime

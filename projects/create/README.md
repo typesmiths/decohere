@@ -10,7 +10,7 @@ Scaffolding always runs somewhere that already has its tools, so nothing gets in
 | Your machine, or another container with Docker access | Runs in the `ghcr.io/typesmiths/decohere/create` image, then copies the project out | Says to open the project's Dev Container |
 | Another container with no Docker access | Says Docker is needed | Says to open the project's Dev Container |
 
-The scaffolder image gets no folders from your machine, and it can't see `~/.npmrc` or your Auth0 login. It works in its own folder, and the project is copied out only if it succeeds, so a failed run or Ctrl-C leaves your folder as it was. The container is always removed. A new project needs an empty folder (a `.git` folder is fine). The image is the bare minimum, plain Alpine with Node, the scaffolder and the Auth0 CLI, so a new project gets formatted by Biome the first time its Dev Container installs dependencies. Outside a Dev Container, run `pnpm lint` once after installing. This works the same from your machine, from inside a container, and against a remote Docker.
+The scaffolder image gets no folders from your machine, and it can't see `~/.npmrc` or your Auth0 login. It works in its own folder, and the project is copied out only if it succeeds, so a failed run or Ctrl-C leaves your folder as it was. The container is always removed. A new project needs an empty folder (a `.git` folder is fine). The image is the bare minimum, plain Alpine with Node, the scaffolder and the Auth0 CLI, so a new project gets formatted by Prettier the first time its Dev Container installs dependencies. Outside a Dev Container, run `pnpm lint` once after installing. This works the same from your machine, from inside a container, and against a remote Docker.
 
 With Auth0 and Postgres, `create` also makes an admin user with a generated password. The password isn't printed or kept in the project, and it's only for logging in. On Linux with a key store (GNOME Keyring or KWallet, through `secret-tool`), it's saved there, and `create` prints the command to read it. Anywhere else it goes in `~/.config/decohere/<project>.env`, readable only by you. Run inside a container, that file is in the container, so copy it if the container may be rebuilt.
 
@@ -67,7 +67,9 @@ my-app/
       ci.yml            # lint ∥ test (+ build and package on default branch)
       publish.yml       # forge publish (skips private); no docker push by default
   tsconfig.json
-  biome.json
+  .oxlintrc.json
+  .prettierrc.json
+  .prettierignore
   pnpm-workspace.yaml   # tells pnpm not to run the SWC and esbuild install scripts
   .env
   config/
@@ -109,7 +111,8 @@ USER node
 | `start:<name>` | same path for that API | Deploy that API (`pnpm run start:billing`) |
 | `dev` | `flux serve --env-file-if-exists .env` (plus `--project @<app>/<first>` when named) | Local HMR for the first API; loads `.env` if present |
 | `dev:<name>` | `PORT=<3000+n> flux serve --env-file-if-exists .env --project @<app>/<name>` | Local HMR for that API |
-| `lint:check` / `typecheck` / `test` | biome / forge typecheck / vitest | CI |
+| `lint` | `oxlint --fix`, then `prettier --write .`, skipping `.devcontainer` | Fix and format |
+| `lint:check` / `typecheck` / `test` | oxlint and Prettier / forge typecheck / vitest | CI |
 
 #### Multiple APIs / add later
 
@@ -119,7 +122,7 @@ decohere add api billing
 npx @decohere/create webapi add billing -d my-app
 ```
 
-Adds `projects/billing`, `start:billing` / `package:billing` / `dev:billing`, and `projects/billing/Dockerfile`. Does not rewrite the first API or workspace files like `biome.json`.
+Adds `projects/billing`, `start:billing` / `package:billing` / `dev:billing`, and `projects/billing/Dockerfile`. Does not rewrite the first API or workspace files like `.prettierrc.json`.
 
 Each API is a separate deploy: package it (`pnpm run package:billing`) and build the image from its folder (`docker build projects/billing`), or set the start command to `pnpm run start:billing`. Workspace `config/` is shared; each API still has its own named datasource and `{PREFIX}_DB_*` env (host/port default to the Compose Postgres).
 

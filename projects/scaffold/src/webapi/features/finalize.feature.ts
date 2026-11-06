@@ -8,7 +8,7 @@ import type { EnvFile } from "../../models/env-file.model.js";
 import type { WorkspaceScaffold } from "../../models/project.model.js";
 import type { Feature } from "../../services/scaffold.service.js";
 import { writeWorkspaceReadme } from "../workspace-readme.js";
-import { formatScaffoldedFiles } from "./biome-format.js";
+import { formatScaffoldedFiles } from "./format-files.js";
 
 function readExistingEnvValue(workspace: WorkspaceScaffold, key: string): string | undefined {
 	try {
@@ -71,7 +71,7 @@ async function finalize(
 	workspace: WorkspaceScaffold,
 	options: FinalizeOptions,
 ): Promise<void> {
-	// The scaffolder image has no Biome. A new project formats itself on its first install, in
+	// The scaffolder image has no Prettier. A new project formats itself on its first install, in
 	// `.devcontainer/post-create.sh`.
 	if (process.env.DECOHERE_BUILDER !== "1") {
 		const formatPaths = options.add

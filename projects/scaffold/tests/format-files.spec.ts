@@ -8,7 +8,8 @@ vi.mock("node:child_process", () => ({
 	spawnSync: mockSpawnSync,
 }));
 
-const { formatScaffoldedFiles } = await import("../src/webapi/features/biome-format.js");
+const { PRETTIER_VERSION } = await import("../src/models/package-json.model.js");
+const { formatScaffoldedFiles } = await import("../src/webapi/features/format-files.js");
 
 beforeEach(() => {
 	mockSpawnSync.mockReset();
@@ -19,19 +20,19 @@ afterEach(() => {
 });
 
 describe("formatScaffoldedFiles", () => {
-	it("runs biome check --write in the target directory", () => {
+	it("runs prettier --write in the target directory", () => {
 		mockSpawnSync.mockReturnValue({ status: 0, stdout: "", stderr: "", error: undefined });
 
 		formatScaffoldedFiles("/tmp/scaffold");
 
 		expect(mockSpawnSync).toHaveBeenCalledWith(
-			"biome",
-			["check", "--write", "."],
+			"prettier",
+			["--write", "."],
 			expect.objectContaining({ cwd: "/tmp/scaffold" }),
 		);
 	});
 
-	it("falls back to npx when biome is not on PATH", () => {
+	it("falls back to npx, at the version projects get, when prettier is not on PATH", () => {
 		const enoent = Object.assign(new Error("not found"), { code: "ENOENT" });
 		mockSpawnSync
 			.mockReturnValueOnce({ status: 1, stdout: "", stderr: "", error: enoent })
@@ -42,7 +43,7 @@ describe("formatScaffoldedFiles", () => {
 		expect(mockSpawnSync).toHaveBeenNthCalledWith(
 			2,
 			"npx",
-			["--yes", "@biomejs/biome", "check", "--write", "."],
+			["--yes", `prettier@${PRETTIER_VERSION}`, "--write", "."],
 			expect.objectContaining({ cwd: "/tmp/scaffold" }),
 		);
 	});

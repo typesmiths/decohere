@@ -119,7 +119,7 @@ function createWorkspace(
 	const installCmd = "bash .devcontainer/post-create.sh";
 	const devContainer = new DevContainer()
 		.setWorkspaceFolder(workspaceRoot)
-		.addExtension("biomejs.biome", "vitest.explorer")
+		.addExtension("oxc.oxc-vscode", "esbenp.prettier-vscode", "vitest.explorer")
 		.setInitializeCommand("bash .devcontainer/initialize.sh")
 		.setPostCreateCommand(installCmd)
 		.setUpdateContentCommand(installCmd)
@@ -161,46 +161,40 @@ function createWorkspace(
 		],
 	});
 
-	// Biome formatter/linter config
+	// The same linter and formatter, set up the same way, as Decohere itself.
 	monoRepo.addFile({
 		files: () => [
 			{
-				filePath: "biome.json",
+				filePath: ".oxlintrc.json",
 				content: JSON.stringify(
 					{
-						$schema: "https://biomejs.dev/schemas/2.0.0/schema.json",
-						files: {
-							includes: ["**/*.ts", "**/*.js", "**/*.json", "**/*.yml", "**/*.yaml"],
-						},
-						assist: { actions: { source: { organizeImports: "on" } } },
-						vcs: { enabled: true, clientKind: "git", useIgnoreFile: true },
-						formatter: {
-							enabled: true,
-							formatWithErrors: true,
-							indentStyle: "tab",
-							lineWidth: 95,
-						},
-						javascript: { parser: { unsafeParameterDecoratorsEnabled: true } },
-						linter: {
-							rules: {
-								style: {
-									useConsistentMemberAccessibility: {
-										level: "error",
-										options: { accessibility: "explicit" },
-									},
-								},
-							},
-						},
+						$schema: "./node_modules/oxlint/configuration_schema.json",
+						ignorePatterns: ["**/dist/**", "**/.package/**"],
+					},
+					null,
+					2,
+				),
+			},
+			{
+				filePath: ".prettierrc.json",
+				content: JSON.stringify(
+					{
+						useTabs: true,
+						printWidth: 95,
 						overrides: [
 							{
-								includes: ["**/*.json"],
-								formatter: { indentStyle: "space", indentWidth: 2 },
+								files: ["*.json", "*.yml", "*.yaml"],
+								options: { useTabs: false, tabWidth: 2 },
 							},
 						],
 					},
 					null,
 					2,
 				),
+			},
+			{
+				filePath: ".prettierignore",
+				content: [".devcontainer", "pnpm-lock.yaml", "*.md", ""].join("\n"),
 			},
 		],
 	});

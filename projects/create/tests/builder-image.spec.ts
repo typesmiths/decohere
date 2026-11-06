@@ -121,11 +121,11 @@ describe("builder image", () => {
 		expect(fs.readFileSync(h.log, "utf8")).not.toContain("@decohere/create@");
 	});
 
-	it("is the bare minimum: plain Alpine, with no Biome, package managers or curl", () => {
+	it("is the bare minimum: plain Alpine, with no formatter, package managers or curl", () => {
 		const dockerfile = fs.readFileSync(DOCKERFILE, "utf8");
 		const finalStage = dockerfile.slice(dockerfile.lastIndexOf("\nFROM "));
 		expect(finalStage).toMatch(/FROM alpine:\d/);
-		expect(finalStage).not.toMatch(/\b(biome|curl|npm install)\b/);
+		expect(finalStage).not.toMatch(/\b(prettier|curl|npm install)\b/);
 		expect(finalStage).toContain("/usr/local/bin/node");
 	});
 

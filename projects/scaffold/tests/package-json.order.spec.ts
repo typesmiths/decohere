@@ -19,7 +19,7 @@ describe("PackageJson dependency order", () => {
 		pkg.addDependency("@casl/ability", "^6.8.1");
 		pkg.addDependency("@decohere/data", "0.0.1");
 		pkg.addDevDependency("vitest", "^3.2.4");
-		pkg.addDevDependency("@biomejs/biome", "^2.0.0");
+		pkg.addDevDependency("oxlint", "1.0.0");
 
 		const rendered = JSON.parse(pkg.files()[0]!.content) as {
 			dependencies: Record<string, string>;

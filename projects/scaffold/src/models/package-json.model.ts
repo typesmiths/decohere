@@ -9,6 +9,10 @@ import {
 import { WELL_KNOWN_FILES } from "./const.js";
 import type { KeyedModel, SourceFile } from "./source-file.js";
 
+/** Exact, so a new version of a tool can't make a new project fail its own lint check. */
+export const OXLINT_VERSION = "1.87.0";
+export const PRETTIER_VERSION = "3.9.10";
+
 export type PackageJsonOptions = {
 	startEntry?: string;
 	/** API slugs in this workspace. Drives `start:<name>` / `dev:<name>`. */
@@ -53,7 +57,9 @@ export class PackageJson implements KeyedModel {
 			dev: namedOrMany
 				? fluxDevScript(workspaceName, first, webapiPort(0))
 				: "flux serve --env-file-if-exists .env",
-			"lint:check": "biome check .",
+			// Prettier reads a folder before ignoring it, and Postgres's data folder isn't readable by everyone.
+			lint: 'oxlint --fix && prettier --write . "!.devcontainer/**"',
+			"lint:check": 'oxlint --deny-warnings && prettier --check . "!.devcontainer/**"',
 			typecheck: "forge typecheck",
 			test: "vitest run --passWithNoTests",
 		};
@@ -81,7 +87,8 @@ export class PackageJson implements KeyedModel {
 			"@decohere/cli": CREATE_VERSION,
 			"@types/node": "^24.0.0",
 			typescript: "^6.0.3",
-			"@biomejs/biome": "^2.0.0",
+			oxlint: OXLINT_VERSION,
+			prettier: PRETTIER_VERSION,
 			vitest: "^3.2.4",
 		};
 	}

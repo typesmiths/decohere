@@ -11,7 +11,7 @@ Scaffolding needs tools, such as the Auth0 CLI, that shouldn't have to be instal
 
 - **Inside a Decohere Dev Container, every command runs right there.** Its image sets `DECOHERE_TOOLS=1` and has the tools, so no second container starts.
 - **Anywhere else, `create` uses the scaffolder image with nothing shared.** It runs as a non-root user in its own folder. The launcher copies the project out with `docker cp`, through a temporary folder, only after a successful run. It removes the container on success, failure and signals.
-- **The scaffolder image is the bare minimum:** plain Alpine with the Node binary, the scaffolder and the Auth0 CLI, and no npm, Biome or curl. A new project formats itself on its first install in the Dev Container, because it installs Biome anyway.
+- **The scaffolder image is the bare minimum:** plain Alpine with the Node binary, the scaffolder and the Auth0 CLI, and no npm, Prettier or curl. A new project formats itself on its first install in the Dev Container, because it installs Prettier anyway.
 - **A new project goes only into an empty folder** (`.git` is allowed), so a copy can't overwrite anyone's files.
 - **Commands on an existing project (`add`, `auth0`) run only in its Dev Container.** Anywhere else they stop and say so.
 - **The GitHub login is kept per project, outside the project folder,** in `~/.config/decohere/gh/<project>` with any token in `<project>.env`. It stays on disk because GitHub logins last much longer than Auth0 sessions.

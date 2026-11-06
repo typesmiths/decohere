@@ -193,7 +193,7 @@ describe.skipIf(!registry || !version)(
 					path = `${bin}:${process.env.PATH}`;
 					pnpm = join(bin, "pnpm");
 					cpSync(app, dir, { recursive: true });
-					// Biome honours .gitignore through git, as in a real project.
+					// As in a real project.
 					expectOk(await run("git", ["init", "-q"], dir));
 				}, FIVE_MINUTES);
 
@@ -204,10 +204,12 @@ describe.skipIf(!registry || !version)(
 					expect(result.output).not.toContain("Ignored build scripts");
 				});
 
-				// What post-create.sh does in the Dev Container. The scaffolder image has no Biome.
+				// What post-create.sh does in the Dev Container. The scaffolder image has no Prettier.
 				it("formats the new project", async () => {
 					expectOk(
-						await run(pnpm, ["exec", "biome", "check", "--write", "."], dir, { PATH: path }),
+						await run(pnpm, ["exec", "prettier", "--write", ".", "!.devcontainer/**"], dir, {
+							PATH: path,
+						}),
 					);
 				});
 
