@@ -10,11 +10,14 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/src,type=bind",
   "workspaceFolder": "/src",
+  // Runs on your machine first, so Docker doesn't create the login folder as root.
+  "initializeCommand": "mkdir -p -m 700 \"$HOME/.config/decohere/gh/decohere\"",
   "mounts": [
     // Per checkout: fast installs, and worktrees don't share node_modules.
     "source=${localWorkspaceFolderBasename}-node_modules,target=/src/node_modules,type=volume",
-    // Shared by every checkout on this machine: log in once to gh and Claude, survive rebuilds.
-    "source=decohere-gh-config,target=/home/node/.config/gh,type=volume",
+    // Shared by every checkout on this machine: log in once, survive rebuilds. The same place projects keep theirs.
+    "source=${localEnv:HOME}/.config/decohere/gh/decohere,target=/home/node/.config/gh,type=bind",
+    // Claude's login, session history and memory, also shared by every checkout.
     "source=decohere-claude,target=/home/node/.claude,type=volume"
   ],
   "remoteEnv": {
@@ -23,7 +26,7 @@
     "BWS_ACCESS_TOKEN": "${localEnv:BWS_ACCESS_TOKEN}"
   },
   // Volumes are created root-owned; hand them to `node`, then install; pnpm switches itself to the version pinned in package.json.
-  "postCreateCommand": "sudo chown node node_modules /home/node/.config/gh /home/node/.claude && pnpm install",
+  "postCreateCommand": "sudo chown node node_modules /home/node/.claude && pnpm install",
   "remoteUser": "node",
   "customizations": {
     "vscode": {

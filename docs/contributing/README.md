@@ -13,7 +13,7 @@ pnpm install
 pnpm test
 ```
 
-**Dev Container (optional):** "Reopen in Container" installs dependencies on first start. Log in once per machine with `gh auth login` (or export `GH_TOKEN` first) and sign in to your agent; both logins live in Docker volumes and survive rebuilds.
+**Dev Container (optional):** "Reopen in Container" installs dependencies on first start. Log in once per machine with `gh auth login` (or export `GH_TOKEN` first) and sign in to your agent. Both logins survive rebuilds: GitHub's is in `~/.config/decohere/gh/decohere/` on your machine, and your agent's is in a Docker volume.
 
 ## Everyday commands
 
