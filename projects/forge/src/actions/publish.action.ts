@@ -6,6 +6,7 @@ import { ActionResponse } from "@decohere/devkit/cli";
 import { Npm } from "@decohere/devkit/interop";
 import { scribe } from "@decohere/scribe";
 import { ForgeError, formatUnknownError } from "../errors.js";
+import { missingEntryPoints } from "../packaging/manifest-entry-points.js";
 
 export type PublishOptions = {
 	configuration: string;
@@ -33,6 +34,7 @@ export class Publish implements Action<PublishOptions> {
 
 	public async run(options: PublishOptions): Promise<ActionResponse<PublishResponse>> {
 		const projects = this.workspace.getProjects(options.configuration);
+		this.assertEntryPointsExist(projects);
 		const token = await this.resolveToken(options);
 		const otp = await this.resolveOtp(options);
 
@@ -49,6 +51,21 @@ export class Publish implements Action<PublishOptions> {
 			return ActionResponse.Error(Publish.name, publishResponses);
 		}
 		return ActionResponse.Success(Publish.name, publishResponses);
+	}
+
+	/** All or nothing: one bad package stops the run before any package is published. */
+	private assertEntryPointsExist(projects: readonly Project[]) {
+		const problems = projects
+			.filter((project) => !project.isPrivate)
+			.flatMap((project) => {
+				const { name, missing } = missingEntryPoints(project.getOutDir());
+				return missing.map((file) => `  ${name ?? project.name}: ${file}`);
+			});
+		if (problems.length > 0) {
+			throw new ForgeError(
+				`These package.json entries point at files the build doesn't contain, so nothing was published:\n${problems.join("\n")}\nFix the paths, or run: forge build --configuration release`,
+			);
+		}
 	}
 
 	public async publishProjects(projects: readonly Project[], options: PublishOptions) {
