@@ -8,7 +8,7 @@ Docker is required on the host. `@decohere/create` only pulls `ghcr.io/typesmith
 
 `npm create` already says “create”, so the first token is the kind (`webapi`), not `create` again. `webapi` is the only kind today, so you can leave it out and give just the project's folder. The launcher forwards `decohere create webapi …` into the builder image.
 
-This run prompts for database, auth, Postman, and whether to install:
+This run prompts for database and auth:
 
 ```bash
 npm create @decohere@dev my-app
@@ -23,14 +23,14 @@ decohere create webapi -d my-app
 To skip prompts, pass every answer up front (`-y` means “install deps, don’t ask”):
 
 ```bash
-npm create @decohere@dev -- webapi -d my-app --database postgres/typeorm --auth none --postman local -y
+npm create @decohere@dev -- webapi -d my-app --database postgres/typeorm --auth none -y
 ```
 
 Target directory is `webapi`'s optional argument or `-d` (default `.`). `npm create` treats `-d` as its own loglevel flag and forwards `my-app` as a positional — that form is supported. Extra create flags still need `--` after `npm create`.
 
 A first token that isn't a command (`webapi`, `create`, `add`, `auth0`, `help`) or a flag is the project's folder, so a mistyped command starts a project with that name.
 
-The scaffolded Dev Container asks **y/N** (TTY only) before npm auth and optional codebase RAG MCP (semantic search). Decline or run without a TTY to skip. Credentials are written under the project `.cursor/` directory (gitignored).
+The scaffolded Dev Container asks no questions. `gh` is installed in it: run `gh auth login` yourself if you want it, and the login persists in `.devcontainer/gh-auth/` (gitignored).
 
 ## Commands
 
@@ -111,7 +111,7 @@ The Auth0 CLI lives in the create image. Host tokens are stored in `~/.config/au
 # Device/URL login — open the printed URL in your browser
 npx @decohere/create auth0 login
 
-# Update the Auth0 API + Postman SPA for this workspace (run from the project, or pass -d)
+# Update the Auth0 API and login app for this workspace (run from the project, or pass -d)
 npx @decohere/create auth0 configure
 npx @decohere/create auth0 configure -d my-app
 
@@ -120,7 +120,15 @@ decohere auth0 login
 decohere auth0 configure
 ```
 
-`configure` does **not** rewrite application source. It scans `projects/*/src` for `@Authorize("action", "Subject")`, adds those permissions to the Auth0 API (keeping any already on the API), assigns them to `AUTH0_ADMIN_USER_SUB` when set, and updates Postman token `scope`.
+`configure` does **not** rewrite application source. It ensures a `<project> Dev` login app (written to `.env` as `AUTH0_CLIENT_ID`), scans `projects/*/src` for `@Authorize("action", "Subject")`, adds those permissions to the Auth0 API (keeping any already on the API) and assigns them to `AUTH0_ADMIN_USER_SUB` when set.
+
+#### Add Auth0 to an existing project
+
+```bash
+decohere add auth0
+```
+
+This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.withAuth()` to each API's `main.ts`. Running it again changes nothing. If a `main.ts` no longer has the generated shape, the command leaves it alone and prints the lines to add. It doesn't protect any routes for you, and it doesn't add the local user profile a new project with Postgres gets.
 
 #### Keep Auth0 in sync with controllers
 
@@ -130,7 +138,7 @@ decohere auth0 configure
 npx @decohere/create auth0 configure
 ```
 
-Then in Postman, Authorization → Get New Access Token so the token includes the new permissions.
+Then get a new access token so it includes the new permissions.
 
 #### Deploy (Railway / Fly / Nixpacks)
 
@@ -187,17 +195,9 @@ override `defineAbilitiesFor` for product CASL rules, and `mapPrincipal` for IdP
 (including the `AUTH0_ADMIN_USER_SUB` admin bootstrap). `@decohere/http`'s default already maps
 `admin` → `manage`/`all` and `action:Subject` scopes.
 
-#### Postman (`--postman`)
+#### Postman
 
-| Value | Effect |
-|---|---|
-| `none` | Skip Postman |
-| `local` | Local View collection + environment under `postman/` |
-| `api` | Create collection/environment in a Postman cloud workspace |
-
-```bash
-npx @decohere/create webapi -d my-app --postman local
-```
+While the API is running, choose Import in Postman and paste `http://localhost:3000/openapi.json`. Import it again after you change a route.
 
 ## Options
 
@@ -206,11 +206,11 @@ npx @decohere/create webapi -d my-app --postman local
 | `[directory]` / `-d <directory>` | `webapi` / global | Target directory (positional wins; default `.`) |
 | `--name <slug>` | `webapi` | API directory under `projects/` (repeatable; default `api`) |
 | `add api <name>` | `decohere add api` / `npx @decohere/create webapi add` | Add an API to an existing Decohere workspace |
+| `add auth0` | `decohere add auth0` / `npx @decohere/create add auth0` | Add Auth0 to an existing workspace |
 | `auth0 login` | `decohere auth0` / `npx @decohere/create auth0` | Device/URL login; persist tokens in `~/.config/auth0` |
-| `auth0 configure` | `decohere auth0` / `npx @decohere/create auth0` | Update Auth0 API + Postman SPA for an existing workspace |
+| `auth0 configure` | `decohere auth0` / `npx @decohere/create auth0` | Update the Auth0 API and login app for an existing workspace |
 | `--database <provider>` | `webapi` / `add` | `none` \| `postgres/typeorm` |
 | `--auth <provider>` | `webapi` / `add` | `none` \| `auth0` |
-| `--postman <provider>` | `webapi` / `add` | `none` \| `local` \| `api` |
 | `-y, --yes` | `webapi` / `add` | Install dependencies without prompting |
 | `--install <mode>` | `webapi` / `add` | `ask` (default) \| `yes` \| `no` |
 

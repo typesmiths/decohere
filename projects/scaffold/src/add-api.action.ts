@@ -7,7 +7,6 @@ export type AddApiOptions = {
 	d?: string;
 	database?: string;
 	auth?: string;
-	postman?: string;
 	yes?: boolean;
 	install?: string;
 };

@@ -13,7 +13,6 @@ export function addWebapiFeatureOptions(cmd: Command): Command {
 	return cmd
 		.option("--database <provider>", "Database provider: none | postgres/typeorm")
 		.option("--auth <provider>", "Auth provider: none | auth0")
-		.option("--postman <provider>", "Postman provider: none | local | api")
 		.option("-y, --yes", "Install dependencies without prompting")
 		.option("--install <mode>", "Dependency install mode: ask | yes | no", "ask");
 }
@@ -33,7 +32,6 @@ export function toApiOptions(
 		d: resolveTargetDir(directory, typeof opts.d === "string" ? opts.d : undefined),
 		databaseProvider: opts.database as ApiOptions["databaseProvider"],
 		authProvider: opts.auth as ApiOptions["authProvider"],
-		postmanProvider: opts.postman as ApiOptions["postmanProvider"],
 		installDependencies:
 			opts.yes === true
 				? "yes"

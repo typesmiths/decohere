@@ -53,7 +53,6 @@
     "get-tsconfig": "^4.14.3",
     "glob": "^13.0.1",
     "jose": "^6.2.3",
-    "openapi-to-postmanv2": "^5.0.0",
     "parse-imports": "^2.2.1",
     "pg": "^8.16.3",
     "picomatch": "^4.0.4",

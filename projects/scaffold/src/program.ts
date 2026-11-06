@@ -1,4 +1,5 @@
 import { Command, CommanderError } from "commander";
+import { runAddAuth0 } from "./webapi/add-auth0.js";
 import { CreateCliError } from "./webapi/api-name.js";
 import { runAuth0Configure, runAuth0Login } from "./webapi/auth0-commands.js";
 import {
@@ -31,12 +32,17 @@ export function createProgram(): Command {
 		await runScaffoldApi(toApiOptions(directory, cmd.optsWithGlobals()));
 	});
 
+	const add = program.command("add").description("Add to an existing Decohere workspace");
+	add
+		.command("auth0")
+		.description("Add Auth0 to an existing Decohere workspace")
+		.action((_opts: unknown, cmd: Command) => {
+			const d = cmd.optsWithGlobals().d;
+			runAddAuth0(typeof d === "string" ? d : ".");
+		});
+
 	addWebapiFeatureOptions(
-		program
-			.command("add")
-			.description("Add to an existing Decohere workspace")
-			.command("api")
-			.argument("<name>", "API name under projects/"),
+		add.command("api").argument("<name>", "API name under projects/"),
 	).action(async (name: string, _opts: unknown, cmd: Command) => {
 		await runScaffoldApi(
 			toApiOptions(undefined, cmd.optsWithGlobals(), { names: [name], add: true }),
@@ -54,9 +60,7 @@ export function createProgram(): Command {
 		});
 	auth0
 		.command("configure")
-		.description(
-			"Update Auth0 API permissions and Postman SPA from @Authorize in this workspace",
-		)
+		.description("Update Auth0 API permissions from @Authorize in this workspace")
 		.action((_opts: unknown, cmd: Command) => {
 			const d = cmd.optsWithGlobals().d;
 			runAuth0Configure(typeof d === "string" ? d : ".");

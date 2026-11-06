@@ -266,7 +266,7 @@ describe("ensureSpaApp", () => {
 			.mockReturnValueOnce({
 				status: 0,
 				stdout: JSON.stringify([
-					{ client_id: "spa_existing", name: "webapi Postman" },
+					{ client_id: "spa_existing", name: "webapi Dev" },
 					{ client_id: "other", name: "Other App" },
 				]),
 				stderr: "",
@@ -279,7 +279,7 @@ describe("ensureSpaApp", () => {
 				error: undefined,
 			});
 
-		const app = ensureSpaApp("webapi Postman", [
+		const app = ensureSpaApp("webapi Dev", [
 			"https://oauth.pstmn.io/v1/callback",
 			"https://oauth.pstmn.io/v1/browser-callback",
 		]);
@@ -307,12 +307,12 @@ describe("ensureSpaApp", () => {
 			})
 			.mockReturnValueOnce({
 				status: 0,
-				stdout: JSON.stringify({ client_id: "spa_new", name: "webapi Postman" }),
+				stdout: JSON.stringify({ client_id: "spa_new", name: "webapi Dev" }),
 				stderr: "",
 				error: undefined,
 			});
 
-		const app = ensureSpaApp("webapi Postman", ["https://oauth.pstmn.io/v1/callback"]);
+		const app = ensureSpaApp("webapi Dev", ["https://oauth.pstmn.io/v1/callback"]);
 		expect(app).toEqual({ client_id: "spa_new", reused: false });
 	});
 
@@ -321,8 +321,8 @@ describe("ensureSpaApp", () => {
 			.mockReturnValueOnce({
 				status: 0,
 				stdout: JSON.stringify([
-					{ client_id: "spa_a", name: "ledger Postman" },
-					{ client_id: "spa_b", name: "workspace Postman" },
+					{ client_id: "spa_a", name: "ledger Dev" },
+					{ client_id: "spa_b", name: "workspace Dev" },
 					{ client_id: "m2m", name: "Default App" },
 				]),
 				stderr: "",
@@ -336,8 +336,8 @@ describe("ensureSpaApp", () => {
 				error: undefined,
 			});
 
-		expect(() =>
-			ensureSpaApp("crypto Postman", ["https://oauth.pstmn.io/v1/callback"]),
-		).toThrow(/tenant application limit reached[\s\S]*delete unused apps/i);
+		expect(() => ensureSpaApp("crypto Dev", ["https://oauth.pstmn.io/v1/callback"])).toThrow(
+			/tenant application limit reached[\s\S]*delete unused apps/i,
+		);
 	});
 });

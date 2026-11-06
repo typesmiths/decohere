@@ -11,8 +11,6 @@ export class Gitignore implements KeyedModel {
 		".pnpm-store",
 		".env",
 		".devcontainer/gh.env",
-		".cursor/codebase-rag.env",
-		".cursor/mcp.json",
 		".DS_Store",
 		"logs",
 	];

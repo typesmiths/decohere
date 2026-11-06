@@ -8,9 +8,7 @@ export class Auth0ConfigureCommand extends DecohereCommand {
 
 	public constructor(name: string) {
 		super(name);
-		this.description(
-			"Update Auth0 API permissions and Postman SPA from @Authorize in this workspace",
-		);
+		this.description("Update Auth0 API permissions from @Authorize in this workspace");
 		this.option("-d <directory>", "Workspace directory (default: current directory)", ".");
 	}
 }

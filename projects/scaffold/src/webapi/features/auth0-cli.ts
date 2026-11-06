@@ -233,8 +233,8 @@ export function formatSpaEntityLimitError(appName: string, apps: Auth0App[]): st
 		listed,
 		"",
 		"Fix: Auth0 Dashboard → Applications → Applications → delete unused apps,",
-		`then re-run the scaffold (or choose Postman "none" to skip SPA creation).`,
-		"Re-scaffold of the same project name reuses an exact-name match when it still exists.",
+		"then run the command again.",
+		"Running it again for the same project reuses an app with the same name if it still exists.",
 	].join("\n");
 }
 
@@ -293,8 +293,8 @@ export function updateSpaCallbacks(
 }
 
 /**
- * Create a Postman SPA, or reuse an existing app with the same name (re-scaffold).
- * Always returns a client_id suitable for Postman auth0ClientId.
+ * Create a single-page app people log in through to get a token, or reuse one with the same
+ * name.
  * On Auth0 application-quota errors, throws a clear delete-apps message (no cross-app reuse).
  */
 export function ensureSpaApp(
@@ -307,7 +307,7 @@ export function ensureSpaApp(
 		try {
 			updateSpaCallbacks(existing.client_id, callbackUrls);
 		} catch {
-			// Callbacks may already match; still usable for Postman.
+			// Callbacks may already match; the app is still usable.
 		}
 		return { client_id: existing.client_id, reused: true };
 	}
@@ -396,7 +396,7 @@ export function updateUserPassword(userId: string, password: string): void {
 }
 
 /**
- * Create a DB connection root-admin user for local / Postman login.
+ * Create a DB connection root-admin user for local login.
  * If the user already exists, look them up, reset password to `input.password`,
  * and return that identity so callers can still write .env credentials.
  */

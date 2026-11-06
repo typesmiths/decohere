@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { WELL_KNOWN_FILES } from "../models/const.js";
 import type { EnvFile } from "../models/env-file.model.js";
 import type { PackageJson } from "../models/package-json.model.js";
@@ -10,7 +8,6 @@ export type WorkspaceReadmeOptions = {
 	add?: boolean;
 	databaseProvider?: "none" | "postgres/typeorm";
 	authProvider?: "auth0" | "none";
-	postmanProvider?: "api" | "local" | "none";
 };
 
 export type WorkspaceReadmeInput = {
@@ -18,12 +15,11 @@ export type WorkspaceReadmeInput = {
 	apiNames: readonly string[];
 	hasPostgres: boolean;
 	hasAuth0: boolean;
-	hasPostman: boolean;
 };
 
 /** Pure renderer — keep feature sections short and copy-paste ready. */
 export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
-	const { projectName, apiNames, hasPostgres, hasAuth0, hasPostman } = input;
+	const { projectName, apiNames, hasPostgres, hasAuth0 } = input;
 	const apis = apiNames.length > 0 ? apiNames : ["api"];
 	const lines: string[] = [
 		`# ${projectName}`,
@@ -34,8 +30,6 @@ export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
 		"",
 		"1. Open this folder in VS Code / Cursor.",
 		"2. **Reopen in Container** (or rebuild the Dev Container).",
-		"   Host `initialize.sh` and container `post-start.sh` ask y/N (TTY only) before npm auth or codebase RAG MCP.",
-		"   Skip or decline; missing TTY skips. RAG credentials land in `.cursor/` (gitignored).",
 		"3. Install dependencies if needed:",
 		"",
 		"```bash",
@@ -117,31 +111,40 @@ export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
 		"",
 	);
 
+	if (!hasAuth0) {
+		lines.push("## Add Auth0 later", "", "```bash", "decohere add auth0", "```", "");
+	}
+
 	if (hasAuth0) {
 		lines.push(
 			"## Auth0",
 			"",
 			"JWT auth is wired from `.env` (`AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE`).",
 			'After you add a controller, `@Authorize("read", "Invoice")` becomes the Auth0 permission `read:Invoice`.',
-			"Sync the Auth0 API, admin grants, and Postman token scopes without re-scaffolding:",
+			"Sync the Auth0 API and admin grants without re-scaffolding:",
 			"",
 			"```bash",
 			"npx @decohere/create auth0 login      # once / when the CLI token expires",
 			"npx @decohere/create auth0 configure  # after new @Authorize decorators",
 			"```",
 			"",
+			"To get a token for protected routes in Postman, use Authorization → OAuth 2.0 → Authorization Code (With PKCE):",
+			"",
+			"- Auth URL: `<AUTH0_ISSUER_BASE_URL>/authorize?audience=<AUTH0_AUDIENCE>`",
+			"- Access Token URL: `<AUTH0_ISSUER_BASE_URL>/oauth/token`",
+			"- Client ID: `AUTH0_CLIENT_ID` from `.env`",
+			"- Scope: `openid profile email`, plus the permissions you need, like `read:Invoice`",
+			"",
 		);
 	}
 
-	if (hasPostman) {
-		lines.push(
-			"## Postman",
-			"",
-			"Open this **project root** in Postman Local View (Files → Open folder), not the `postman/` subfolder.",
-			"Select the Local environment, then Authorization → Get New Access Token when Auth0 is enabled.",
-			"",
-		);
-	}
+	lines.push(
+		"## Try the API in Postman",
+		"",
+		"While the API is running, choose Import in Postman and paste `http://localhost:3000/openapi.json`.",
+		"Import it again after you change a route.",
+		"",
+	);
 
 	lines.push(
 		"## More",
@@ -172,18 +175,12 @@ export function resolveWorkspaceReadmeInput(
 		options.databaseProvider === "postgres/typeorm" || Boolean(pkg?.hasScript("db:up"));
 	const hasAuth0 =
 		options.authProvider === "auth0" || Boolean(env?.hasEntry("AUTH0_ISSUER_BASE_URL"));
-	const hasPostman =
-		options.postmanProvider === "local" ||
-		options.postmanProvider === "api" ||
-		existsSync(join(workspace.targetDir, "postman")) ||
-		existsSync(join(workspace.targetDir, ".postman"));
 
 	return {
 		projectName: workspace.name,
 		apiNames,
 		hasPostgres,
 		hasAuth0,
-		hasPostman,
 	};
 }
 

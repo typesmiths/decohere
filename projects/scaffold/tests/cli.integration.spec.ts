@@ -7,7 +7,7 @@
  *
  * Examples are argv permutations only.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resetMemfs } from "@decohere/testing";
@@ -24,11 +24,11 @@ const {
 	mockLogin,
 	mockListTenants,
 	mockListApis,
-	mockEnsureSpaApp,
 	mockUpdateApiScopes,
-	mockEnableConnection,
 	mockCreateApi,
 	mockListApiScopes,
+	mockEnsureSpaApp,
+	mockEnableConnection,
 	mockAssignUserPermissions,
 } = vi.hoisted(() => ({
 	mockAsk: vi.fn((_q: string, fallback = "") => Promise.resolve(fallback)),
@@ -41,10 +41,10 @@ const {
 	mockLogin: vi.fn(() => true),
 	mockListTenants: vi.fn(() => [] as Array<{ name: string; active?: boolean }>),
 	mockListApis: vi.fn(() => [] as Array<{ name: string; identifier: string }>),
-	mockEnsureSpaApp: vi.fn(() => ({ client_id: "spa_123", reused: true })),
 	mockUpdateApiScopes: vi.fn(),
-	mockEnableConnection: vi.fn(),
 	mockCreateApi: vi.fn(() => ({ identifier: "https://api.my-app" })),
+	mockEnsureSpaApp: vi.fn(() => ({ client_id: "spa_123", reused: true })),
+	mockEnableConnection: vi.fn(),
 	mockListApiScopes: vi.fn(() => [] as string[]),
 	mockAssignUserPermissions: vi.fn(),
 }));
@@ -77,8 +77,8 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 		login: mockLogin,
 		listTenants: mockListTenants,
 		listApis: mockListApis,
-		ensureSpaApp: mockEnsureSpaApp,
 		updateApiScopes: mockUpdateApiScopes,
+		ensureSpaApp: mockEnsureSpaApp,
 		enableConnectionForClient: mockEnableConnection,
 		createApi: mockCreateApi,
 		listApiScopes: mockListApiScopes,
@@ -98,14 +98,7 @@ const PROGRAM_FILE = realFs.realpathSync(
 const NPM_BIN = "/node_modules/.bin/decohere";
 
 /** Feature flags only — does not skip install (use with builder env or `--install no`). */
-const NON_INTERACTIVE_FEATURES = [
-	"--database",
-	"none",
-	"--auth",
-	"none",
-	"--postman",
-	"none",
-] as const;
+const NON_INTERACTIVE_FEATURES = ["--database", "none", "--auth", "none"] as const;
 
 const NON_INTERACTIVE = [...NON_INTERACTIVE_FEATURES, "--install", "no"] as const;
 
@@ -143,8 +136,6 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 		"scribe.withPinoPretty().and.withPinoRoll",
 	);
 	expect(readFileSync(join(root, ".gitignore"), "utf8")).toContain("logs");
-	expect(readFileSync(join(root, ".gitignore"), "utf8")).toContain(".cursor/codebase-rag.env");
-	expect(readFileSync(join(root, ".gitignore"), "utf8")).toContain(".cursor/mcp.json");
 	expect(
 		existsSync(join(root, "projects/api/src/controllers/hello.controller.ts")),
 		`${root}/projects/api/src/controllers/hello.controller.ts`,
@@ -185,44 +176,28 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	expect(devcontainerJson).toContain(
 		'"updateContentCommand": "bash .devcontainer/post-create.sh"',
 	);
-	expect(devcontainerJson).toContain('"postStartCommand": "bash .devcontainer/post-start.sh"');
+	expect(devcontainerJson).not.toContain("postStartCommand");
 
 	const postCreate = readFileSync(join(root, ".devcontainer/post-create.sh"), "utf8");
 	expect(postCreate).toContain("pnpm install --frozen-lockfile");
 	expect(postCreate).toContain("pnpm install");
 
-	const postStart = readFileSync(join(root, ".devcontainer/post-start.sh"), "utf8");
-	expect(postStart).not.toContain("pnpm install");
-	expect(postStart).toContain("codebase-rag-mcp.ts");
-	expect(postStart).toContain('prompt_yn "Log in to npm?"');
-	expect(postStart).toContain('prompt_yn "Log in to GitHub CLI (gh)?"');
-	expect(postStart).toContain("gh auth login");
-	expect(postStart).toContain(".devcontainer/gh-auth/");
-	expect(postStart).not.toContain("exit 1");
-
 	const initialize = readFileSync(join(root, ".devcontainer/initialize.sh"), "utf8");
-	expect(initialize).toContain('prompt_yn "Configure npm auth for this workspace?"');
-	expect(initialize).toContain('prompt_yn "Configure GitHub CLI auth for this workspace?"');
-	expect(initialize).toContain('prompt_yn "Configure codebase RAG MCP (semantic search)?"');
 	expect(initialize).toContain('gh_dir="$root/.devcontainer/gh-auth"');
 	expect(initialize).toContain('gh_env="$root/.devcontainer/gh.env"');
 	expect(initialize).not.toContain("python3");
-	expect(existsSync(join(root, ".devcontainer/codebase-rag-mcp.ts"))).toBe(true);
-	expect(existsSync(join(root, ".devcontainer/tty-prompt.sh"))).toBe(true);
-
-	expect(initialize).toContain('cursor_dir="$root/.cursor"');
-	expect(initialize).toContain("codebase-rag.env");
+	// Opening the Dev Container asks nothing and never needs a login.
+	expect(initialize).not.toMatch(/prompt_yn|\/dev\/tty|\bread\b|npm|\.cursor/);
 
 	const compose = readFileSync(join(root, ".devcontainer/docker-compose.yml"), "utf8");
 	expect(compose).toContain(`..:${workspaceRoot}`);
 	expect(compose).toContain(`webapi-node-modules:${workspaceRoot}/node_modules`);
-	expect(compose).toContain(`CODEBASE_RAG_WORKSPACE=${workspaceRoot}`);
-	expect(compose).toContain(`${workspaceRoot}/.devcontainer/codebase-rag-mcp.ts merge`);
-	expect(compose).toContain("postStartCommand runs after Cursor's first MCP snapshot");
+	expect(compose).toContain("command: sleep infinity");
+	expect(compose).not.toContain("codebase-rag");
+	expect(compose).not.toContain("npm-auth");
+	expect(compose).not.toContain("NPM_CONFIG_USERCONFIG");
 	expect(compose).toContain("./gh-auth:/home/node/.config/gh");
 	expect(compose).toContain("./gh.env");
-	expect(compose).not.toContain("cursor-mcp");
-	expect(compose).not.toContain("${HOME}/.config/cursor/codebase-rag.env");
 	expect(compose).toContain("bashhistory:/commandhistory");
 	expect(compose).toMatch(/^ {2}bashhistory:\s*$/m);
 
@@ -233,6 +208,19 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 
 	const gitignore = readFileSync(join(root, ".gitignore"), "utf8");
 	expect(gitignore).toContain(".devcontainer/gh.env");
+	expect(gitignore).not.toContain(".cursor");
+
+	for (const removed of [
+		"postman",
+		".postman",
+		".devcontainer/post-start.sh",
+		".devcontainer/tty-prompt.sh",
+		".devcontainer/codebase-rag-mcp.ts",
+		".devcontainer/codebase-rag.env.example",
+		".devcontainer/npm-auth",
+	]) {
+		expect(existsSync(join(root, removed)), removed).toBe(false);
+	}
 }
 
 /** argv as `node node_modules/.bin/decohere …args`, run in process; resolves to the exit code. */
@@ -279,12 +267,12 @@ beforeEach(() => {
 	mockListTenants.mockReturnValue([]);
 	mockListApis.mockReset();
 	mockListApis.mockReturnValue([]);
-	mockEnsureSpaApp.mockReset();
-	mockEnsureSpaApp.mockReturnValue({ client_id: "spa_123", reused: true });
 	mockUpdateApiScopes.mockReset();
-	mockEnableConnection.mockReset();
 	mockCreateApi.mockReset();
 	mockCreateApi.mockReturnValue({ identifier: "https://api.my-app" });
+	mockEnsureSpaApp.mockReset();
+	mockEnsureSpaApp.mockReturnValue({ client_id: "spa_123", reused: true });
+	mockEnableConnection.mockReset();
 	mockListApiScopes.mockReset();
 	mockListApiScopes.mockReturnValue([]);
 	mockAssignUserPermissions.mockReset();
@@ -596,7 +584,7 @@ describe("auth0 login and configure", () => {
 		expect(existsSync("/package.json")).toBe(false);
 	});
 
-	it("updates Auth0 env and Postman client id without rewriting the app", async () => {
+	it("updates Auth0 env without rewriting the app", async () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
 		writeFileSync(
 			"/my-app/.env",
@@ -606,29 +594,8 @@ describe("auth0 login and configure", () => {
 			"/my-app/projects/api/src/controllers/hello.controller.ts",
 			"// keep-controller\n",
 		);
-		const envDir = "/my-app/postman/environments";
-		mkdirSync(envDir, { recursive: true });
-		writeFileSync(
-			join(envDir, "my-app-Local.environment.yaml"),
-			[
-				"name: my-app Local",
-				"values:",
-				"  - key: auth0ClientId",
-				'    value: ""',
-				"    enabled: true",
-				"  - key: auth0Audience",
-				"    value: https://api.my-app",
-				"    enabled: true",
-				"  - key: scope",
-				"    value: openid profile email read:Hello",
-				"    enabled: true",
-				"",
-			].join("\n"),
-		);
-
 		mockIsInstalled.mockReturnValue(true);
 		mockListTenants.mockReturnValue([{ name: "dev-tenant.us.auth0.com", active: true }]);
-		mockEnsureSpaApp.mockReturnValue({ client_id: "spa_updated", reused: true });
 
 		await runCliAsNodeBin(["auth0", "configure", "-d", "my-app"], { resetFs: false });
 
@@ -638,7 +605,6 @@ describe("auth0 login and configure", () => {
 			"read:Hello",
 			"update:Hello",
 		]);
-		expect(mockEnsureSpaApp).toHaveBeenCalled();
 		expect(
 			readFileSync("/my-app/projects/api/src/controllers/hello.controller.ts", "utf8"),
 		).toBe("// keep-controller\n");
@@ -646,13 +612,12 @@ describe("auth0 login and configure", () => {
 		expect(env).toContain("AUTH0_ISSUER_BASE_URL=https://dev-tenant.us.auth0.com");
 		expect(env).toContain("AUTH0_AUDIENCE=https://api.my-app");
 		expect(env).toContain("KEEP=1");
+		expect(env).toContain("AUTH0_CLIENT_ID=spa_123");
+		expect(mockEnsureSpaApp).toHaveBeenCalledWith("my-app Dev", expect.any(Array));
 		expect(mockAssignUserPermissions).not.toHaveBeenCalled();
-		expect(readFileSync(join(envDir, "my-app-Local.environment.yaml"), "utf8")).toContain(
-			"spa_updated",
-		);
 	});
 
-	it("adds controller @Authorize scopes to the Auth0 API and Postman token request", async () => {
+	it("adds controller @Authorize scopes to the Auth0 API", async () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
 		writeFileSync(
 			"/my-app/.env",
@@ -674,27 +639,9 @@ describe("auth0 login and configure", () => {
 				"",
 			].join("\n"),
 		);
-		const envDir = "/my-app/postman/environments";
-		mkdirSync(envDir, { recursive: true });
-		writeFileSync(
-			join(envDir, "my-app-Local.environment.yaml"),
-			[
-				"name: my-app Local",
-				"values:",
-				"  - key: auth0ClientId",
-				'    value: "old"',
-				"    enabled: true",
-				"  - key: scope",
-				"    value: openid profile email read:Hello",
-				"    enabled: true",
-				"",
-			].join("\n"),
-		);
-
 		mockIsInstalled.mockReturnValue(true);
 		mockListTenants.mockReturnValue([{ name: "dev-tenant.us.auth0.com", active: true }]);
 		mockListApiScopes.mockReturnValue(["read:Hello"]);
-		mockEnsureSpaApp.mockReturnValue({ client_id: "spa_updated", reused: true });
 
 		await runCliAsNodeBin(["auth0", "configure", "-d", "my-app"], { resetFs: false });
 
@@ -708,10 +655,6 @@ describe("auth0 login and configure", () => {
 			"https://api.my-app",
 			["create:Invoice", "read:Hello", "read:Invoice"],
 		);
-		const postman = readFileSync(join(envDir, "my-app-Local.environment.yaml"), "utf8");
-		expect(postman).toContain("create:Invoice");
-		expect(postman).toContain("read:Invoice");
-		expect(postman).toContain("openid");
 	});
 
 	it("refuses configure outside a Decohere workspace", async () => {
@@ -731,11 +674,91 @@ const POSTGRES = [
 	"postgres/typeorm",
 	"--auth",
 	"none",
-	"--postman",
-	"none",
 	"--install",
 	"no",
 ] as const;
+
+describe("decohere add auth0", () => {
+	const main = "/my-app/projects/api/src/main.ts";
+
+	async function addAuth0(): Promise<number> {
+		mockIsInstalled.mockReturnValue(true);
+		mockListTenants.mockReturnValue([{ name: "dev-tenant.us.auth0.com", active: true }]);
+		return runCliAsNodeBin(["add", "auth0", "-d", "my-app"], { resetFs: false });
+	}
+
+	it("sets up Auth0 and wires it into a project created without it", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		expect(readFileSync(main, "utf8")).not.toContain("withAuth");
+
+		expect(await addAuth0()).toBe(0);
+
+		const source = readFileSync(main, "utf8");
+		expect(source).toContain('import "@decohere/http/auth";');
+		expect(source).toMatch(/\.withConfiguration\(YamlDataSource\)\n\s*\.withAuth\(\)/);
+		expect(readFileSync("/my-app/config/config.yaml", "utf8")).toContain(
+			"discoveryUrl: ${AUTH0_ISSUER_BASE_URL}",
+		);
+		const env = readFileSync("/my-app/.env", "utf8");
+		expect(env).toContain("AUTH0_ISSUER_BASE_URL=https://dev-tenant.us.auth0.com");
+		expect(env).toContain("AUTH0_AUDIENCE=");
+		expect(env).toContain("AUTH0_CLIENT_ID=spa_123");
+	});
+
+	it("changes nothing when run again", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		await addAuth0();
+		const files = [main, "/my-app/config/config.yaml", "/my-app/.env"];
+		const before = files.map((file) => readFileSync(file, "utf8"));
+
+		expect(await addAuth0()).toBe(0);
+
+		expect(files.map((file) => readFileSync(file, "utf8"))).toEqual(before);
+	});
+
+	it("leaves a main.ts it can't change safely and says what to add", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		const custom = "export const app = buildMyOwnApp();\n";
+		writeFileSync(main, custom);
+		const logs: string[] = [];
+		vi.spyOn(console, "log").mockImplementation((msg?: unknown) => {
+			logs.push(String(msg ?? ""));
+		});
+
+		expect(await addAuth0()).toBe(0);
+
+		expect(readFileSync(main, "utf8")).toBe(custom);
+		expect(logs.join("\n")).toContain("projects/api/src/main.ts");
+		expect(logs.join("\n")).toContain('import "@decohere/http/auth";');
+	});
+
+	it("refuses outside a Decohere workspace", async () => {
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
+
+		await runCliAsNodeBin(["add", "auth0"]);
+
+		expect(errors.join("\n")).toMatch(/Not a Decohere workspace/);
+	});
+});
+
+describe("scaffolder options that no longer exist", () => {
+	it("rejects --postman with an unknown option error and writes nothing", async () => {
+		const stderr: string[] = [];
+		vi.spyOn(process.stderr, "write").mockImplementation((chunk: unknown) => {
+			stderr.push(String(chunk));
+			return true;
+		});
+
+		const code = await runCliAsNodeBin(["create", "webapi", "my-app", "--postman", "none"]);
+
+		expect(code).not.toBe(0);
+		expect(stderr.join("")).toContain("unknown option '--postman'");
+		expect(existsSync("/my-app/package.json")).toBe(false);
+	});
+});
 
 describe("scaffolder writes a root README with CLI examples", () => {
 	it("includes webapi add and pnpm dev, and omits db:* when database is none", async () => {
@@ -746,15 +769,15 @@ describe("scaffolder writes a root README with CLI examples", () => {
 		expect(readme).toContain("pnpm dev");
 		expect(readme).toContain("pnpm install");
 		expect(readme).toContain("Reopen in Container");
-		expect(readme).toContain("y/N");
-		expect(readme).toContain("codebase RAG MCP");
-		expect(readme).toContain(".cursor/");
+		expect(readme).not.toContain("y/N");
+		expect(readme).not.toContain("RAG");
+		expect(readme).toContain("http://localhost:3000/openapi.json");
 		expect(readme).toContain("forge package");
 		expect(readme).toContain("## Logging");
 		expect(readme).toContain("NODE_ENV=production");
 		expect(readme).not.toContain("pnpm db:up");
 		expect(readme).not.toContain("## Auth0");
-		expect(readme).not.toContain("## Postman");
+		expect(readme).toContain("decohere add auth0");
 	});
 
 	it("includes db:up when postgres is enabled", async () => {

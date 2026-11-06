@@ -35,7 +35,6 @@ import { DevContainerHostScripts } from "./devcontainer/host-scripts.js";
 import { AuthFeature } from "./features/auth.feature.js";
 import { DatabaseFeature } from "./features/database.feature.js";
 import { FinalizeFeature } from "./features/finalize.feature.js";
-import { PostmanFeature } from "./features/postman.feature.js";
 import { ApiPackageJson } from "./models/api-package-json.model.js";
 import { ControllerSourceFile } from "./models/controller-source-file.model.js";
 import { GithubCiWorkflows } from "./models/github-ci.model.js";
@@ -56,11 +55,10 @@ export type ApiOptions = {
 	add?: boolean;
 	authProvider?: "auth0" | "none";
 	databaseProvider?: "none" | "postgres/typeorm";
-	postmanProvider?: "api" | "local" | "none";
 	installDependencies?: "yes" | "no";
 };
 
-const features = [DatabaseFeature, AuthFeature, PostmanFeature, FinalizeFeature];
+const features = [DatabaseFeature, AuthFeature, FinalizeFeature];
 
 export async function scaffoldApi(cliOptions: ApiOptions) {
 	const targetDir = resolve(cliOptions.d ?? ".");
@@ -89,9 +87,6 @@ function createWorkspace(
 
 	const compose = new DockerCompose()
 		.setProjectName(name)
-		.addHeaderComment(
-			"Merge .cursor/mcp.json in the service command. postStartCommand runs after Cursor's first MCP snapshot.",
-		)
 		.addNetwork(name, { name: `samples-${name}` })
 		.addService("devcontainer", {
 			build: ".",
@@ -100,15 +95,13 @@ function createWorkspace(
 				`..:${workspaceRoot}`,
 				// Workspace-local (created by initialize.sh as the host user).
 				// Do NOT bind ${HOME}/.npm/... — Docker creates missing host paths as root.
-				"./npm-auth:/home/node/.npm-config",
 				"./gh-auth:/home/node/.config/gh",
 				`webapi-node-modules:${workspaceRoot}/node_modules`,
 				// Named volume (not a Cursor-only mount) so CLI recreates keep Up-arrow history.
 				`${commandHistory.volumeName}:${commandHistory.dir}`,
 			],
 			env_file: ["./gh.env"],
-			environment: { NPM_CONFIG_USERCONFIG: "/home/node/.npm-config/.npmrc" },
-			command: `'bash -c "CODEBASE_RAG_WORKSPACE=${workspaceRoot} node --experimental-strip-types ${workspaceRoot}/.devcontainer/codebase-rag-mcp.ts merge || true && exec sleep infinity"'`,
+			command: "sleep infinity",
 			networks: [name],
 		})
 		.addVolume("webapi-node-modules")
@@ -121,7 +114,6 @@ function createWorkspace(
 		.setInitializeCommand("bash .devcontainer/initialize.sh")
 		.setPostCreateCommand(installCmd)
 		.setUpdateContentCommand(installCmd)
-		.setPostStartCommand("bash .devcontainer/post-start.sh")
 		.useCompose();
 
 	forwardApiPorts(devContainer, apiNames, 0);

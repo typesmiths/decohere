@@ -10,17 +10,15 @@ import {
 	Query,
 } from "../../http/src/routing/index.js";
 import { RouteRegistry } from "../../http/src/routing/services/route-registry.js";
-import { POSTMAN_CALLBACKS } from "../src/webapi/features/postman.feature.js";
 import { ControllerSourceFile } from "../src/webapi/models/controller-source-file.model.js";
 import { MainSourceFile } from "../src/webapi/models/main-source-file.model.js";
-import { buildHelloOpenApiDocument } from "../src/webapi/postman/hello-openapi.js";
 
 /**
- * Contract: scaffolded Hello routes must match Postman / OpenAPI paths.
- * Regression: `@Post("/")` registered POST /hello/ while Postman called POST /hello.
+ * Contract: scaffolded Hello routes register without a trailing slash.
+ * Regression: `@Post("/")` registered POST /hello/ while clients called POST /hello.
  */
 
-describe("Hello controller ↔ Postman route contract", () => {
+describe("Hello controller route contract", () => {
 	it("generates @Post() without a trailing-slash path", () => {
 		const content = new ControllerSourceFile().files()[0]?.content ?? "";
 		expect(content).toMatch(/@Post\(\)/);
@@ -33,7 +31,7 @@ describe("Hello controller ↔ Postman route contract", () => {
 		expect(content).toContain('title: "demo.api"');
 	});
 
-	it("registers the same paths OpenAPI / Postman Local View call", () => {
+	it("registers the paths clients call", () => {
 		@Controller({ prefix: "/hello" })
 		class HelloController {
 			@Get()
@@ -68,27 +66,5 @@ describe("Hello controller ↔ Postman route contract", () => {
 		expect(registered.create).toMatchObject({ method: "POST", path: "/hello" });
 		expect(registered.update).toMatchObject({ method: "PUT", path: "/hello/:id" });
 		expect(registered.remove).toMatchObject({ method: "DELETE", path: "/hello/:id" });
-
-		const openapi = buildHelloOpenApiDocument("Contract");
-		expect(Object.keys(openapi.paths)).toEqual(
-			expect.arrayContaining(["/hello", "/hello/{id}"]),
-		);
-
-		const postman = {
-			list: { method: "GET", url: "{{baseUrl}}/hello" },
-			getOne: { method: "GET", url: "{{baseUrl}}/hello/:id" },
-			create: { method: "POST", url: "{{baseUrl}}/hello" },
-			update: { method: "PUT", url: "{{baseUrl}}/hello/:id" },
-			remove: { method: "DELETE", url: "{{baseUrl}}/hello/:id" },
-		};
-		expect(postman.create.url.replace("{{baseUrl}}", "")).toBe(registered.create?.path);
-		expect(postman.list.url.replace("{{baseUrl}}", "")).toBe(registered.getAll?.path);
-		expect(postman.getOne.url.replace("{{baseUrl}}", "")).toBe(registered.getOne?.path);
-		expect(postman.update.url.replace("{{baseUrl}}", "")).toBe(registered.update?.path);
-		expect(postman.remove.url.replace("{{baseUrl}}", "")).toBe(registered.remove?.path);
-	});
-
-	it("keeps Postman OAuth callbacks stable (sanity for auth contract)", () => {
-		expect(POSTMAN_CALLBACKS).toContain("https://oauth.pstmn.io/v1/callback");
 	});
 });

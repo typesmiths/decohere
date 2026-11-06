@@ -2,9 +2,6 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { listExistingApiNames } from "./api-name.js";
 
-/** OIDC scopes requested on the Postman SPA token (not Auth0 API permissions). */
-export const OIDC_SCOPES = ["openid", "profile", "email"] as const;
-
 const AUTHORIZE_RE = /@Authorize\(\s*(["'])([^"']+)\1(?:\s*,\s*(["'])([^"']+)\3)?\s*\)/g;
 
 function isAppSource(fileName: string): boolean {
@@ -50,8 +47,4 @@ export function mergeApiScopes(
 	existing: readonly string[],
 ): string[] {
 	return [...new Set([...existing, ...discovered])].sort();
-}
-
-export function postmanRequestedScopes(apiScopes: readonly string[]): string {
-	return [...OIDC_SCOPES, ...apiScopes].join(" ");
 }

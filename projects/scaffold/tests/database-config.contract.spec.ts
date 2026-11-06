@@ -44,7 +44,6 @@ function scaffold(names: string[], add = false) {
 		add,
 		databaseProvider: "postgres/typeorm",
 		authProvider: "none",
-		postmanProvider: "none",
 		installDependencies: "no",
 	});
 }

@@ -127,8 +127,6 @@ describe("a generated app's types", () => {
 				"none",
 				"--auth",
 				"none",
-				"--postman",
-				"none",
 				"--install",
 				"no",
 			],

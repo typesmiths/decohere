@@ -5,11 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { seedDevcontainerTemplates } from "./seed-devcontainer-templates.js";
 
 /**
- * Feature-level coverage for Auth0 + Postman wiring.
+ * Feature-level coverage for Auth0 wiring.
  *
  * webapi.spec.ts only asserts install behaviour with authProvider:"none" and
- * stubs auth0-cli as isInstalled:false — so missing .env / empty auth0ClientId
- * on re-scaffold never failed the suite.
+ * stubs auth0-cli as isInstalled:false — so a missing .env never failed the suite.
  */
 
 const {
@@ -64,9 +63,6 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 		updateApiScopes: vi.fn(),
 		createAdminDatabaseUser: mockCreateAdminDatabaseUser,
 		ensureSpaApp: mockEnsureSpaApp,
-		createSpaApp: vi.fn(() => {
-			throw new Error("createSpaApp should not be called — use ensureSpaApp");
-		}),
 		enableConnectionForClient: mockEnableConnectionForClient,
 		generateAdminPassword: () => "Generated1!",
 	};
@@ -100,7 +96,6 @@ const baseOpts = (): ScaffoldOpts => ({
 	audience: "https://api.webapi",
 	adminUsername: "admin",
 	adminPassword: "Generated1!",
-	postmanProvider: "local",
 	installDependencies: "no",
 });
 
@@ -114,6 +109,7 @@ beforeEach(() => {
 	mockCreateAdminDatabaseUser.mockReset();
 	mockEnsureSpaApp.mockReset();
 	mockEnableConnectionForClient.mockReset();
+	mockEnsureSpaApp.mockReturnValue({ client_id: "spa_client_123", reused: false });
 
 	mockCreateAdminDatabaseUser.mockReturnValue({
 		user_id: "auth0|admin",
@@ -121,7 +117,6 @@ beforeEach(() => {
 		password: "Generated1!",
 		username: "admin",
 	});
-	mockEnsureSpaApp.mockReturnValue({ client_id: "spa_client_123", reused: false });
 });
 
 afterEach(() => {
@@ -130,8 +125,8 @@ afterEach(() => {
 	delete process.env.DECOHERE_BUILDER;
 });
 
-describe("scaffoldApi auth0 + postman wiring", () => {
-	it("writes AUTH0_ADMIN_* to .env and auth0ClientId into the Postman environment", async () => {
+describe("scaffoldApi auth0 wiring", () => {
+	it("writes AUTH0_ADMIN_* to .env", async () => {
 		await scaffoldApi(baseOpts());
 
 		const env = read(".env");
@@ -140,12 +135,6 @@ describe("scaffoldApi auth0 + postman wiring", () => {
 		expect(env).toContain("AUTH0_ADMIN_USER_PASSWORD=Generated1!");
 		expect(env).toContain("AUTH0_ADMIN_USERNAME=admin");
 
-		const postmanEnv = read("postman/environments/my-api-Local.environment.yaml");
-		expect(postmanEnv).toMatch(/key: auth0ClientId\n\s+value: spa_client_123/);
-		expect(mockEnsureSpaApp).toHaveBeenCalledWith(
-			"my-api Postman",
-			expect.arrayContaining(["https://oauth.pstmn.io/v1/callback"]),
-		);
 		expect(mockCreateAdminDatabaseUser).toHaveBeenCalledOnce();
 
 		const readme = read("README.md");
@@ -154,8 +143,6 @@ describe("scaffoldApi auth0 + postman wiring", () => {
 		expect(readme).toContain("npx @decohere/create auth0 login");
 		expect(readme).toContain("npx @decohere/create auth0 configure");
 		expect(readme).toContain("@Authorize");
-		expect(readme).toContain("## Postman");
-		expect(readme).toContain("Local View");
 	});
 
 	it("still writes admin env when Auth0 returns an existing user identity", async () => {
@@ -173,68 +160,52 @@ describe("scaffoldApi auth0 + postman wiring", () => {
 		expect(env).toContain("AUTH0_ADMIN_USER_PASSWORD=Generated1!");
 	});
 
-	it("writes a non-empty auth0ClientId when the SPA app is reused", async () => {
-		mockEnsureSpaApp.mockReturnValue({ client_id: "spa_reused", reused: true });
-
+	it("creates the login app and writes its client id to .env", async () => {
 		await scaffoldApi(baseOpts());
 
-		const postmanEnv = read("postman/environments/my-api-Local.environment.yaml");
-		expect(postmanEnv).toMatch(/key: auth0ClientId\n\s+value: spa_reused/);
-		expect(postmanEnv).not.toMatch(/key: auth0ClientId\n\s+value: ""/);
-
-		const collectionAuth = read(
-			"postman/collections/my-api WebAPI/.resources/definition.yaml",
+		expect(read(".env")).toContain("AUTH0_CLIENT_ID=spa_client_123");
+		expect(mockEnsureSpaApp).toHaveBeenCalledWith(
+			"my-api Dev",
+			expect.arrayContaining(["https://oauth.pstmn.io/v1/callback"]),
 		);
-		expect(collectionAuth).toMatch(/clientId:\s*spa_reused/);
+		expect(mockEnableConnectionForClient).toHaveBeenCalledWith(
+			expect.any(String),
+			"spa_client_123",
+		);
+		expect(read("README.md")).toContain("`AUTH0_CLIENT_ID` from `.env`");
 	});
 
-	it("preserves existing auth0ClientId when ensureSpaApp fails on re-scaffold", async () => {
+	it("keeps the client id from .env when Auth0 fails on a later run", async () => {
 		await scaffoldApi(baseOpts());
-
 		mockEnsureSpaApp.mockImplementation(() => {
 			throw new Error("auth0 apps create failed: Unauthorized");
 		});
 
 		await scaffoldApi(baseOpts());
 
-		const postmanEnv = read("postman/environments/my-api-Local.environment.yaml");
-		expect(postmanEnv).toMatch(/key: auth0ClientId\n\s+value: spa_client_123/);
-		expect(postmanEnv).not.toMatch(/key: auth0ClientId\n\s+value: ""/);
+		expect(read(".env")).toContain("AUTH0_CLIENT_ID=spa_client_123");
 	});
 
-	it("fails the scaffold instead of writing an empty auth0ClientId", async () => {
+	it("fails instead of leaving a project with no login app", async () => {
 		mockEnsureSpaApp.mockImplementation(() => {
 			throw new Error("auth0 apps create failed: Unauthorized");
 		});
 
-		await expect(scaffoldApi(baseOpts())).rejects.toThrow(/auth0ClientId would be empty/);
+		await expect(scaffoldApi(baseOpts())).rejects.toThrow(
+			/Failed to create the Auth0 login app/,
+		);
 	});
 
-	it("surfaces Auth0 application-limit guidance without writing an empty auth0ClientId", async () => {
+	it("passes on Auth0's application limit guidance unchanged", async () => {
 		mockEnsureSpaApp.mockImplementation(() => {
 			throw new Error(
-				[
-					'Auth0 refused to create SPA "my-api Postman": tenant application limit reached.',
-					"This tenant already has 3 application(s):",
-					"  - ledger Postman (spa_a)",
-					"",
-					"Fix: Auth0 Dashboard → Applications → Applications → delete unused apps,",
-					'then re-run the scaffold (or choose Postman "none" to skip SPA creation).',
-				].join("\n"),
+				'Auth0 refused to create SPA "my-api Dev": tenant application limit reached.',
 			);
 		});
 
-		let thrown: unknown;
-		try {
-			await scaffoldApi(baseOpts());
-		} catch (err) {
-			thrown = err;
-		}
-		expect(thrown).toBeInstanceOf(Error);
-		const message = (thrown as Error).message;
-		expect(message).toMatch(/tenant application limit reached/);
-		expect(message).toMatch(/delete unused apps/i);
-		expect(message).not.toMatch(/auth0ClientId would be empty/);
+		await expect(scaffoldApi(baseOpts())).rejects.toThrow(
+			/^Auth0 refused to create SPA "my-api Dev": tenant application limit reached\.$/,
+		);
 	});
 
 	it("scaffolds a thin ability.factory extension point (not CASL infrastructure)", async () => {

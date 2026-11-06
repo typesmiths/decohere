@@ -1,11 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resetMemfs } from "@decohere/testing";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-	discoverAuthorizeScopes,
-	mergeApiScopes,
-	postmanRequestedScopes,
-} from "../src/webapi/authorize-scopes.js";
+import { discoverAuthorizeScopes, mergeApiScopes } from "../src/webapi/authorize-scopes.js";
 
 beforeEach(() => {
 	resetMemfs();
@@ -76,17 +72,11 @@ describe("discoverAuthorizeScopes", () => {
 	});
 });
 
-describe("mergeApiScopes / postmanRequestedScopes", () => {
+describe("mergeApiScopes", () => {
 	it("unions existing Auth0 permissions with newly discovered ones", () => {
 		expect(mergeApiScopes(["read:Invoice"], ["read:Hello", "read:Invoice"])).toEqual([
 			"read:Hello",
 			"read:Invoice",
 		]);
-	});
-
-	it("prefixes OIDC scopes for Postman PKCE", () => {
-		expect(postmanRequestedScopes(["read:Hello", "read:Invoice"])).toBe(
-			"openid profile email read:Hello read:Invoice",
-		);
 	});
 });
