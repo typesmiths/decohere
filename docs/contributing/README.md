@@ -15,7 +15,7 @@ pnpm test
 
 **Dev Container (optional):** "Reopen in Container" installs dependencies on first start. Log in once per machine with `gh auth login` and sign in to your agent. Both logins survive rebuilds: GitHub's is in `~/.config/decohere/gh/decohere/` on your machine, and your agent's is in a Docker volume.
 
-This repo's container also starts Claude Remote Control, listed in claude.ai/code as `decohere-container`. It needs a claude.ai login, and it can't start until you run `claude` once in a terminal and accept the prompt to trust the folder. The trust answer survives rebuilds. Its log is `~/.cache/claude-remote-control.log`.
+This repo's container also starts Claude Remote Control, listed in claude.ai/code as `decohere-container`. It needs a claude.ai login, and it can't start until you answer two prompts once in a terminal: run `claude` and accept the prompt to trust the folder, then run `claude remote-control`, answer `y`, and press Ctrl+C. The answers survive rebuilds. Its log is `~/.cache/claude-remote-control.log`.
 
 ## Everyday commands
 
