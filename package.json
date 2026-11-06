@@ -70,13 +70,13 @@
     "@types/node": "^22.15.0",
     "@types/pg": "^8.16.0",
     "@types/picomatch": "^4.0.0",
-    "@vitest/coverage-v8": "^3.2.6",
+    "@vitest/coverage-v8": "^4.1.12",
     "axios": "^1.16.0",
     "memfs": "^4.17.0",
     "oxlint": "1.87.0",
     "pino-roll": "^4.0.0",
     "prettier": "3.9.10",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.12"
   },
   "pnpm": {
     "overrides": {
@@ -98,13 +98,9 @@
       "picomatch@^4.0.0": "4.0.5",
       "picomatch": "4.0.5",
       "postcss": "8.5.26",
-      "vite": "7.3.7",
-      "vitest": "3.2.7",
-      "@vitest/coverage-v8": "3.2.7",
       "ip-address": "10.7.6",
       "uuid@^8.0.0": "11.1.1",
       "yaml@^1.0.0": "1.10.3",
-      "tinypool": "2.1.2",
       "source-map-js": "1.2.2"
     }
   }

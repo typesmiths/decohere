@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 import { cache } from "../../src/caching/cache.decorator.js";
 
 // Simple cache implementation for testing
@@ -33,7 +33,7 @@ export const CACHE = new MockCache();
 
 export class CacheTestClass {
 	public callCount = 0;
-	public counter = vi.fn();
+	public counter: Mock = vi.fn();
 
 	@cache({ cache: CACHE })
 	public syncMethod(value: number): number {

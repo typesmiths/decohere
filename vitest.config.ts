@@ -7,6 +7,8 @@ const { forgeBuild } = await import("@decohere/forge/vitest");
 export default defineConfig({
 	plugins: [forgeBuild({ logLevel: "silent" })],
 	test: {
+		// Spies keep their call history otherwise: restoreAllMocks() doesn't clear it.
+		clearMocks: true,
 		// Run one with `--project <name>`. `pnpm test` runs "unit"; the scripts in package.json run the others.
 		server: {
 			deps: {
@@ -75,8 +77,9 @@ export default defineConfig({
 			],
 			thresholds: {
 				lines: 50,
-				// Headroom below typical ~82% so ops/script noise does not flake main.
-				branches: 80,
+				// About 5 points below today's 70%, so ops/script noise does not flake main. Vitest 4 counts
+				// branches differently: the same code and tests measured 85.5% on Vitest 3.
+				branches: 65,
 				functions: 76,
 				statements: 50,
 			},

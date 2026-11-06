@@ -89,7 +89,7 @@ export class PackageJson implements KeyedModel {
 			typescript: "^6.0.3",
 			oxlint: OXLINT_VERSION,
 			prettier: PRETTIER_VERSION,
-			vitest: "^3.2.4",
+			vitest: "^4.1.12",
 		};
 	}
 
