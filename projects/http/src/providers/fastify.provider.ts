@@ -1,3 +1,4 @@
+import type { AddressInfo } from "node:net";
 import { randomUUID } from "node:crypto";
 import { stat } from "node:fs/promises";
 import path from "node:path";
@@ -131,7 +132,7 @@ export class FastifyProvider implements HttpProvider {
 	public get addresses() {
 		return this.provider
 			.addresses()
-			.filter((a) => a.family === "IPv4")
+			.filter((a): a is AddressInfo => typeof a !== "string" && a.family === "IPv4")
 			.map((a) => `http://${a.address}:${a.port}`);
 	}
 
