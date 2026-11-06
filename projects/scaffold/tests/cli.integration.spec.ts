@@ -95,6 +95,8 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 	};
 });
 
+const { Auth0AuthError } = await import("../src/webapi/features/auth0-cli.js");
+
 vi.mock("../src/webapi/features/format-files.js", () => ({
 	formatScaffoldedFiles: vi.fn(),
 }));
@@ -744,6 +746,58 @@ describe("auth0 login and configure", () => {
 		]);
 		expect(written.join("")).toBe("a-token\n");
 		expect(logs).not.toHaveBeenCalled();
+	});
+
+	it("auth0 token logs you in when you aren't, and still prints only the token", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		writeFileSync(
+			"/my-app/.env",
+			"AUTH0_AUDIENCE=https://api.my-app\nAUTH0_TOKEN_CLIENT_ID=m2m_123\n",
+		);
+		mockIsInstalled.mockReturnValue(true);
+		mockListApiScopes
+			.mockImplementationOnce(() => {
+				throw new Auth0AuthError("no_config");
+			})
+			.mockReturnValue(["read:Hello"]);
+		mockLogin.mockReturnValue(true);
+		const written: string[] = [];
+		const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+			written.push(String(chunk));
+			return true;
+		});
+		const logs = vi.spyOn(console, "log");
+		const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+		await runCliAsNodeBin(["auth0", "token", "-d", "my-app"], { resetFs: false });
+
+		write.mockRestore();
+		expect(mockLogin).toHaveBeenCalledOnce();
+		expect(written.join("")).toBe("a-token\n");
+		expect(logs).not.toHaveBeenCalled();
+		expect(errors.mock.calls.flat().join("\n")).toContain("Logging in to Auth0");
+	});
+
+	it("auth0 token stops with a plain message when the login fails", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		writeFileSync(
+			"/my-app/.env",
+			"AUTH0_AUDIENCE=https://api.my-app\nAUTH0_TOKEN_CLIENT_ID=m2m_123\n",
+		);
+		mockIsInstalled.mockReturnValue(true);
+		mockListApiScopes.mockImplementation(() => {
+			throw new Auth0AuthError("no_config");
+		});
+		mockLogin.mockReturnValue(false);
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
+
+		await runCliAsNodeBin(["auth0", "token", "-d", "my-app"], { resetFs: false });
+
+		expect(errors.join("\n")).toContain("Auth0 login failed.");
+		expect(mockRequestAccessToken).not.toHaveBeenCalled();
 	});
 
 	it("auth0 token says what to run when there's no token app", async () => {

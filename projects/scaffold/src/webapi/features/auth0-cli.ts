@@ -42,6 +42,7 @@ export class Auth0AuthError extends Error {
 /** Returns true if an error or stderr output looks like an expired/missing token. */
 function isAuthError(text: string): boolean {
 	return (
+		text.includes("no_config") ||
 		text.includes("renew access token") ||
 		text.includes("log in") ||
 		text.includes("Unauthorized")
@@ -112,10 +113,13 @@ export function listTenants(): Auth0Tenant[] {
 	}
 }
 
-/** Device/URL login (`--no-input`) so Docker can print a host-browser URL. */
+/**
+ * Device/URL login (`--no-input`) so Docker can print a host-browser URL. Its output goes to
+ * stderr, so `$(decohere auth0 token)` captures only the token.
+ */
 export function login(): boolean {
 	const result = spawnSync("auth0", ["login", "--scopes", REQUIRED_SCOPES, "--no-input"], {
-		stdio: "inherit",
+		stdio: ["inherit", 2, "inherit"],
 	});
 	return result.status === 0;
 }

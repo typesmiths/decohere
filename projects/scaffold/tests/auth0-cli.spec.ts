@@ -11,12 +11,14 @@ vi.mock("node:child_process", () => ({
 
 const {
 	assignUserPermissions,
+	Auth0AuthError,
 	createAdminDatabaseUser,
 	createApi,
 	DB_CONNECTION_NAME,
 	ensureSpaApp,
 	listApiScopes,
 	login,
+	requestAccessToken,
 	updateApiScopes,
 } = await import("../src/webapi/features/auth0-cli.js");
 
@@ -340,5 +342,29 @@ describe("ensureSpaApp", () => {
 		expect(() => ensureSpaApp("crypto Dev", ["http://localhost:3000"])).toThrow(
 			/tenant application limit reached[\s\S]*delete unused apps/i,
 		);
+	});
+});
+
+describe("the Auth0 login", () => {
+	it("treats the CLI's real logged-out error as not logged in", () => {
+		mockSpawnSync.mockReturnValueOnce({
+			status: 1,
+			stdout: "",
+			// Exactly what auth0 1.39.0 prints with no login.
+			stderr:
+				'{"error":{"code":"auth","reason":"no_config","message":"config.json file is missing"}}\n',
+		});
+
+		expect(() => requestAccessToken("client", "https://api", [])).toThrow(Auth0AuthError);
+	});
+
+	it("keeps the login prompt off stdout, so `$(auth0 token)` captures only the token", () => {
+		mockSpawnSync.mockReturnValueOnce({ status: 0 });
+
+		expect(login()).toBe(true);
+
+		expect(mockSpawnSync.mock.calls[0]?.[2]).toMatchObject({
+			stdio: ["inherit", 2, "inherit"],
+		});
 	});
 });
