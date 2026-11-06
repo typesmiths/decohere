@@ -1,6 +1,8 @@
 export { AddModule } from "./add.module.js";
 export type { AddApiOptions } from "./add-api.action.js";
 export { AddApiAction } from "./add-api.action.js";
+export type { AddAuth0Options } from "./add-auth0.action.js";
+export { AddAuth0Action } from "./add-auth0.action.js";
 export { Auth0Module } from "./auth0.module.js";
 export type { Auth0ConfigureOptions } from "./auth0-configure.action.js";
 export { Auth0ConfigureAction } from "./auth0-configure.action.js";

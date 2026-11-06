@@ -44,7 +44,7 @@ describe("product CLI shape", () => {
 		expect(names(create?.commands ?? [])).toEqual(["webapi"]);
 
 		const add = app.commands.find((c) => c.name() === "add");
-		expect(names(add?.commands ?? [])).toEqual(["api"]);
+		expect(names(add?.commands ?? [])).toEqual(["api", "auth0"]);
 
 		const auth0 = app.commands.find((c) => c.name() === "auth0");
 		expect(names(auth0?.commands ?? [])).toEqual(["login", "configure"]);
@@ -58,6 +58,7 @@ describe("product CLI shape", () => {
 		[["create", "webapi", "--help"]],
 		[["add", "--help"]],
 		[["add", "api", "--help"]],
+		[["add", "auth0", "--help"]],
 		[["auth0", "--help"]],
 		[["auth0", "login", "--help"]],
 		[["auth0", "configure", "--help"]],

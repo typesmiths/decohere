@@ -27,6 +27,8 @@ const {
 	mockUpdateApiScopes,
 	mockCreateApi,
 	mockListApiScopes,
+	mockEnsureSpaApp,
+	mockEnableConnection,
 	mockAssignUserPermissions,
 } = vi.hoisted(() => ({
 	mockAsk: vi.fn((_q: string, fallback = "") => Promise.resolve(fallback)),
@@ -41,6 +43,8 @@ const {
 	mockListApis: vi.fn(() => [] as Array<{ name: string; identifier: string }>),
 	mockUpdateApiScopes: vi.fn(),
 	mockCreateApi: vi.fn(() => ({ identifier: "https://api.my-app" })),
+	mockEnsureSpaApp: vi.fn(() => ({ client_id: "spa_123", reused: true })),
+	mockEnableConnection: vi.fn(),
 	mockListApiScopes: vi.fn(() => [] as string[]),
 	mockAssignUserPermissions: vi.fn(),
 }));
@@ -74,6 +78,8 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 		listTenants: mockListTenants,
 		listApis: mockListApis,
 		updateApiScopes: mockUpdateApiScopes,
+		ensureSpaApp: mockEnsureSpaApp,
+		enableConnectionForClient: mockEnableConnection,
 		createApi: mockCreateApi,
 		listApiScopes: mockListApiScopes,
 		assignUserPermissions: mockAssignUserPermissions,
@@ -264,6 +270,9 @@ beforeEach(() => {
 	mockUpdateApiScopes.mockReset();
 	mockCreateApi.mockReset();
 	mockCreateApi.mockReturnValue({ identifier: "https://api.my-app" });
+	mockEnsureSpaApp.mockReset();
+	mockEnsureSpaApp.mockReturnValue({ client_id: "spa_123", reused: true });
+	mockEnableConnection.mockReset();
 	mockListApiScopes.mockReset();
 	mockListApiScopes.mockReturnValue([]);
 	mockAssignUserPermissions.mockReset();
@@ -603,6 +612,8 @@ describe("auth0 login and configure", () => {
 		expect(env).toContain("AUTH0_ISSUER_BASE_URL=https://dev-tenant.us.auth0.com");
 		expect(env).toContain("AUTH0_AUDIENCE=https://api.my-app");
 		expect(env).toContain("KEEP=1");
+		expect(env).toContain("AUTH0_CLIENT_ID=spa_123");
+		expect(mockEnsureSpaApp).toHaveBeenCalledWith("my-app Dev", expect.any(Array));
 		expect(mockAssignUserPermissions).not.toHaveBeenCalled();
 	});
 
@@ -667,6 +678,72 @@ const POSTGRES = [
 	"no",
 ] as const;
 
+describe("decohere add auth0", () => {
+	const main = "/my-app/projects/api/src/main.ts";
+
+	async function addAuth0(): Promise<number> {
+		mockIsInstalled.mockReturnValue(true);
+		mockListTenants.mockReturnValue([{ name: "dev-tenant.us.auth0.com", active: true }]);
+		return runCliAsNodeBin(["add", "auth0", "-d", "my-app"], { resetFs: false });
+	}
+
+	it("sets up Auth0 and wires it into a project created without it", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		expect(readFileSync(main, "utf8")).not.toContain("withAuth");
+
+		expect(await addAuth0()).toBe(0);
+
+		const source = readFileSync(main, "utf8");
+		expect(source).toContain('import "@decohere/http/auth";');
+		expect(source).toMatch(/\.withConfiguration\(YamlDataSource\)\n\s*\.withAuth\(\)/);
+		expect(readFileSync("/my-app/config/config.yaml", "utf8")).toContain(
+			"discoveryUrl: ${AUTH0_ISSUER_BASE_URL}",
+		);
+		const env = readFileSync("/my-app/.env", "utf8");
+		expect(env).toContain("AUTH0_ISSUER_BASE_URL=https://dev-tenant.us.auth0.com");
+		expect(env).toContain("AUTH0_AUDIENCE=");
+		expect(env).toContain("AUTH0_CLIENT_ID=spa_123");
+	});
+
+	it("changes nothing when run again", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		await addAuth0();
+		const files = [main, "/my-app/config/config.yaml", "/my-app/.env"];
+		const before = files.map((file) => readFileSync(file, "utf8"));
+
+		expect(await addAuth0()).toBe(0);
+
+		expect(files.map((file) => readFileSync(file, "utf8"))).toEqual(before);
+	});
+
+	it("leaves a main.ts it can't change safely and says what to add", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		const custom = "export const app = buildMyOwnApp();\n";
+		writeFileSync(main, custom);
+		const logs: string[] = [];
+		vi.spyOn(console, "log").mockImplementation((msg?: unknown) => {
+			logs.push(String(msg ?? ""));
+		});
+
+		expect(await addAuth0()).toBe(0);
+
+		expect(readFileSync(main, "utf8")).toBe(custom);
+		expect(logs.join("\n")).toContain("projects/api/src/main.ts");
+		expect(logs.join("\n")).toContain('import "@decohere/http/auth";');
+	});
+
+	it("refuses outside a Decohere workspace", async () => {
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
+
+		await runCliAsNodeBin(["add", "auth0"]);
+
+		expect(errors.join("\n")).toMatch(/Not a Decohere workspace/);
+	});
+});
+
 describe("scaffolder options that no longer exist", () => {
 	it("rejects --postman with an unknown option error and writes nothing", async () => {
 		const stderr: string[] = [];
@@ -700,6 +777,7 @@ describe("scaffolder writes a root README with CLI examples", () => {
 		expect(readme).toContain("NODE_ENV=production");
 		expect(readme).not.toContain("pnpm db:up");
 		expect(readme).not.toContain("## Auth0");
+		expect(readme).toContain("decohere add auth0");
 	});
 
 	it("includes db:up when postgres is enabled", async () => {

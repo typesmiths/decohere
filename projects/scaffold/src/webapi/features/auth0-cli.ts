@@ -210,6 +210,148 @@ export function updateApiScopes(
 	]);
 }
 
+/** True when Auth0 refuses create because the tenant hit its Applications quota. */
+export function isAuth0EntityLimitError(err: unknown): boolean {
+	const text = err instanceof Error ? err.message : String(err);
+	return /limit of entities|reached the limit|tenant application limit reached/i.test(text);
+}
+
+/**
+ * Actionable message when Auth0 will not create another application.
+ * Does not suggest reusing unrelated apps — free tenants must delete unused ones.
+ */
+export function formatSpaEntityLimitError(appName: string, apps: Auth0App[]): string {
+	const listed =
+		apps.length === 0
+			? "Could not list existing applications."
+			: `This tenant already has ${apps.length} application(s):\n${apps
+					.map((a) => `  - ${a.name} (${a.client_id})`)
+					.join("\n")}`;
+
+	return [
+		`Auth0 refused to create SPA "${appName}": tenant application limit reached.`,
+		listed,
+		"",
+		"Fix: Auth0 Dashboard → Applications → Applications → delete unused apps,",
+		"then run the command again.",
+		"Running it again for the same project reuses an app with the same name if it still exists.",
+	].join("\n");
+}
+
+export function createSpaApp(
+	name: string,
+	callbackUrls: string | readonly string[],
+): { client_id: string } {
+	const callbacks = typeof callbackUrls === "string" ? callbackUrls : callbackUrls.join(",");
+	const out = runAuth0([
+		"apps",
+		"create",
+		"--name",
+		name,
+		"--type",
+		"spa",
+		"--callbacks",
+		callbacks,
+		"--json",
+		"--no-input",
+	]);
+	const app = parseJsonOutput<{ client_id?: string; clientId?: string }>(out);
+	const clientId = app.client_id ?? app.clientId;
+	if (!clientId) {
+		throw new Error(
+			`Auth0 create SPA response missing client_id. stdout: ${out.slice(0, 300)}`,
+		);
+	}
+	return { client_id: clientId };
+}
+
+export type Auth0App = { client_id: string; name: string };
+
+export function listApps(): Auth0App[] {
+	try {
+		const out = runAuth0(["apps", "list", "--json", "--no-input"]);
+		const apps =
+			parseJsonOutput<Array<{ client_id?: string; clientId?: string; name?: string }>>(out);
+		return apps
+			.map((a) => ({
+				client_id: a.client_id ?? a.clientId ?? "",
+				name: a.name ?? "",
+			}))
+			.filter((a) => a.client_id && a.name);
+	} catch (err) {
+		if (err instanceof Auth0AuthError) throw err;
+		return [];
+	}
+}
+
+export function updateSpaCallbacks(
+	clientId: string,
+	callbackUrls: string | readonly string[],
+): void {
+	const callbacks = typeof callbackUrls === "string" ? callbackUrls : callbackUrls.join(",");
+	runAuth0(["apps", "update", clientId, "--callbacks", callbacks, "--no-input"]);
+}
+
+/**
+ * Create a single-page app people log in through to get a token, or reuse one with the same
+ * name.
+ * On Auth0 application-quota errors, throws a clear delete-apps message (no cross-app reuse).
+ */
+export function ensureSpaApp(
+	name: string,
+	callbackUrls: string | readonly string[],
+): { client_id: string; reused: boolean } {
+	const apps = listApps();
+	const existing = apps.find((a) => a.name === name);
+	if (existing) {
+		try {
+			updateSpaCallbacks(existing.client_id, callbackUrls);
+		} catch {
+			// Callbacks may already match; the app is still usable.
+		}
+		return { client_id: existing.client_id, reused: true };
+	}
+	try {
+		return { ...createSpaApp(name, callbackUrls), reused: false };
+	} catch (err) {
+		if (isAuth0EntityLimitError(err)) {
+			throw new Error(formatSpaEntityLimitError(name, apps));
+		}
+		throw err;
+	}
+}
+
+type Auth0Connection = { id: string; name: string; strategy: string };
+
+/** Enable a database connection for an application (required for username/password login). */
+export function enableConnectionForClient(connectionName: string, clientId: string): void {
+	const listOut = runAuth0(["api", "get", "connections", "--no-input"]);
+	const connections = parseJsonOutput<Auth0Connection[]>(listOut);
+	const connection = connections.find((c) => c.name === connectionName);
+	if (!connection) {
+		throw new Error(`Auth0 connection not found: ${connectionName}`);
+	}
+
+	const clientsOut = runAuth0([
+		"api",
+		"get",
+		`connections/${connection.id}/clients`,
+		"--no-input",
+	]);
+	const { clients } = parseJsonOutput<{ clients: Array<{ client_id: string }> }>(clientsOut);
+	if (clients.some((c) => c.client_id === clientId)) return;
+
+	// Dedicated enabled-clients endpoint (enabled_clients on connection PATCH is deprecated).
+	runAuth0([
+		"api",
+		"patch",
+		`connections/${connection.id}/clients`,
+		"--data",
+		JSON.stringify([{ client_id: clientId, status: true }]),
+		"--no-input",
+	]);
+}
+
 export type AdminDatabaseUser = {
 	user_id: string;
 	email: string;

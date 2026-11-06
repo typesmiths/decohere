@@ -4,11 +4,39 @@ import { CreateCliError, isDecohereWorkspace } from "./api-name.js";
 import { discoverAuthorizeScopes, mergeApiScopes } from "./authorize-scopes.js";
 import * as auth0Cli from "./features/auth0-cli.js";
 
+/** Postman's OAuth callbacks, so a token can be fetched from Postman without more setup. */
+const LOGIN_APP_CALLBACKS = [
+	"https://oauth.pstmn.io/v1/callback",
+	"https://oauth.pstmn.io/v1/browser-callback",
+] as const;
+
 export const AUTH0_CLI_INSTALL_MESSAGE =
 	"The Auth0 CLI is required.\n" +
 	"  It is bundled in the Decohere create image (`npx @decohere/create auth0 login`).\n" +
 	"  Host install: brew install auth0/auth0-cli/auth0\n" +
 	"  Or visit: https://github.com/auth0/auth0-cli";
+
+/**
+ * Create or reuse the app people log in through to get a token during development, and
+ * return its client id.
+ */
+export function ensureLoginApp(projectName: string): string {
+	const app = auth0Cli.ensureSpaApp(`${projectName} Dev`, [...LOGIN_APP_CALLBACKS]);
+	console.log(
+		app.reused
+			? `  ✓ Reusing Auth0 login app (${app.client_id})`
+			: `  ✓ Auth0 login app created (${app.client_id})`,
+	);
+	try {
+		auth0Cli.enableConnectionForClient(auth0Cli.DB_CONNECTION_NAME, app.client_id);
+		console.log(`  ✓ Enabled ${auth0Cli.DB_CONNECTION_NAME} on the login app`);
+	} catch (err) {
+		console.error(
+			`  ✗ Failed to enable DB connection on the login app: ${err instanceof Error ? err.message : err}`,
+		);
+	}
+	return app.client_id;
+}
 
 function fail(message: string): never {
 	throw new CreateCliError(message);
@@ -112,11 +140,14 @@ export function runAuth0Configure(directory = "."): void {
 		console.log(`  ✓ API created: ${audience}`);
 	}
 
+	const clientId = ensureLoginApp(projectName);
+
 	upsertEnv(envPath, {
 		AUTH0_ISSUER_BASE_URL: issuerBaseUrl,
 		AUTH0_AUDIENCE: audience,
+		AUTH0_CLIENT_ID: clientId,
 	});
-	console.log(`  ✓ Wrote AUTH0_ISSUER_BASE_URL and AUTH0_AUDIENCE to .env`);
+	console.log("  ✓ Wrote AUTH0_ISSUER_BASE_URL, AUTH0_AUDIENCE and AUTH0_CLIENT_ID to .env");
 
 	const adminSub = existing.AUTH0_ADMIN_USER_SUB?.trim();
 	if (adminSub) {
@@ -131,7 +162,7 @@ export function runAuth0Configure(directory = "."): void {
 	}
 }
 
-function readEnvFile(path: string): Record<string, string> {
+export function readEnvFile(path: string): Record<string, string> {
 	if (!existsSync(path)) return {};
 	const out: Record<string, string> = {};
 	for (const line of readFileSync(path, "utf8").split("\n")) {

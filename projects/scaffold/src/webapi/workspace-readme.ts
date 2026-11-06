@@ -111,6 +111,10 @@ export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
 		"",
 	);
 
+	if (!hasAuth0) {
+		lines.push("## Add Auth0 later", "", "```bash", "decohere add auth0", "```", "");
+	}
+
 	if (hasAuth0) {
 		lines.push(
 			"## Auth0",
@@ -124,7 +128,12 @@ export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
 			"npx @decohere/create auth0 configure  # after new @Authorize decorators",
 			"```",
 			"",
-			"To get a token for protected routes, add an application for your client in the Auth0 dashboard.",
+			"To get a token for protected routes in Postman, use Authorization → OAuth 2.0 → Authorization Code (With PKCE):",
+			"",
+			"- Auth URL: `<AUTH0_ISSUER_BASE_URL>/authorize?audience=<AUTH0_AUDIENCE>`",
+			"- Access Token URL: `<AUTH0_ISSUER_BASE_URL>/oauth/token`",
+			"- Client ID: `AUTH0_CLIENT_ID` from `.env`",
+			"- Scope: `openid profile email`, plus the permissions you need, like `read:Invoice`",
 			"",
 		);
 	}

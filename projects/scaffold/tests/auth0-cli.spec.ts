@@ -14,6 +14,7 @@ const {
 	createAdminDatabaseUser,
 	createApi,
 	DB_CONNECTION_NAME,
+	ensureSpaApp,
 	listApiScopes,
 	login,
 	updateApiScopes,
@@ -256,5 +257,87 @@ describe("login", () => {
 		expect(args).toEqual(["login", "--scopes", expect.any(String), "--no-input"]);
 		expect(args[2]).toContain("create:clients");
 		expect(args[2]).toContain("create:users");
+	});
+});
+
+describe("ensureSpaApp", () => {
+	it("reuses an existing app by name and refreshes callbacks", () => {
+		mockSpawnSync
+			.mockReturnValueOnce({
+				status: 0,
+				stdout: JSON.stringify([
+					{ client_id: "spa_existing", name: "webapi Dev" },
+					{ client_id: "other", name: "Other App" },
+				]),
+				stderr: "",
+				error: undefined,
+			})
+			.mockReturnValueOnce({
+				status: 0,
+				stdout: "",
+				stderr: "",
+				error: undefined,
+			});
+
+		const app = ensureSpaApp("webapi Dev", [
+			"https://oauth.pstmn.io/v1/callback",
+			"https://oauth.pstmn.io/v1/browser-callback",
+		]);
+
+		expect(app).toEqual({ client_id: "spa_existing", reused: true });
+		const updateArgs = mockSpawnSync.mock.calls[1]?.[1] as string[];
+		expect(updateArgs).toEqual(
+			expect.arrayContaining([
+				"apps",
+				"update",
+				"spa_existing",
+				"--callbacks",
+				"https://oauth.pstmn.io/v1/callback,https://oauth.pstmn.io/v1/browser-callback",
+			]),
+		);
+	});
+
+	it("creates a SPA when no matching app exists", () => {
+		mockSpawnSync
+			.mockReturnValueOnce({
+				status: 0,
+				stdout: JSON.stringify([{ client_id: "other", name: "Other App" }]),
+				stderr: "",
+				error: undefined,
+			})
+			.mockReturnValueOnce({
+				status: 0,
+				stdout: JSON.stringify({ client_id: "spa_new", name: "webapi Dev" }),
+				stderr: "",
+				error: undefined,
+			});
+
+		const app = ensureSpaApp("webapi Dev", ["https://oauth.pstmn.io/v1/callback"]);
+		expect(app).toEqual({ client_id: "spa_new", reused: false });
+	});
+
+	it("fails with a delete-apps message when Auth0 hits the application entity limit", () => {
+		mockSpawnSync
+			.mockReturnValueOnce({
+				status: 0,
+				stdout: JSON.stringify([
+					{ client_id: "spa_a", name: "ledger Dev" },
+					{ client_id: "spa_b", name: "workspace Dev" },
+					{ client_id: "m2m", name: "Default App" },
+				]),
+				stderr: "",
+				error: undefined,
+			})
+			.mockReturnValueOnce({
+				status: 1,
+				stdout: "",
+				stderr:
+					"Failed to create application: 403 Forbidden: You reached the limit of entities of this type for this tenant.",
+				error: undefined,
+			});
+
+		expect(() => ensureSpaApp("crypto Dev", ["https://oauth.pstmn.io/v1/callback"])).toThrow(
+			/tenant application limit reached[\s\S]*delete unused apps/i,
+		);
 	});
 });

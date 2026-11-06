@@ -1,11 +1,12 @@
+import { join } from "node:path";
 import { ask, pick } from "../../domain/prompt.js";
 import type { ConfigYaml } from "../../models/config-yaml.model.js";
 import { WELL_KNOWN_FILES } from "../../models/const.js";
 import type { EnvFile } from "../../models/env-file.model.js";
 import type { WorkspaceScaffold } from "../../models/project.model.js";
 import type { Feature } from "../../services/scaffold.service.js";
-import { ensureLoggedIn } from "../auth0-commands.js";
-import { AuthConfigModel } from "../models/auth-config.model.js";
+import { ensureLoggedIn, ensureLoginApp, readEnvFile } from "../auth0-commands.js";
+import { AUTH_CONFIG_SECTION, AuthConfigModel } from "../models/auth-config.model.js";
 import { ControllerSourceFile } from "../models/controller-source-file.model.js";
 import type { MainSourceFile } from "../models/main-source-file.model.js";
 import * as auth0Cli from "./auth0-cli.js";
@@ -336,6 +337,27 @@ function scaffoldLocalUserProfile(workspace: WorkspaceScaffold): void {
 	}
 }
 
+/**
+ * The login app's client id. If Auth0 fails, keeps the id from an earlier run. Otherwise it
+ * fails, so a project is never left with no way to get a token.
+ */
+function resolveLoginClientId(workspace: WorkspaceScaffold): string {
+	try {
+		return ensureLoginApp(workspace.name);
+	} catch (err) {
+		const detail = err instanceof Error ? err.message : String(err);
+		const existing = readEnvFile(join(workspace.targetDir, ".env")).AUTH0_CLIENT_ID?.trim();
+		if (existing) {
+			console.error(`  ✗ Failed to ensure the Auth0 login app (${detail})`);
+			console.log(`  ✓ Keeping AUTH0_CLIENT_ID from .env (${existing})`);
+			return existing;
+		}
+		// Application-limit messages already say what to do.
+		if (auth0Cli.isAuth0EntityLimitError(err)) throw new Error(detail);
+		throw new Error(`Failed to create the Auth0 login app: ${detail}`);
+	}
+}
+
 function scaffold(workspace: WorkspaceScaffold, options: AuthOptions): void {
 	if (options.authProvider !== "auth0") return;
 
@@ -395,21 +417,26 @@ function scaffold(workspace: WorkspaceScaffold, options: AuthOptions): void {
 		}
 	}
 
-	const issuerPlaceholder = "${AUTH0_ISSUER_BASE_URL}";
-	const audPlaceholder = "${AUTH0_AUDIENCE}";
-
-	const configSection = `auth:\n  discoveryUrl: ${issuerPlaceholder}\n  audience: ${audPlaceholder}\n`;
-
-	workspace.getModel<ConfigYaml>(WELL_KNOWN_FILES.CONFIG_YAML)?.addSection(configSection);
+	workspace
+		.getModel<ConfigYaml>(WELL_KNOWN_FILES.CONFIG_YAML)
+		?.addSection(AUTH_CONFIG_SECTION);
 
 	workspace
 		.getModel<EnvFile>(WELL_KNOWN_FILES.ENV_FILE)
 		?.addEntry("AUTH0_ISSUER_BASE_URL", options.issuerBaseUrl ?? "")
 		.addEntry("AUTH0_AUDIENCE", options.audience ?? "");
 
+	const clientId = options.issuerBaseUrl ? resolveLoginClientId(workspace) : undefined;
+	if (clientId) {
+		workspace
+			.getModel<EnvFile>(WELL_KNOWN_FILES.ENV_FILE)
+			?.addEntry("AUTH0_CLIENT_ID", clientId);
+	}
+
 	const authConfig = new AuthConfigModel({
 		issuerBaseUrl: options.issuerBaseUrl ?? "",
 		audience: options.audience ?? "",
+		clientId,
 	});
 	workspace.addModel(authConfig);
 

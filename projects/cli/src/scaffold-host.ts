@@ -4,6 +4,8 @@ import type { ActionResponse } from "@decohere/devkit/cli";
 import {
 	AddApiAction,
 	type AddApiOptions,
+	AddAuth0Action,
+	type AddAuth0Options,
 	AddModule,
 	Auth0ConfigureAction,
 	type Auth0ConfigureOptions,
@@ -39,9 +41,19 @@ export class HostCreateModule extends CreateModule {
 	public override readonly actions = { webapi: HostWebapiAction };
 }
 
+@injectable()
+class HostAddAuth0Action extends AddAuth0Action {
+	public override async run(options: AddAuth0Options): Promise<ActionResponse> {
+		if (process.env.DECOHERE_BUILDER !== "1") {
+			runInBuilder(containerArgvFromHost(process.argv));
+		}
+		return super.run(options);
+	}
+}
+
 /** Host `decohere add` — Docker-delegates unless already inside the builder image. */
 export class HostAddModule extends AddModule {
-	public override readonly actions = { api: HostAddApiAction };
+	public override readonly actions = { api: HostAddApiAction, auth0: HostAddAuth0Action };
 }
 
 @injectable()

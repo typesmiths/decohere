@@ -1,6 +1,10 @@
 import { WELL_KNOWN_FILES } from "../../models/const.js";
 import type { KeyedModel, SourceFile } from "../../models/source-file.js";
 
+/** The `auth` section of config/config.yaml. The values come from `.env`. */
+export const AUTH_CONFIG_SECTION =
+	"auth:\n  discoveryUrl: ${AUTH0_ISSUER_BASE_URL}\n  audience: ${AUTH0_AUDIENCE}\n";
+
 export type AdminUserConfig = {
 	sub: string;
 	email: string;
@@ -11,6 +15,7 @@ export type AdminUserConfig = {
 export type AuthConfig = {
 	issuerBaseUrl: string;
 	audience: string;
+	clientId?: string;
 	adminUser?: AdminUserConfig;
 };
 
