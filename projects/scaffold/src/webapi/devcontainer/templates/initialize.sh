@@ -27,3 +27,9 @@ touch "$gh_env"
 # In memory on Linux, so the Auth0 login is never on disk. Keep in step with docker-compose.yml.
 project="$(sed -n 's/^name: *//p' "$root/.devcontainer/docker-compose.yml" | head -n 1)"
 mkdir -p -m 700 "${XDG_RUNTIME_DIR:-$HOME/.config/decohere}/decohere-auth0/$project"
+
+# Postgres runs as you, so you can delete its files without sudo. Keep in step with docker-compose.yml.
+if grep -q 'postgres-data:' "$root/.devcontainer/docker-compose.yml"; then
+	mkdir -p "$root/.devcontainer/postgres-data"
+	printf 'DECOHERE_UID=%s\nDECOHERE_GID=%s\n' "$(id -u)" "$(id -g)" >"$root/.devcontainer/.env"
+fi
