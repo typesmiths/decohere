@@ -71,3 +71,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node ${{ env.CI_TOOLS }}/bench/file-regressions.mjs
+
+  failure-report:
+    needs: [bench]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/failure-report

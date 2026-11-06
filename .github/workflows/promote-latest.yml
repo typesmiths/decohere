@@ -46,3 +46,15 @@ jobs:
           PROMOTE_VERSION: ${{ inputs.version }}
           PROMOTE_ALLOW_YOUNG: ${{ inputs.allow_young }}
         run: node projects/ci-tools/src/release/promote-latest.mjs
+
+  failure-report:
+    needs: [promote]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/failure-report

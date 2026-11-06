@@ -1,0 +1,10 @@
+name: Failure report
+description: Puts why each failed job failed on the run's summary page. Check out the repo first.
+runs:
+  using: composite
+  steps:
+    - name: Report why this run failed
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: node projects/ci-tools/src/github/failure-report.mjs

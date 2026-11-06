@@ -65,7 +65,12 @@ flowchart LR
 | [`setup-node-pnpm`](../../.github/actions/setup-node-pnpm/action.yml) | Composite action: pnpm, Node, install, optional git identity. |
 | [`publish-prepare`](../../.github/actions/publish-prepare/action.yml) | Composite action: applies the build's version and downloads CI's release build for Publish. |
 | [`verify-release`](../../.github/actions/verify-release/action.yml) | Composite action: uses a build from a temporary registry, the way a user does. |
+| [`failure-report`](../../.github/actions/failure-report/action.yml) | Composite action: puts why a failed job failed on the run's summary page. |
 | [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml) | Which paths count as code for CI and Publish. |
+
+## When a run fails
+
+The run's summary page says which step failed and why, with the step's last lines and a link to its full log. Every workflow does this through [`failure-report.mjs`](../../projects/ci-tools/src/github/failure-report.mjs), so a script only has to print its reason before exiting. In `ci.yml` it's a step in the `ci` job; elsewhere it's a `failure-report` job, which a test requires of every workflow.
 
 ## CI (`ci.yml`)
 

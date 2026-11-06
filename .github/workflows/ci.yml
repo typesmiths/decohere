@@ -362,7 +362,17 @@ jobs:
     if: always() && needs.changes.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
     steps:
+      - uses: actions/checkout@v4
+        if: contains(needs.*.result, 'failure')
+      # A problem in the report mustn't hide the result below.
+      - uses: ./.github/actions/failure-report
+        if: contains(needs.*.result, 'failure')
+        continue-on-error: true
+
       - name: Every job that had to run passed
         env:
           NEEDS: ${{ toJSON(needs) }}
