@@ -30,6 +30,47 @@ describe("publish.yml", () => {
 		expect(build).not.toContain("forge --log-level info build");
 	});
 
+	it("takes either a tested version or a patch branch, and checks a patch before using it", () => {
+		const inputs = yml.slice(yml.indexOf("workflow_dispatch:"), yml.indexOf("\nconcurrency:"));
+		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
+
+		expect(inputs).toContain("patch_branch:");
+		expect(guard).toContain("check-patch-release.mjs");
+		expect(guard).toContain("Give either tested_version or patch_branch");
+	});
+
+	it("only releases a patch whose commit passed full CI", () => {
+		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
+
+		expect(guard).toContain("event=push&status=success");
+		expect(guard.indexOf("git/ref/heads/")).toBeLessThan(
+			guard.indexOf("event=push&status=success"),
+		);
+	});
+
+	it("reads a patch's tested version from its build", () => {
+		const build = yml.slice(yml.indexOf("\n  release-build:"), yml.indexOf("\n  verify:"));
+
+		expect(build).toContain("dist/release/projects/cli/package.json");
+	});
+
+	it("never lowers main's base version after a patch", () => {
+		const finish = yml.slice(
+			yml.indexOf("\n  release-finish:"),
+			yml.indexOf("\n  failure-report:"),
+		);
+
+		expect(finish).toContain("sort -V");
+	});
+
+	it("doesn't publish a patch branch by itself: only main publishes automatically", () => {
+		const on = yml.slice(0, yml.indexOf("workflow_dispatch:"));
+		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
+
+		expect(on).toContain("branches: [main]");
+		expect(guard).toContain("head_branch == 'main'");
+	});
+
 	it("only tags a version once npm and the images have shipped", () => {
 		const tag = yml.slice(yml.indexOf("\n  tag:"));
 		const needs = /needs: \[(.+)\]/.exec(tag)?.[1].split(", ");

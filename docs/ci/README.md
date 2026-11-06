@@ -8,6 +8,7 @@ CI stores no secrets or variables. npm publishing uses Trusted Publishing (OIDC)
 |---|---|
 | Pull request (this repo or a fork) | CI: lint, typecheck, unit tests, release build and publish dry run. Images are built only when their files change, and Docker-backed tests run only when data code changes. Read-only token, no secrets. |
 | Merge queue (`merge_group`) | The same checks on the PR combined with `main` and the PRs ahead of it, docs-only or not. No images or Docker-backed tests: `main` covers those. |
+| Push to `release/<major>.<minor>` | A patch to a release: the full run, as on `main`. Nothing publishes until you start a release. See [Patching a release](#patching-a-release). |
 | Push to `main` | The integration run. A beta release build, then **verify-release** uses it from a temporary registry, alongside the coverage gate and Docker-backed tests. Lint, typecheck and the package check don't repeat, because the queue tested this same commit. If it all passes, Publish uploads that build to the npm `dev` dist-tag. |
 | Started by hand | **Stable release**: gives a tested build its stable version, checks it, and publishes it to npm `latest`. See [Stable release](#stable-release). |
 | Nightly 03:17 UTC | Bench on `main`, then Pages (benchmark charts). |
@@ -123,7 +124,28 @@ What it does:
 - **npm**, **docker**, **check-images** and **tag** run as for any publish, with `latest` as the npm tag and `v0.1.0` on the tested commit.
 - **release-finish** creates the GitHub Release, and pushes the branch for the PR in step 4. It can't open the PR itself, because this repo doesn't let Actions create PRs.
 
-Changesets are off ([ADR 0003](../adr/0003-no-changesets-until-public-release.md)): you choose the version, and the release notes are generated from merged PRs. There's no way to patch an old release yet. When one is needed, it will be a branch cut from the release's tag, running the full checks.
+Changesets are off ([ADR 0003](../adr/0003-no-changesets-until-public-release.md)): you choose the version, and the release notes are generated from merged PRs. 
+
+### Patching a release
+
+Use this when `main` has moved on and you need to fix a release without shipping what came after it.
+
+1. Land the fix on `main` first.
+2. Cut the branch from the release's tag, and cherry-pick the fix. Pushing the branch runs full CI, because its commits weren't tested on `main`:
+
+   ```bash
+   git switch -c release/0.1 v0.1.0
+   git cherry-pick <fix>
+   git push -u origin release/0.1
+   ```
+
+3. Once CI passes on it, try the release, then run it with `-f dry_run=false`:
+
+   ```bash
+   gh workflow run publish.yml -f patch_branch=release/0.1 -f version=0.1.1
+   ```
+
+It takes the build CI made of that branch's latest commit, and carries on as above. It refuses a commit with no passing CI run, a version that doesn't belong on the branch, or one that isn't newer than npm `latest`: a patch to an older line would take `latest` backwards, and there's no separate tag for those yet. The base version PR is only offered if `main` isn't already further on.
 
 ## Pages
 
