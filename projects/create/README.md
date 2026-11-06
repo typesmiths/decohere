@@ -128,7 +128,7 @@ pnpm decohere auth0 configure
 pnpm decohere auth0 token
 ```
 
-`configure` does **not** rewrite application source. It ensures a `<project> Dev` login app (written to `.env` as `AUTH0_CLIENT_ID`), scans `projects/*/src` for `@Authorize("action", "Subject")`, adds those permissions to the Auth0 API (keeping any already on the API) and assigns them to `AUTH0_ADMIN_USER_SUB` when set.
+`configure` does **not** rewrite application source. It ensures a `<project> Dev` login app for your web app (written to `.env` as `AUTH0_CLIENT_ID`, and allowing `http://localhost:<port>` for each API), scans `projects/*/src` for `@Authorize("action", "Subject")`, adds those permissions to the Auth0 API (keeping any already on the API) and assigns them to `AUTH0_ADMIN_USER_SUB` when set.
 
 #### Add Auth0 to an existing project
 

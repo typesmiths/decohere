@@ -1,14 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { CreateCliError, isDecohereWorkspace } from "./api-name.js";
+import { CreateCliError, isDecohereWorkspace, listExistingApiNames } from "./api-name.js";
 import { discoverAuthorizeScopes, mergeApiScopes } from "./authorize-scopes.js";
+import { webapiPort } from "./const.js";
 import * as auth0Cli from "./features/auth0-cli.js";
-
-/** Postman's OAuth callbacks, so a token can be fetched from Postman without more setup. */
-const LOGIN_APP_CALLBACKS = [
-	"https://oauth.pstmn.io/v1/callback",
-	"https://oauth.pstmn.io/v1/browser-callback",
-] as const;
 
 export const AUTH0_CLI_INSTALL_MESSAGE =
 	"The Auth0 CLI is required.\n" +
@@ -17,11 +12,15 @@ export const AUTH0_CLI_INSTALL_MESSAGE =
 	"  Or install it yourself: https://github.com/auth0/auth0-cli";
 
 /**
- * Create or reuse the app people log in through to get a token during development, and
- * return its client id.
+ * Create or reuse the app a web app's users log in through, allowing the local URL of each API,
+ * and return its client id.
  */
-export function ensureLoginApp(projectName: string): string {
-	const app = auth0Cli.ensureSpaApp(`${projectName} Dev`, [...LOGIN_APP_CALLBACKS]);
+export function ensureLoginApp(projectName: string, apiCount: number): string {
+	const urls = Array.from(
+		{ length: Math.max(apiCount, 1) },
+		(_, index) => `http://localhost:${webapiPort(index)}`,
+	);
+	const app = auth0Cli.ensureSpaApp(`${projectName} Dev`, urls);
 	console.log(
 		app.reused
 			? `  ✓ Reusing Auth0 login app (${app.client_id})`
@@ -159,7 +158,7 @@ export function runAuth0Configure(directory = "."): void {
 		console.log(`  ✓ API created: ${audience}`);
 	}
 
-	const clientId = ensureLoginApp(projectName);
+	const clientId = ensureLoginApp(projectName, listExistingApiNames(targetDir).length);
 	const tokenClientId = ensureTokenApp(projectName, audience, apiScopes);
 
 	upsertEnv(envPath, {

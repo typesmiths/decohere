@@ -348,7 +348,7 @@ function scaffoldLocalUserProfile(workspace: WorkspaceScaffold): void {
  */
 function resolveLoginClientId(workspace: WorkspaceScaffold): string {
 	try {
-		return ensureLoginApp(workspace.name);
+		return ensureLoginApp(workspace.name, workspace.getProjects().length);
 	} catch (err) {
 		const detail = err instanceof Error ? err.message : String(err);
 		const existing = readEnvFile(join(workspace.targetDir, ".env")).AUTH0_CLIENT_ID?.trim();

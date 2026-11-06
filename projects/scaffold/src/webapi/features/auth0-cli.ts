@@ -242,11 +242,22 @@ export function formatSpaEntityLimitError(appName: string, apps: Auth0App[]): st
 	].join("\n");
 }
 
-export function createSpaApp(
-	name: string,
-	callbackUrls: string | readonly string[],
-): { client_id: string } {
-	const callbacks = typeof callbackUrls === "string" ? callbackUrls : callbackUrls.join(",");
+/** Where a local web app may send people to log in, and come back to. */
+function spaUrlFlags(urls: readonly string[]): string[] {
+	const list = urls.join(",");
+	return [
+		"--callbacks",
+		list,
+		"--logout-urls",
+		list,
+		"--origins",
+		list,
+		"--web-origins",
+		list,
+	];
+}
+
+export function createSpaApp(name: string, urls: readonly string[]): { client_id: string } {
 	const out = runAuth0([
 		"apps",
 		"create",
@@ -254,8 +265,7 @@ export function createSpaApp(
 		name,
 		"--type",
 		"spa",
-		"--callbacks",
-		callbacks,
+		...spaUrlFlags(urls),
 		"--json",
 		"--no-input",
 	]);
@@ -371,35 +381,27 @@ export function listApps(): Auth0App[] {
 	}
 }
 
-export function updateSpaCallbacks(
-	clientId: string,
-	callbackUrls: string | readonly string[],
-): void {
-	const callbacks = typeof callbackUrls === "string" ? callbackUrls : callbackUrls.join(",");
-	runAuth0(["apps", "update", clientId, "--callbacks", callbacks, "--no-input"]);
+export function updateSpaUrls(clientId: string, urls: readonly string[]): void {
+	runAuth0(["apps", "update", clientId, ...spaUrlFlags(urls), "--no-input"]);
 }
 
 /**
- * Create a single-page app people log in through to get a token, or reuse one with the same
- * name.
+ * Create a single-page app a web app's users log in through, or reuse one with the same name,
+ * and allow these URLs on it.
  * On Auth0 application-quota errors, throws a clear delete-apps message (no cross-app reuse).
  */
 export function ensureSpaApp(
 	name: string,
-	callbackUrls: string | readonly string[],
+	urls: readonly string[],
 ): { client_id: string; reused: boolean } {
 	const apps = listApps();
 	const existing = apps.find((a) => a.name === name);
 	if (existing) {
-		try {
-			updateSpaCallbacks(existing.client_id, callbackUrls);
-		} catch {
-			// Callbacks may already match; the app is still usable.
-		}
+		updateSpaUrls(existing.client_id, urls);
 		return { client_id: existing.client_id, reused: true };
 	}
 	try {
-		return { ...createSpaApp(name, callbackUrls), reused: false };
+		return { ...createSpaApp(name, urls), reused: false };
 	} catch (err) {
 		if (isAuth0EntityLimitError(err)) {
 			throw new Error(formatSpaEntityLimitError(name, apps));

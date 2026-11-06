@@ -184,14 +184,20 @@ describe("scaffoldApi auth0 wiring", () => {
 		await scaffoldApi(baseOpts());
 
 		expect(read(".env")).toContain("AUTH0_CLIENT_ID=spa_client_123");
-		expect(mockEnsureSpaApp).toHaveBeenCalledWith(
-			"my-api Dev",
-			expect.arrayContaining(["https://oauth.pstmn.io/v1/callback"]),
-		);
+		expect(mockEnsureSpaApp).toHaveBeenCalledWith("my-api Dev", ["http://localhost:3000"]);
 		expect(mockEnableConnectionForClient).toHaveBeenCalledWith(
 			expect.any(String),
 			"spa_client_123",
 		);
+	});
+
+	it("allows the local URL of each API on the login app", async () => {
+		await scaffoldApi({ ...baseOpts(), names: ["api", "billing"] });
+
+		expect(mockEnsureSpaApp).toHaveBeenCalledWith("my-api Dev", [
+			"http://localhost:3000",
+			"http://localhost:3001",
+		]);
 	});
 
 	it("keeps the client id from .env when Auth0 fails on a later run", async () => {
