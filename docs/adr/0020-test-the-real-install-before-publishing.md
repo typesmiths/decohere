@@ -37,3 +37,4 @@ Not chosen:
 - 2026-11-05: Added stable releases from a tested build, replacing the long-running `release` branch.
 - 2026-11-05: Shortened merges: images and Docker-backed tests left the queue and most PRs, and `main` stopped repeating the queue's checks. An image break can now land on `main`, where this check stops it from being published.
 - 2026-11-05: Added promoting to `latest` from a manually started workflow, which npm's trusted publishing has allowed since 2026-09-30.
+- 2026-11-06: Added patch releases: a `release/<major>.<minor>` branch cut from a tag, which runs full CI, and is released from its own tested build.

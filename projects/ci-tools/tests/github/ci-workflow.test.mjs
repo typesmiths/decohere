@@ -17,6 +17,17 @@ describe("ci.yml and the merge queue", () => {
 		expect(gate).toContain('"${{ github.event_name }}" == "merge_group"');
 	});
 
+	it("runs the whole suite on a patch branch, whose commits weren't tested on main", () => {
+		const jobs = yml.slice(yml.indexOf("\njobs:"));
+		expect(triggers).toContain('branches: [main, "release/**"]');
+		for (const job of ["coverage", "build", "verify-release"]) {
+			const start = jobs.indexOf(`\n  ${job}:`);
+			expect(jobs.slice(start, jobs.indexOf("runs-on:", start)), job).toContain(
+				"startsWith(github.ref, 'refs/heads/release/')",
+			);
+		}
+	});
+
 	it("makes the required check wait for every job, so a failing job can't be missed", () => {
 		const jobs = yml.slice(yml.indexOf("\njobs:"));
 		const names = [...jobs.matchAll(/^ {2}([a-z-]+):$/gm)].map((match) => match[1]);
