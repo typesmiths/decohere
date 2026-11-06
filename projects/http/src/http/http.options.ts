@@ -7,21 +7,12 @@ import type { CompressionOptions } from "./http.compression.js";
 import type { StaticMount } from "./http.static.js";
 import type { HelmetOptions, RateLimitOptions } from "./http.security.js";
 
-/** Options for {@link Builder.withHttp} (request-id / access-log defaults, etc.). */
-export type WithHttpOptions = {
-	/**
-	 * Register {@link HttpAccessLogMiddleware} (request id echo + Scribe access log).
-	 * Defaults to `true`.
-	 */
-	accessLog?: boolean;
-};
-
-/** App-level HTTP options set via builder extensions (`withCors`, `withGlobalPrefix`, …). */
+/** App-level HTTP options, collected from `http(...)` and `configureHttp(...)`. */
 export class HttpOptions {
 	public globalPrefix = "";
 	/**
 	 * Controllers put under the global prefix although they declare `globalPrefix: false`
-	 * (`withHealth({ underGlobalPrefix: true })`).
+	 * (`health({ underGlobalPrefix: true })`).
 	 */
 	public readonly underGlobalPrefix = new Set<Constructable>();
 	public cors?: CorsOptions;
@@ -30,11 +21,11 @@ export class HttpOptions {
 	public helmet?: HelmetOptions;
 	/** `undefined` = rate-limit on with defaults; `false` = off; object = plugin options. */
 	public rateLimit?: RateLimitOptions;
-	/** `undefined` = compression on with defaults; `false` = off; object = options. See `withCompression`. */
+	/** `undefined` = compression on with defaults; `false` = off; object = options. See `HttpSettings.compression`. */
 	public compression?: CompressionOptions;
 	/** Request body size limit in bytes; `undefined` uses the 1 MiB default. */
 	public bodyLimit?: number;
-	/** Built UIs served from this API, see `withStatic`. */
+	/** Built UIs served from this API, see `HttpSettings.statics`. */
 	public statics: StaticMount[] = [];
 	public middlewareTypes: Constructable<Middleware>[] = [];
 	public filterTypes: Constructable<ExceptionFilter>[] = [];

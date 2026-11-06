@@ -1,8 +1,8 @@
+import { http } from "../http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import type { ContainerBuilder } from "@decohere/crucible";
 import type { Constructable } from "@decohere/core/reflection";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../http/http.extensions.js";
 import { FastifyProvider } from "../providers/fastify.provider.js";
 import type { HttpProvider } from "../routing/http.types.js";
 import {
@@ -15,7 +15,7 @@ export type BootModuleOptions = {
 	controllers: Constructable[];
 	/** Register services the controllers need. */
 	services?: (containerBuilder: ContainerBuilder) => void;
-	/** Add anything else to the builder (`withAuth()`, `withOpenApi()`, ...) before the app is built. */
+	/** Add anything else to the builder (`auth()`, `openApi`, ...) before the app is built. */
 	configure?: (builder: Builder) => unknown;
 	/** Defaults to the Fastify provider. */
 	provider?: Constructable<HttpProvider>;
@@ -40,9 +40,9 @@ export type BootedModule = AsyncDisposable & {
  * const { events } = await api.readEvents("/prices/stream", { count: 3 });
  */
 export async function bootModule(options: BootModuleOptions): Promise<BootedModule> {
-	let builder = Builder.create(new ServiceContainerBuilder())
-		.withHttp(options.provider ?? FastifyProvider)
-		.withControllers(...options.controllers);
+	let builder = Builder.create(new ServiceContainerBuilder()).use(
+		http(options.provider ?? FastifyProvider, { controllers: [...options.controllers] }),
+	);
 	if (options.services) builder = builder.withServices(options.services);
 	options.configure?.(builder);
 	const app = await builder.build();

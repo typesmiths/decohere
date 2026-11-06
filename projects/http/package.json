@@ -33,17 +33,9 @@
       "types": "./types/src/providers/index.d.ts",
       "import": "./es6/src/providers/index.js"
     },
-    "./auth": {
-      "types": "./types/src/auth/auth.extensions.d.ts",
-      "import": "./es6/src/auth/auth.extensions.js"
-    },
     "./testing": {
       "types": "./types/src/testing/index.d.ts",
       "import": "./es6/src/testing/index.js"
-    },
-    "./http": {
-      "types": "./types/src/http/index.d.ts",
-      "import": "./es6/src/http/index.js"
     }
   },
   "scripts": {

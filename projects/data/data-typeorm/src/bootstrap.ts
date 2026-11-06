@@ -22,7 +22,7 @@ const SHARED_FIELDS = ["auth", "adminUser", "migrateUsername"] as const;
  * other: in parallel they would race to create the same database and roles. Running it again
  * changes nothing.
  *
- * For runners and scripts that open their own `DataSource`; `withTypeOrm` calls it for you.
+ * For runners and scripts that open their own `DataSource`; `typeOrm()` calls it for you.
  */
 export async function bootstrapDataSources(
 	dataSources: readonly ConnectionInfo[],

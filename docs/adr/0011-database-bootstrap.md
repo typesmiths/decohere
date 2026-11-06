@@ -18,7 +18,7 @@
 - **`schema`** (default `public`): bootstrap creates it when missing, owned by the database owner (the migrate role, if any), and grants the app role USAGE, plus CREATE with `synchronize`. Default privileges from the migrate role apply there. TypeORM gets the same `schema`.
 - **Grant only what is missing**: each grant is preceded by a `has_*_privilege` check, so a rerun changes nothing.
 - **The admin borrows the owner's rights**: for one run the admin is made a member of the migrate role and the database owner where it is not already, and exactly that is revoked at the end, even on failure. Keeping the admin a member for good was rejected: it would hold every app database's rights.
-- **`bootstrapDataSources(dataSources, { applicationName })`** is exported for runners and scripts that open their own `DataSource`; `withTypeOrm` calls it once before any DataSource opens. It groups data sources by server and database and bootstraps each group once, in order. Data sources in a group must agree on `auth`, `adminUser` and `migrateUsername`. `PostgresServerManager` stays internal.
+- **`bootstrapDataSources(dataSources, { applicationName })`** is exported for runners and scripts that open their own `DataSource`; `typeOrm()` calls it once before any DataSource opens. It groups data sources by server and database and bootstraps each group once, in order. Data sources in a group must agree on `auth`, `adminUser` and `migrateUsername`. `PostgresServerManager` stays internal.
 
 ## Consequences
 
@@ -33,3 +33,4 @@
 
 - 2026-10-15: Decided. Replaces the NODE_ENV-based passwordless rule.
 - 2026-11-06: Scaffolded projects use `auth: trust` locally, with no database passwords. A password set to `null` by a config file means no password.
+- 2026-11-06: `withTypeOrm` became the `typeOrm()` plugin ([ADR 0014](0014-package-names.md)).

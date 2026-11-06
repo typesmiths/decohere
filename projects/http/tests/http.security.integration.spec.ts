@@ -1,8 +1,8 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get, Post } from "../src/routing/index.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
@@ -29,8 +29,7 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 
 	it("applies helmet security headers by default", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withControllers(SecureController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [SecureController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -41,11 +40,15 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 		expect(res.headers["x-frame-options"]).toBeDefined();
 	});
 
-	it("disables helmet when withHelmet(false)", async () => {
+	it("disables helmet when helmet: false", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHelmet(false)
-			.withHttpProvider(FastifyProvider)
-			.withControllers(SecureController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [SecureController],
+					helmet: false,
+				}),
+			)
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -57,10 +60,14 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 
 	it("rejects oversize bodies with the configured bodyLimit", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withBodyLimit(64)
-			.withRateLimit(false)
-			.withHttpProvider(FastifyProvider)
-			.withControllers(SecureController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [SecureController],
+					bodyLimit: 64,
+					rateLimit: false,
+				}),
+			)
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -77,9 +84,13 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 
 	it("returns 429 when the rate limit is exceeded", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withRateLimit({ max: 1, timeWindow: "1 minute" })
-			.withHttpProvider(FastifyProvider)
-			.withControllers(SecureController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [SecureController],
+					rateLimit: { max: 1, timeWindow: "1 minute" },
+				}),
+			)
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -90,11 +101,15 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 		expect(second.status).toBe(429);
 	});
 
-	it("skips rate limiting when withRateLimit(false)", async () => {
+	it("skips rate limiting when rateLimit: false", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withRateLimit(false)
-			.withHttpProvider(FastifyProvider)
-			.withControllers(SecureController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [SecureController],
+					rateLimit: false,
+				}),
+			)
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 

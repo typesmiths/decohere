@@ -1,9 +1,9 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { scribe } from "@decohere/scribe";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import {
 	Controller,
@@ -21,7 +21,7 @@ class PingController {
 	}
 }
 
-describe("withHttp request id + access logging", () => {
+describe("http() request id + access logging", () => {
 	let app: App;
 	const accessLog = {
 		info: vi.fn(),
@@ -53,8 +53,7 @@ describe("withHttp request id + access logging", () => {
 
 	it("echoes inbound x-request-id and logs access via Scribe", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttp(FastifyProvider)
-			.withControllers(PingController)
+			.use(http(FastifyProvider, { controllers: [PingController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -79,8 +78,7 @@ describe("withHttp request id + access logging", () => {
 
 	it("generates a request id when the client omits the header", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttp(FastifyProvider)
-			.withControllers(PingController)
+			.use(http(FastifyProvider, { controllers: [PingController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -97,10 +95,9 @@ describe("withHttp request id + access logging", () => {
 		);
 	});
 
-	it("does not write access logs when withHttp({ accessLog: false })", async () => {
+	it("does not write access logs when http(provider, { accessLog: false })", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttp(FastifyProvider, { accessLog: false })
-			.withControllers(PingController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [PingController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 

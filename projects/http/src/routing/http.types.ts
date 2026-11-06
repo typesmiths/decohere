@@ -92,7 +92,7 @@ export type ArgumentMeta = {
 export type ControllerMetadata = {
 	prefix: string;
 	/**
-	 * `false` leaves this controller's routes out of the global prefix (`withGlobalPrefix`), for
+	 * `false` leaves this controller's routes out of the global prefix (`globalPrefix`), for
 	 * paths something outside the app expects at a fixed place: probes, webhooks, metrics. Default
 	 * `true`.
 	 */

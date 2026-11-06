@@ -423,7 +423,7 @@ function scaffold(workspace: WorkspaceScaffold, chosen: AuthOptions): void {
 	for (const project of workspace.getProjects()) {
 		project
 			.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
-			?.addSideEffectImport("@decohere/http/auth");
+			?.addImport("auth", "@decohere/http");
 	}
 
 	if (withLocalUsers) {
@@ -431,13 +431,13 @@ function scaffold(workspace: WorkspaceScaffold, chosen: AuthOptions): void {
 		for (const project of workspace.getProjects()) {
 			project
 				.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
-				?.addBuilderCall(".withAuth(defineAbilitiesFor, { principalMapper: mapPrincipal })");
+				?.addBuilderCall(".use(auth(defineAbilitiesFor, { principalMapper: mapPrincipal }))");
 		}
 	} else {
 		for (const project of workspace.getProjects()) {
 			project
 				.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
-				?.addBuilderCall(".withAuth()");
+				?.addBuilderCall(".use(auth())");
 		}
 	}
 

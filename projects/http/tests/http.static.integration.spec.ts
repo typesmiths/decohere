@@ -1,3 +1,6 @@
+import { configureHttp } from "../src/http/http.plugin.js";
+import { health } from "../src/health/health.plugin.js";
+import { auth } from "../src/auth/auth.plugin.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
@@ -9,7 +12,6 @@ import {
 import type { Constructable } from "@decohere/core/reflection";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { AuthConfig } from "../src/auth/auth.config.js";
-import "../src/auth/auth.extensions.js";
 import { TokenService } from "../src/auth/token-service.js";
 import type { StaticOptions } from "../src/http/http.static.js";
 import { AllowAnonymous, Authorize, Controller, Get } from "../src/index.js";
@@ -119,7 +121,7 @@ function boot(
 	return bootModule({
 		controllers: [ApiController],
 		configure: (builder) => {
-			builder.withStatic("/ui/", ui);
+			builder.use(configureHttp({ statics: [{ prefix: "/ui/", directory: ui }] }));
 			return configure(builder);
 		},
 	});
@@ -246,11 +248,19 @@ describe("serving a built UI from the API", () => {
 			await using api = await bootModule({
 				controllers: [ApiController],
 				configure: (builder) =>
-					builder.withStatic("/ui/", ui, {
-						noCache: ["index.html", "favicon.ico"],
-						immutable: /^assets\//,
-						cacheControl: "public, max-age=60",
-					}),
+					builder.use(
+						configureHttp({
+							statics: [
+								{
+									prefix: "/ui/",
+									directory: ui,
+									noCache: ["index.html", "favicon.ico"],
+									immutable: /^assets\//,
+									cacheControl: "public, max-age=60",
+								},
+							],
+						}),
+					),
 			});
 
 			const cache = async (file: string) =>
@@ -322,7 +332,12 @@ describe("serving a built UI from the API", () => {
 		it("can be turned off", async () => {
 			await using api = await bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("/ui/", ui, { spaFallback: false }),
+				configure: (builder) =>
+					builder.use(
+						configureHttp({
+							statics: [{ prefix: "/ui/", directory: ui, spaFallback: false }],
+						}),
+					),
 			});
 
 			expect((await fetch(`${api.baseUrl}/ui/portfolio`, { headers: browser })).status).toBe(
@@ -359,7 +374,8 @@ describe("serving a built UI from the API", () => {
 			await writeFile(path.join(bare, "app.js"), "x");
 			await using api = await bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("/ui/", bare),
+				configure: (builder) =>
+					builder.use(configureHttp({ statics: [{ prefix: "/ui/", directory: bare }] })),
 			});
 
 			expect((await fetch(`${api.baseUrl}/ui/route`, { headers: browser })).status).toBe(404);
@@ -373,7 +389,10 @@ describe("serving a built UI from the API", () => {
 				controllers: [ApiController, SecuredController],
 				services: (c) =>
 					c.registerSingleton(ConfigurationServiceToken, new SecretConfigService()),
-				configure: (builder) => builder.withAuth().withStatic("/ui/", ui),
+				configure: (builder) =>
+					builder
+						.use(auth())
+						.use(configureHttp({ statics: [{ prefix: "/ui/", directory: ui }] })),
 			});
 
 		it("serves the UI to an anonymous caller while an API route still says 401", async () => {
@@ -414,7 +433,13 @@ describe("serving a built UI from the API", () => {
 		it("is not counted by the rate limit, while the API is", async () => {
 			await using api = await bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withRateLimit({ max: 3 }).withStatic("/ui/", ui),
+				configure: (builder) =>
+					builder.use(
+						configureHttp({
+							statics: [{ prefix: "/ui/", directory: ui }],
+							rateLimit: { max: 3 },
+						}),
+					),
 			});
 
 			const ui1 = [];
@@ -435,7 +460,12 @@ describe("serving a built UI from the API", () => {
 			await using api = await bootModule({
 				controllers: [ApiController],
 				configure: (builder) =>
-					builder.withRateLimit({ max: 1, allowList: ["127.0.0.1"] }).withStatic("/ui/", ui),
+					builder.use(
+						configureHttp({
+							statics: [{ prefix: "/ui/", directory: ui }],
+							rateLimit: { max: 1, allowList: ["127.0.0.1"] },
+						}),
+					),
 			});
 
 			const statuses = [];
@@ -450,7 +480,12 @@ describe("serving a built UI from the API", () => {
 			await using api = await bootModule({
 				controllers: [ApiController],
 				configure: (builder) =>
-					builder.withOpenApi({ info: { title: "t", version: "1" } }).withStatic("/ui/", ui),
+					builder.use(
+						configureHttp({
+							statics: [{ prefix: "/ui/", directory: ui }],
+							openApi: { info: { title: "t", version: "1" } },
+						}),
+					),
 			});
 
 			const document = (await (
@@ -526,7 +561,8 @@ describe("serving a built UI from the API", () => {
 			vi.spyOn(process, "cwd").mockReturnValue(site);
 			await using api = await bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("/ui/", "ui"),
+				configure: (builder) =>
+					builder.use(configureHttp({ statics: [{ prefix: "/ui/", directory: "ui" }] })),
 			});
 
 			const response = await fetch(`${api.baseUrl}/ui/`);
@@ -539,7 +575,10 @@ describe("serving a built UI from the API", () => {
 
 			const boot = bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("/ui/", "no-such-ui-build"),
+				configure: (builder) =>
+					builder.use(
+						configureHttp({ statics: [{ prefix: "/ui/", directory: "no-such-ui-build" }] }),
+					),
 			});
 
 			await expect(boot).rejects.toThrow(
@@ -551,7 +590,10 @@ describe("serving a built UI from the API", () => {
 			vi.stubEnv("NODE_ENV", "development");
 			await using api = await bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("/ui/", "no-such-ui-build"),
+				configure: (builder) =>
+					builder.use(
+						configureHttp({ statics: [{ prefix: "/ui/", directory: "no-such-ui-build" }] }),
+					),
 			});
 
 			expect((await fetch(`${api.baseUrl}/api/ping`)).status).toBe(200);
@@ -563,7 +605,13 @@ describe("serving a built UI from the API", () => {
 			await using api = await bootModule({
 				controllers: [ApiController],
 				configure: (builder) =>
-					builder.withStatic("/ui/", "no-such-ui-build", { onMissingDirectory: "warn" }),
+					builder.use(
+						configureHttp({
+							statics: [
+								{ prefix: "/ui/", directory: "no-such-ui-build", onMissingDirectory: "warn" },
+							],
+						}),
+					),
 			});
 
 			expect((await fetch(`${api.baseUrl}/api/ping`)).status).toBe(200);
@@ -572,7 +620,8 @@ describe("serving a built UI from the API", () => {
 		it("refuses an empty prefix", () => {
 			const mount = bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("", ui),
+				configure: (builder) =>
+					builder.use(configureHttp({ statics: [{ prefix: "", directory: ui }] })),
 			});
 
 			return expect(mount).rejects.toThrow(/needs a prefix/);
@@ -581,7 +630,15 @@ describe("serving a built UI from the API", () => {
 		it("can serve more than one UI", async () => {
 			await using api = await bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("/ui/", ui).withStatic("/admin/", ui),
+				configure: (builder) =>
+					builder.use(
+						configureHttp({
+							statics: [
+								{ prefix: "/ui/", directory: ui },
+								{ prefix: "/admin/", directory: ui },
+							],
+						}),
+					),
 			});
 
 			expect((await fetch(`${api.baseUrl}/ui/`)).status).toBe(200);
@@ -599,10 +656,14 @@ describe("serving a built UI from the API", () => {
 					c.registerSingleton(ConfigurationServiceToken, new SecretConfigService()),
 				configure: (builder) =>
 					builder
-						.withAuth()
-						.withHealth()
-						.withOpenApi({ info: { title: "t", version: "1" } })
-						.withStatic("/", ui, options),
+						.use(auth())
+						.use(health())
+						.use(
+							configureHttp({
+								statics: [{ prefix: "/", directory: ui, ...options }],
+								openApi: { info: { title: "t", version: "1" } },
+							}),
+						),
 			});
 		const json = { accept: "application/json" };
 		const notFound = async (response: Response) => {
@@ -754,7 +815,13 @@ describe("serving a built UI from the API", () => {
 		it("exempts only the static route from the rate limit", async () => {
 			await using api = await bootModule({
 				controllers: [ApiController, PortfolioController],
-				configure: (builder) => builder.withRateLimit({ max: 2 }).withStatic("/", ui),
+				configure: (builder) =>
+					builder.use(
+						configureHttp({
+							statics: [{ prefix: "/", directory: ui }],
+							rateLimit: { max: 2 },
+						}),
+					),
 			});
 
 			const files = [];
@@ -795,7 +862,15 @@ describe("serving a built UI from the API", () => {
 			await writeFile(path.join(admin, "index.html"), "<title>the admin</title>");
 			await using api = await bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("/", ui).withStatic("/admin/", admin),
+				configure: (builder) =>
+					builder.use(
+						configureHttp({
+							statics: [
+								{ prefix: "/", directory: ui },
+								{ prefix: "/admin/", directory: admin },
+							],
+						}),
+					),
 			});
 
 			const text = async (route: string) =>
@@ -813,7 +888,15 @@ describe("serving a built UI from the API", () => {
 			await writeFile(path.join(admin, "index.html"), "<title>the admin</title>");
 			await using api = await bootModule({
 				controllers: [ApiController],
-				configure: (builder) => builder.withStatic("/", ui).withStatic("/admin/", admin),
+				configure: (builder) =>
+					builder.use(
+						configureHttp({
+							statics: [
+								{ prefix: "/", directory: ui },
+								{ prefix: "/admin/", directory: admin },
+							],
+						}),
+					),
 			});
 
 			const response = await fetch(`${api.baseUrl}/admin?x=1`, { redirect: "manual" });

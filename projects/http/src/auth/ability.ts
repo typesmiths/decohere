@@ -10,7 +10,7 @@ export const ADMIN_ROLE = "admin";
  * - `admin` role → `manage` / `all` (wildcard)
  * - otherwise map `principal.scopes` of the form `"action:Subject"` to CASL rules
  *
- * Pass a custom factory to `withAuth()` (or override the app stub) for product-specific rules.
+ * Pass a custom factory to `auth()` (or override the app stub) for product-specific rules.
  */
 export function defineAbilitiesFor(principal: Principal) {
 	const { can, build } = new AbilityBuilder(createMongoAbility);
@@ -29,7 +29,7 @@ export function defineAbilitiesFor(principal: Principal) {
  * Map a raw JWT payload → {@link Principal}.
  *
  * Merges OAuth `scope` / `scopes` with an IdP `permissions` claim (e.g. Auth0 API permissions).
- * Override via `withAuth(..., { principalMapper })` when claims differ.
+ * Override via `auth(..., { principalMapper })` when claims differ.
  */
 export function createPrincipalFromPayload(payload: Record<string, unknown>): Principal {
 	const sub = typeof payload.sub === "string" ? payload.sub : "";

@@ -1,12 +1,12 @@
+import { http } from "../src/http/http.plugin.js";
+import { health } from "../src/health/health.plugin.js";
+import { auth } from "../src/auth/auth.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthConfig } from "../src/auth/auth.config.js";
-import "../src/auth/auth.extensions.js";
 import { type App, Builder } from "@decohere/core/hosting";
 import type { IReadinessCheck } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
-import "../src/health/health.extensions.js";
 import type { IConfigurationService } from "@decohere/core/configuration";
 import { ConfigurationServiceToken } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
@@ -47,8 +47,8 @@ describe("health / ready probes", () => {
 
 	it("GET /health returns 200 { status: ok } without auth", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withHealth()
+			.use(http(FastifyProvider, { accessLog: false }))
+			.use(health())
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -59,8 +59,8 @@ describe("health / ready probes", () => {
 
 	it("GET /ready returns 200 when no readiness checks are registered", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withHealth()
+			.use(http(FastifyProvider, { accessLog: false }))
+			.use(health())
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -78,8 +78,8 @@ describe("health / ready probes", () => {
 		};
 
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withHealth({ checks: [failing] })
+			.use(http(FastifyProvider, { accessLog: false }))
+			.use(health({ checks: [failing] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -88,23 +88,22 @@ describe("health / ready probes", () => {
 		expect(res.data).toEqual({ message: "Not ready" });
 	});
 
-	it("GET /health and /ready stay anonymous when withAuth is enabled", async () => {
+	it("GET /health and /ready stay anonymous when auth() is enabled", async () => {
 		vi.stubEnv("NODE_ENV", "development");
 
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [GuardController] }))
 			.withServices((c) => {
 				c.registerSingleton(ConfigurationServiceToken, new DevStaticConfigService());
 			})
-			.withAuth()
-			.withHealth()
-			.withControllers(GuardController)
+			.use(auth())
+			.use(health())
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
-		const health = await axios.get("/health");
-		expect(health.status).toBe(200);
-		expect(health.data).toEqual({ status: "ok" });
+		const liveness = await axios.get("/health");
+		expect(liveness.status).toBe(200);
+		expect(liveness.data).toEqual({ status: "ok" });
 
 		const ready = await axios.get("/ready");
 		expect(ready.status).toBe(200);

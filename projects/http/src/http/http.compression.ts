@@ -1,5 +1,5 @@
 /**
- * Response compression (`builder.withCompression`). Provider-neutral options and defaults;
+ * Response compression (the `compression` setting). Provider-neutral options and defaults;
  * the HTTP provider hands them to its compression plugin and the plugin owns the policy
  * (which responses are compressed, `Vary`, `HEAD`, streams). See ADR 0008.
  */
@@ -13,7 +13,7 @@ export const DEFAULT_COMPRESSION_THRESHOLD = 1024;
 /** The codings offered by default, in order of preference. `deflate` is left out on purpose. */
 export const DEFAULT_COMPRESSION_ENCODINGS: readonly CompressionEncoding[] = ["br", "gzip"];
 
-/** Options for {@link Builder.withCompression}. `false` turns compression off. */
+/** Options for the `compression` setting. `false` turns compression off. */
 export type CompressionOptions =
 	| false
 	| {

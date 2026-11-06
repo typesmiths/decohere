@@ -1,9 +1,9 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { injectable } from "@decohere/crucible/decorators";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import {
 	Catch,
@@ -94,12 +94,16 @@ describe("HTTP surface (filters, HttpCode/Header, middleware, CORS, global prefi
 
 	it("applies global prefix, HttpCode, Header, middleware, CORS, and exception filters", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withGlobalPrefix("/api")
-			.withCors({ origin: "https://example.com", credentials: true })
-			.withMiddleware(TraceMiddleware)
-			.withExceptionFilters(NotFoundFilter)
-			.withHttpProvider(FastifyProvider)
-			.withControllers(WidgetController)
+			.use(
+				http(FastifyProvider, {
+					accessLog: false,
+					controllers: [WidgetController],
+					middleware: [TraceMiddleware],
+					exceptionFilters: [NotFoundFilter],
+					globalPrefix: "/api",
+					cors: { origin: "https://example.com", credentials: true },
+				}),
+			)
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -144,8 +148,7 @@ describe("HTTP surface (filters, HttpCode/Header, middleware, CORS, global prefi
 
 	it("returns 404 for an unregistered path", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withControllers(WidgetController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [WidgetController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 
@@ -155,8 +158,7 @@ describe("HTTP surface (filters, HttpCode/Header, middleware, CORS, global prefi
 
 	it("creates a new controller instance per request", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttpProvider(FastifyProvider)
-			.withControllers(ScopedController)
+			.use(http(FastifyProvider, { accessLog: false, controllers: [ScopedController] }))
 			.build();
 		axios.defaults.baseURL = await listenEphemeral(app);
 

@@ -1,10 +1,10 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { createConnection } from "node:net";
 import { inject, injectable } from "@decohere/crucible/decorators";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get } from "../src/routing/index.js";
 
@@ -65,9 +65,8 @@ function connect(baseURL: string): Promise<void> {
 
 async function buildApp(): Promise<App> {
 	return Builder.create(new ServiceContainerBuilder())
-		.withHttp(FastifyProvider)
+		.use(http(FastifyProvider, { controllers: [SlowController] }))
 		.withServices((c) => c.registerSingleton(DbToken, Db))
-		.withControllers(SlowController)
 		.build();
 }
 
@@ -156,8 +155,7 @@ describe("graceful shutdown on SIGTERM / SIGINT", () => {
 			}
 		}
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttp(FastifyProvider)
-			.withControllers(HangController)
+			.use(http(FastifyProvider, { controllers: [HangController] }))
 			.build();
 		const exit = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
 		const stderr = vi.spyOn(console, "error").mockImplementation(() => {});

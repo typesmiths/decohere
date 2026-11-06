@@ -151,9 +151,9 @@ In the project's Dev Container:
 pnpm decohere add auth0
 ```
 
-This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.withAuth()` to each API's `main.ts`. Running it again changes nothing. If a `main.ts` no longer has the generated shape, the command leaves it alone and prints the lines to add. It also creates a `<project> Token` machine app (written to `.env` as `AUTH0_TOKEN_CLIENT_ID`). It doesn't add the local user profile a new project with Postgres gets.
+This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.use(auth())` to each API's `main.ts`. Running it again changes nothing. If a `main.ts` no longer has the generated shape, the command leaves it alone and prints the lines to add. It also creates a `<project> Token` machine app (written to `.env` as `AUTH0_TOKEN_CLIENT_ID`). It doesn't add the local user profile a new project with Postgres gets.
 
-Once Auth0 is added, **every route needs a token** unless it has `@AllowAnonymous()`, because `withAuth()` is secure by default. To call one, in the Dev Container:
+Once Auth0 is added, **every route needs a token** unless it has `@AllowAnonymous()`, because `auth()` is secure by default. To call one, in the Dev Container:
 
 ```bash
 curl -H "Authorization: Bearer $(pnpm -s decohere auth0 token)" localhost:3000/hello/1
@@ -197,11 +197,11 @@ npx @decohere/create webapi -d my-app --database postgres/typeorm
 npx @decohere/create webapi -d my-app --name api --name billing --database postgres/typeorm
 ```
 
-`config.yaml` lists one datasource per API (`name: billing` → `withTypeOrm({ name: "billing" })`). Locally they share host `postgres` port `5432`. Point `BILLING_DB_HOST` / `BILLING_DB_PORT` at another server to split later. `webapi add billing --database postgres/typeorm` appends a datasource; TypeORM bootstrap `CREATE DATABASE`s it on first run.
+`config.yaml` lists one datasource per API (`name: billing` → `typeOrm({ name: "billing" })`). Locally they share host `postgres` port `5432`. Point `BILLING_DB_HOST` / `BILLING_DB_PORT` at another server to split later. `webapi add billing --database postgres/typeorm` appends a datasource; TypeORM bootstrap `CREATE DATABASE`s it on first run.
 
 #### Health probes
 
-Scaffolded APIs call `.withHealth()` so these routes are available **without auth**:
+Scaffolded APIs call `.use(health())` so these routes are available **without auth**:
 
 | Route | Purpose | Status |
 |---|---|---|

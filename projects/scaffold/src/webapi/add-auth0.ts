@@ -4,8 +4,8 @@ import { listExistingApiNames } from "./api-name.js";
 import { runAuth0Configure } from "./auth0-commands.js";
 import { AUTH_CONFIG_SECTION } from "./models/auth-config.model.js";
 
-const AUTH_IMPORT = 'import "@decohere/http/auth";';
-const CONFIGURATION_CALL = /^([ \t]*)\.withConfiguration\([^\n]*\)[ \t]*$/m;
+const AUTH_IMPORT = 'import { auth } from "@decohere/http";';
+const CONFIGURATION_CALL = /^([ \t]*)\.use\(config\([^\n]*\)\)[ \t]*$/m;
 const IMPORT_STATEMENT = /^import\b[^;]*;[ \t]*$/gm;
 
 /**
@@ -13,13 +13,13 @@ const IMPORT_STATEMENT = /^import\b[^;]*;[ \t]*$/gm;
  * handles the shape the scaffolder generates, because this file belongs to the user.
  */
 export function addAuthToMain(source: string): string | undefined {
-	if (source.includes(".withAuth(")) return source;
+	if (source.includes(".use(auth(")) return source;
 	const call = CONFIGURATION_CALL.exec(source);
 	if (call == null) return undefined;
 
 	const withCall = source.replace(
 		CONFIGURATION_CALL,
-		(line, indent: string) => `${line}\n${indent}.withAuth()`,
+		(line, indent: string) => `${line}\n${indent}.use(auth())`,
 	);
 	if (withCall.includes(AUTH_IMPORT)) return withCall;
 
@@ -70,7 +70,7 @@ export function runAddAuth0(directory = "."): void {
 		console.log("\n  These files don't have the shape this command can change safely:");
 		for (const path of byHand) console.log(`    ${path}`);
 		console.log(`\n  Add this to each one:\n\n    ${AUTH_IMPORT}`);
-		console.log("\n  and call .withAuth() on the builder, before .build().");
+		console.log("\n  and call .use(auth()) on the builder, before .build().");
 	}
 	console.log(
 		"\n  ✓ Auth0 added. Every route now needs a token, unless it has @AllowAnonymous().",

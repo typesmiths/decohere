@@ -1,3 +1,5 @@
+import { configureHttp } from "../src/http/http.plugin.js";
+import { auth } from "../src/auth/auth.plugin.js";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
@@ -11,7 +13,6 @@ import {
 import type { Constructable } from "@decohere/core/reflection";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { AuthConfig } from "../src/auth/auth.config.js";
-import "../src/auth/auth.extensions.js";
 import {
 	Authorize,
 	Controller,
@@ -298,7 +299,7 @@ describe("response compression", () => {
 
 		it("keeps the helmet, CORS and rate-limit headers on a compressed response", async () => {
 			await using api = await boot((builder) =>
-				builder.withCors({ origin: "https://app.example.com" }),
+				builder.use(configureHttp({ cors: { origin: "https://app.example.com" } })),
 			);
 
 			const response = await wire(api.baseUrl, "/api/big", {
@@ -334,7 +335,7 @@ describe("response compression", () => {
 		});
 
 		it("still answers an unauthorised request with 401", async () => {
-			await using api = await boot((builder) => builder.withAuth(), [SecuredController]);
+			await using api = await boot((builder) => builder.use(auth()), [SecuredController]);
 
 			const response = await wire(api.baseUrl, "/api/secured", {
 				"accept-encoding": "br, gzip",
@@ -385,8 +386,10 @@ describe("response compression", () => {
 	});
 
 	describe("options", () => {
-		it("is off with withCompression(false)", async () => {
-			await using api = await boot((builder) => builder.withCompression(false));
+		it("is off with compression: false", async () => {
+			await using api = await boot((builder) =>
+				builder.use(configureHttp({ compression: false })),
+			);
 
 			const response = await wire(api.baseUrl, "/api/big", { "accept-encoding": "br, gzip" });
 
@@ -395,8 +398,10 @@ describe("response compression", () => {
 			expect(response.body).toBe(bigJson);
 		});
 
-		it("compresses by default with withCompression() and no options", async () => {
-			await using api = await boot((builder) => builder.withCompression());
+		it("compresses by default with no compression options", async () => {
+			await using api = await boot((builder) =>
+				builder.use(configureHttp({ compression: {} })),
+			);
 
 			const response = await wire(api.baseUrl, "/api/big", { "accept-encoding": "gzip" });
 
@@ -404,13 +409,15 @@ describe("response compression", () => {
 		});
 
 		it("honours a custom threshold", async () => {
-			await using api = await boot((builder) => builder.withCompression({ threshold: 5 }));
+			await using api = await boot((builder) =>
+				builder.use(configureHttp({ compression: { threshold: 5 } })),
+			);
 
 			const small = await wire(api.baseUrl, "/api/small", { "accept-encoding": "gzip" });
 			expect(small.headers["content-encoding"]).toBe("gzip");
 
 			await using high = await boot((builder) =>
-				builder.withCompression({ threshold: 1_000_000 }),
+				builder.use(configureHttp({ compression: { threshold: 1_000_000 } })),
 			);
 			const big = await wire(high.baseUrl, "/api/big", { "accept-encoding": "gzip" });
 			expect(big.headers["content-encoding"]).toBeUndefined();
@@ -418,7 +425,7 @@ describe("response compression", () => {
 
 		it("honours custom encodings and their order", async () => {
 			await using gzipOnly = await boot((builder) =>
-				builder.withCompression({ encodings: ["gzip"] }),
+				builder.use(configureHttp({ compression: { encodings: ["gzip"] } })),
 			);
 			const onlyGzip = await wire(gzipOnly.baseUrl, "/api/big", {
 				"accept-encoding": "br, gzip",
@@ -426,7 +433,7 @@ describe("response compression", () => {
 			expect(onlyGzip.headers["content-encoding"]).toBe("gzip");
 
 			await using withDeflate = await boot((builder) =>
-				builder.withCompression({ encodings: ["deflate", "gzip"] }),
+				builder.use(configureHttp({ compression: { encodings: ["deflate", "gzip"] } })),
 			);
 			const deflate = await wire(withDeflate.baseUrl, "/api/big", {
 				"accept-encoding": "gzip, deflate",
@@ -437,7 +444,7 @@ describe("response compression", () => {
 
 		it("adds content types with types (a RegExp)", async () => {
 			await using api = await boot((builder) =>
-				builder.withCompression({ types: /^image\/png/ }),
+				builder.use(configureHttp({ compression: { types: /^image\/png/ } })),
 			);
 
 			const image = await wire(api.baseUrl, "/api/image", { "accept-encoding": "gzip" });
@@ -447,7 +454,9 @@ describe("response compression", () => {
 
 		it("accepts a function for types", async () => {
 			await using api = await boot((builder) =>
-				builder.withCompression({ types: (type) => type.startsWith("image/png") }),
+				builder.use(
+					configureHttp({ compression: { types: (type) => type.startsWith("image/png") } }),
+				),
 			);
 
 			const image = await wire(api.baseUrl, "/api/image", { "accept-encoding": "gzip" });
@@ -465,7 +474,9 @@ describe("response compression", () => {
 
 		it("passes providerOptions to the plugin, overriding the defaults", async () => {
 			await using api = await boot((builder) =>
-				builder.withCompression({ providerOptions: { threshold: 1_000_000 } }),
+				builder.use(
+					configureHttp({ compression: { providerOptions: { threshold: 1_000_000 } } }),
+				),
 			);
 
 			const response = await wire(api.baseUrl, "/api/big", { "accept-encoding": "gzip" });
@@ -475,11 +486,15 @@ describe("response compression", () => {
 
 		it("lets providerOptions reach other plugin options (onUnsupportedEncoding)", async () => {
 			await using api = await boot((builder) =>
-				builder.withCompression({
-					providerOptions: {
-						onUnsupportedEncoding: () => JSON.stringify({ message: "unsupported" }),
-					},
-				}),
+				builder.use(
+					configureHttp({
+						compression: {
+							providerOptions: {
+								onUnsupportedEncoding: () => JSON.stringify({ message: "unsupported" }),
+							},
+						},
+					}),
+				),
 			);
 
 			const response = await wire(api.baseUrl, "/api/big", { "accept-encoding": "compress" });
@@ -488,7 +503,7 @@ describe("response compression", () => {
 		});
 	});
 
-	describe("files served by withStatic", () => {
+	describe("files served by statics", () => {
 		let site: string;
 		const script = `${"export const answer = 42; // padding to pass the threshold\n".repeat(60)}`;
 
@@ -508,7 +523,10 @@ describe("response compression", () => {
 			await rm(site, { recursive: true, force: true });
 		});
 
-		const bootUi = () => boot((builder) => builder.withStatic("/ui/", site));
+		const bootUi = () =>
+			boot((builder) =>
+				builder.use(configureHttp({ statics: [{ prefix: "/ui/", directory: site }] })),
+			);
 
 		it("compresses a file on the fly and keeps its caching headers", async () => {
 			await using api = await bootUi();
@@ -588,9 +606,14 @@ describe("response compression", () => {
 			expect(png.headers["content-encoding"]).toBeUndefined();
 		});
 
-		it("sends files as they are with withCompression(false)", async () => {
+		it("sends files as they are with compression: false", async () => {
 			await using api = await boot((builder) =>
-				builder.withCompression(false).withStatic("/ui/", site),
+				builder.use(
+					configureHttp({
+						statics: [{ prefix: "/ui/", directory: site }],
+						compression: false,
+					}),
+				),
 			);
 
 			const response = await wire(api.baseUrl, "/ui/assets/index-DiwrgTda.js", {

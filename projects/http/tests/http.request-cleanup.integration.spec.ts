@@ -1,9 +1,9 @@
+import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { inject, injectable } from "@decohere/crucible/decorators";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import "../src/http/http.extensions.js";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get } from "../src/routing/index.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
@@ -43,9 +43,8 @@ describe("per-request cleanup", () => {
 
 	it("awaits async cleanup of request-scoped services, even when the handler throws", async () => {
 		app = await Builder.create(new ServiceContainerBuilder())
-			.withHttp(FastifyProvider)
+			.use(http(FastifyProvider, { controllers: [WorkController] }))
 			.withServices((c) => c.registerRequestScoped(WorkToken, RequestWork))
-			.withControllers(WorkController)
 			.build();
 		const baseURL = await listenEphemeral(app);
 

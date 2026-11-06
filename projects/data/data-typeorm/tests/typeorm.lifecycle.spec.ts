@@ -1,3 +1,4 @@
+import { typeOrm } from "../src/typeorm.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import "reflect-metadata";
 import { type ConnectionInfo, DatabaseConfig } from "@decohere/data";
@@ -10,7 +11,6 @@ import {
 import type { Constructable } from "@decohere/core/reflection";
 import { DataSource } from "typeorm";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import "../src/typeorm.extensions.js";
 
 const connection: ConnectionInfo = {
 	name: "default",
@@ -63,7 +63,7 @@ function stubConnections() {
 	});
 }
 
-describe("withTypeOrm lifecycle", () => {
+describe("typeOrm() lifecycle", () => {
 	afterEach(() => {
 		vi.restoreAllMocks();
 		events = [];
@@ -73,7 +73,7 @@ describe("withTypeOrm lifecycle", () => {
 		const destroy = stubConnections();
 		const app = await Builder.create(new ServiceContainerBuilder())
 			.withServices((c) => c.registerSingleton(ConfigurationServiceToken, new StaticConfig()))
-			.withTypeOrm({ entities: [] })
+			.use(typeOrm({ entities: [] }))
 			.withHostedService(UsesTheDatabase)
 			.build();
 		await app.start({ port: 0, shutdownSignals: false });
@@ -88,7 +88,7 @@ describe("withTypeOrm lifecycle", () => {
 		const destroy = stubConnections();
 		const app = await Builder.create(new ServiceContainerBuilder())
 			.withServices((c) => c.registerSingleton(ConfigurationServiceToken, new StaticConfig()))
-			.withTypeOrm({ entities: [] })
+			.use(typeOrm({ entities: [] }))
 			.build();
 
 		await app.dispose();

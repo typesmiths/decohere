@@ -23,6 +23,17 @@ class QueueConsumer implements HostedService {
 	}
 }
 
+describe("builder.use", () => {
+	it("hands the plugin the builder, and returns it to keep chaining", () => {
+		const builder = Builder.create(new ServiceContainerBuilder());
+		const seen: unknown[] = [];
+
+		expect(builder.use((given) => seen.push(given))).toBe(builder);
+
+		expect(seen).toEqual([builder]);
+	});
+});
+
 describe("a worker with no HTTP", () => {
 	it("starts its hosted services and stops them when disposed", async () => {
 		const app = await Builder.create(new ServiceContainerBuilder())

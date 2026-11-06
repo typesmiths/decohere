@@ -25,7 +25,7 @@ export interface HostedService {
 	stop?(): Promise<void> | void;
 	/**
 	 * Readiness while the service is started but still warming up: throw until it can serve, and
-	 * `GET /ready` answers 503 (`withHealth()`). Optional.
+	 * `GET /ready` answers 503 (`health()`). Optional.
 	 */
 	check?(): Promise<void>;
 }

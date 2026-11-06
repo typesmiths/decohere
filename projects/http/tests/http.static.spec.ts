@@ -36,7 +36,7 @@ describe("static file rules", () => {
 	});
 
 	it.each(["", "/ui/../api", "/ui/*"])("refuses the prefix %j", (given) => {
-		expect(() => staticFiles.toMount(given, "ui")).toThrow(/withStatic/);
+		expect(() => staticFiles.toMount(given, "ui")).toThrow(/static/i);
 	});
 
 	it.each([

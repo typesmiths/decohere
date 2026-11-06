@@ -3,7 +3,7 @@ import picomatch from "picomatch";
 import { isDevelopmentNodeEnv } from "../auth/auth.types.js";
 
 /**
- * Serving a module's built UI from its API (`builder.withStatic`). Everything here is
+ * Serving a module's built UI from its API (the `statics` setting). Everything here is
  * provider-neutral: the options, the caching rules and the missing-directory policy.
  * Only the HTTP provider knows how to put files on the wire. See ADR 0007.
  */
@@ -71,7 +71,7 @@ export type StaticOptions = {
 	onMissingDirectory?: "fail" | "warn";
 };
 
-/** A `withStatic` call, as the builder keeps it. */
+/** A `statics` call, as the builder keeps it. */
 export type StaticMount = {
 	/** Normalised: starts and ends with `/`, for example `/ui/`. */
 	prefix: string;
@@ -98,23 +98,23 @@ function normalizePrefix(prefix: string): string {
 	const segments = prefix.split("/").filter((segment) => segment !== "");
 	if (segments.length === 0) {
 		if (prefix.trim() === "") {
-			throw new Error('withStatic needs a prefix, such as "/ui/" or "/" for the root.');
+			throw new Error('A static mount needs a prefix, such as "/ui/" or "/" for the root.');
 		}
 		return "/";
 	}
 	if (
 		segments.some((segment) => segment === "." || segment === ".." || /[*:?]/.test(segment))
 	) {
-		throw new Error(
-			`withStatic prefix "${prefix}" must be plain path segments, such as "/ui/".`,
-		);
+		throw new Error(`Static prefix "${prefix}" must be plain path segments, such as "/ui/".`);
 	}
 	return `/${segments.join("/")}/`;
 }
 
 function toMount(prefix: string, directory: string, options: StaticOptions = {}): StaticMount {
 	if (directory.trim() === "") {
-		throw new Error(`withStatic("${prefix}") needs the directory that holds the built files.`);
+		throw new Error(
+			`Static files at "${prefix}" need the directory that holds the built files.`,
+		);
 	}
 	return { prefix: normalizePrefix(prefix), directory, options };
 }
@@ -142,7 +142,7 @@ async function resolve(
 	const seen = new Set<string>();
 	for (const mount of mounts) {
 		if (seen.has(mount.prefix)) {
-			throw new Error(`withStatic: ${mount.prefix} is mounted twice.`);
+			throw new Error(`statics: ${mount.prefix} is mounted twice.`);
 		}
 		seen.add(mount.prefix);
 
@@ -152,7 +152,7 @@ async function resolve(
 				mount.options.onMissingDirectory ??
 				(isDevelopmentNodeEnv(env.nodeEnv) ? "warn" : "fail");
 			const message =
-				`withStatic("${mount.prefix}", "${mount.directory}"): ${root} does not exist. ` +
+				`statics "${mount.prefix}" at "${mount.directory}": ${root} does not exist. ` +
 				"Build the UI first, or run the app from the folder that holds it.";
 			if (policy === "fail") {
 				throw new Error(message);

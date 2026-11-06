@@ -113,12 +113,6 @@
       "@decohere/http/*": [
         "./projects/http/src/*"
       ],
-      "@decohere/http/auth": [
-        "./projects/http/src/auth/auth.extensions.ts"
-      ],
-      "@decohere/http/http": [
-        "./projects/http/src/http/index.ts"
-      ],
       "@decohere/http/providers": [
         "./projects/http/src/providers/index.ts"
       ],
