@@ -30,7 +30,7 @@ function needsDevContainer(name: string): ActionResponse {
 class HostWebapiAction extends WebapiAction {
 	public override async run(options: WebapiOptions): Promise<ActionResponse> {
 		if (!hasDecohereTools()) {
-			runInBuilder(containerArgvFromHost(process.argv));
+			await runInBuilder(containerArgvFromHost(process.argv));
 		}
 		return super.run(options);
 	}

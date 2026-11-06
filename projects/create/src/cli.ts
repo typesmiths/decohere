@@ -1,4 +1,4 @@
 #!/usr/bin/env node
 import { launch } from "./runner.js";
 
-launch(process.argv.slice(2));
+await launch(process.argv.slice(2));

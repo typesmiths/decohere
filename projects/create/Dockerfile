@@ -24,8 +24,9 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install auth0 CLI into /usr/local/bin so it is available on PATH.
-RUN curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/main/install.sh \
-    | sh -s -- -b /usr/local/bin
+# Keep this version the same as the Dev Container's (a test checks).
+RUN curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/v1.39.0/install.sh \
+    | sh -s -- -b /usr/local/bin v1.39.0
 
 # Install Biome globally so scaffolded files can be linted before handoff.
 RUN npm install -g @biomejs/biome
@@ -40,6 +41,9 @@ RUN mkdir -p /usr/local/lib/node_modules/@decohere/scaffold \
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# The scaffolder writes only here, and the launcher copies the result out.
+RUN mkdir -p /workspace && chown node:node /workspace
 WORKDIR /workspace
+USER node
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
