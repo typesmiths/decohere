@@ -20,11 +20,6 @@
     // Claude's login, session history and memory, also shared by every checkout.
     "source=decohere-claude,target=/home/node/.claude,type=volume"
   ],
-  "remoteEnv": {
-    // Optional: export these on your machine to skip `gh auth login` / pass Bitwarden access through.
-    "GH_TOKEN": "${localEnv:GH_TOKEN}",
-    "BWS_ACCESS_TOKEN": "${localEnv:BWS_ACCESS_TOKEN}"
-  },
   // Volumes are created root-owned; hand them to `node`, then install; pnpm switches itself to the version pinned in package.json.
   "postCreateCommand": "sudo chown node node_modules /home/node/.claude && pnpm install",
   "remoteUser": "node",
