@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { importKindsOutput, importKindsWorkspace } from "./__fixtures__/import-kinds.js";
@@ -14,13 +14,11 @@ const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const ws = realFs.mkdtempSync(join(tmpdir(), "decohere-forge-debug-"));
 const mainJs = join(ws, "dist/debug/projects/app/src/main.js");
 
-describe("forge build debug output runs with plain node (real process)", () => {
-	beforeAll(() => {
-		for (const [relativePath, content] of Object.entries(importKindsWorkspace)) {
-			realFs.mkdirSync(join(ws, relativePath, ".."), { recursive: true });
-			realFs.writeFileSync(join(ws, relativePath), content);
-		}
-		const build = spawnSync(
+function runForgeBuild(
+	cwd: string,
+): Promise<{ status: number | null; signal: NodeJS.Signals | null; output: string }> {
+	return new Promise((resolve, reject) => {
+		const child = spawn(
 			process.execPath,
 			[
 				"--import",
@@ -28,12 +26,30 @@ describe("forge build debug output runs with plain node (real process)", () => {
 				join(repo, "projects/cli/src/forge.ts"),
 				"build",
 			],
-			{ cwd: ws, encoding: "utf8", timeout: 60_000 },
+			{ cwd, timeout: 60_000 },
 		);
-		if (build.status !== 0) {
-			throw new Error(`forge build failed:\n${build.stdout}\n${build.stderr}`);
+		let output = "";
+		child.stdout.on("data", (chunk) => (output += chunk));
+		child.stderr.on("data", (chunk) => (output += chunk));
+		child.on("error", reject);
+		child.on("close", (status, signal) => resolve({ status, signal, output }));
+	});
+}
+
+describe("forge build debug output runs with plain node (real process)", () => {
+	beforeAll(async () => {
+		for (const [relativePath, content] of Object.entries(importKindsWorkspace)) {
+			realFs.mkdirSync(join(ws, relativePath, ".."), { recursive: true });
+			realFs.writeFileSync(join(ws, relativePath), content);
 		}
-	}, 60_000);
+		// Async, so a slow build doesn't block this worker and its messages to Vitest.
+		const build = await runForgeBuild(ws);
+		if (build.status !== 0) {
+			throw new Error(
+				`forge build failed (exit ${build.status}, signal ${build.signal}):\n${build.output}`,
+			);
+		}
+	}, 70_000);
 
 	afterAll(() => {
 		realFs.rmSync(ws, { recursive: true, force: true });
