@@ -60,7 +60,12 @@ export type ApiOptions = {
 
 const features = [DatabaseFeature, AuthFeature, FinalizeFeature];
 
-const AUTH0_LOGIN_VOLUME = "auth0-login";
+/**
+ * Where a project's Auth0 CLI login lives on the host: in memory on Linux, and otherwise under the
+ * home folder. One per project, so a project can't act on another's tenant. Keep in step with
+ * `.devcontainer/initialize.sh`, which creates it first so Docker doesn't create it as root.
+ */
+const AUTH0_LOGIN_ROOT = "${XDG_RUNTIME_DIR:-${HOME}/.config/decohere}/decohere-auth0";
 
 export async function scaffoldApi(cliOptions: ApiOptions) {
 	const targetDir = resolve(cliOptions.d ?? ".");
@@ -101,16 +106,15 @@ function createWorkspace(
 				`webapi-node-modules:${workspaceRoot}/node_modules`,
 				// Named volume (not a Cursor-only mount) so CLI recreates keep Up-arrow history.
 				`${commandHistory.volumeName}:${commandHistory.dir}`,
-				// Named volume so a rebuild keeps the Auth0 CLI login.
-				`${AUTH0_LOGIN_VOLUME}:/home/node/.config/auth0`,
+				// A folder on the host, so a rebuild keeps the Auth0 CLI login and you can see it.
+				`${AUTH0_LOGIN_ROOT}/${name}:/home/node/.config/auth0`,
 			],
 			env_file: ["./gh.env"],
 			command: "sleep infinity",
 			networks: [name],
 		})
 		.addVolume("webapi-node-modules")
-		.addVolume(commandHistory.volumeName)
-		.addVolume(AUTH0_LOGIN_VOLUME);
+		.addVolume(commandHistory.volumeName);
 
 	const installCmd = "bash .devcontainer/post-create.sh";
 	const devContainer = new DevContainer()

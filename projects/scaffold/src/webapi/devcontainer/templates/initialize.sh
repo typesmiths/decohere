@@ -23,3 +23,7 @@ if [[ -d "$gh_env" ]]; then
 	exit 1
 fi
 touch "$gh_env"
+
+# In memory on Linux, so the Auth0 login is never on disk. Keep in step with docker-compose.yml.
+project="$(sed -n 's/^name: *//p' "$root/.devcontainer/docker-compose.yml" | head -n 1)"
+mkdir -p -m 700 "${XDG_RUNTIME_DIR:-$HOME/.config/decohere}/decohere-auth0/$project"

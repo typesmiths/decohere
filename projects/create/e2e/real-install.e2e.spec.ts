@@ -10,6 +10,7 @@
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import {
+	chmodSync,
 	cpSync,
 	existsSync,
 	mkdirSync,
@@ -18,7 +19,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -261,6 +262,12 @@ describe.skipIf(!registry || !version)(
 					// Behave like a machine whose user ID matches the image's node user. On any other ID the tool
 					// remaps that user, and the node_modules volume keeps the old owner.
 					expectOk(await run("chmod", ["-R", "a+rwX", dir], root));
+					// The same for the Auth0 login folder, which initialize.sh makes private to the host user.
+					const loginRoot =
+						process.env.XDG_RUNTIME_DIR ?? join(homedir(), ".config", "decohere");
+					const loginFolder = join(loginRoot, "decohere-auth0", "orders");
+					mkdirSync(loginFolder, { recursive: true, mode: 0o777 });
+					chmodSync(loginFolder, 0o777);
 					expectOk(
 						await devcontainer(
 							"up",
@@ -280,6 +287,23 @@ describe.skipIf(!registry || !version)(
 						);
 					},
 				);
+
+				it("keeps the Auth0 login through a rebuild", async () => {
+					const exec = (...args: string[]) =>
+						devcontainer("exec", "--workspace-folder", dir, ...args);
+					expectOk(await exec("touch", "/home/node/.config/auth0/still-here"));
+					expectOk(
+						await devcontainer(
+							"up",
+							"--workspace-folder",
+							dir,
+							"--update-remote-user-uid-default",
+							"off",
+							"--remove-existing-container",
+						),
+					);
+					expectOk(await exec("test", "-f", "/home/node/.config/auth0/still-here"));
+				});
 			},
 			{ skip: !containerRegistry },
 		);

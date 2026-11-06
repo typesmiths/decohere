@@ -209,8 +209,13 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	expect(compose).toContain("./gh.env");
 	expect(compose).toContain("bashhistory:/commandhistory");
 	expect(compose).toMatch(/^ {2}bashhistory:\s*$/m);
-	expect(compose).toContain("auth0-login:/home/node/.config/auth0");
-	expect(compose).toMatch(/^ {2}auth0-login:\s*$/m);
+	expect(compose).toContain(
+		`\${XDG_RUNTIME_DIR:-\${HOME}/.config/decohere}/decohere-auth0/${projectName}:/home/node/.config/auth0`,
+	);
+	expect(compose).not.toMatch(/^ {2}auth0-login:\s*$/m);
+	expect(initialize).toContain(
+		'"${XDG_RUNTIME_DIR:-$HOME/.config/decohere}/decohere-auth0/$project"',
+	);
 
 	const appDevDockerfile = readFileSync(join(root, ".devcontainer/Dockerfile"), "utf8");
 	expect(appDevDockerfile).toMatch(/^FROM ghcr\.io\/typesmiths\/decohere\/devcontainer:/m);
@@ -599,7 +604,7 @@ describe("auth0 login and configure", () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
 		writeFileSync(
 			"/my-app/.env",
-			"AUTH0_ISSUER_BASE_URL=https://old.example.com\nAUTH0_AUDIENCE=https://api.my-app\nKEEP=1\n",
+			"AUTH0_ISSUER_BASE_URL=https://dev-tenant.us.auth0.com\nAUTH0_AUDIENCE=https://api.my-app\nKEEP=1\n",
 		);
 		writeFileSync(
 			"/my-app/projects/api/src/controllers/hello.controller.ts",
@@ -626,6 +631,29 @@ describe("auth0 login and configure", () => {
 		expect(env).toContain("AUTH0_CLIENT_ID=spa_123");
 		expect(mockEnsureSpaApp).toHaveBeenCalledWith("my-app Dev", expect.any(Array));
 		expect(mockAssignUserPermissions).not.toHaveBeenCalled();
+	});
+
+	it("stops, changing nothing, when logged in to a different tenant", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		const env =
+			"AUTH0_ISSUER_BASE_URL=https://client-a.us.auth0.com\nAUTH0_AUDIENCE=https://api.my-app\n";
+		writeFileSync("/my-app/.env", env);
+		mockIsInstalled.mockReturnValue(true);
+		mockListTenants.mockReturnValue([{ name: "client-b.us.auth0.com", active: true }]);
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
+
+		await runCliAsNodeBin(["auth0", "configure", "-d", "my-app"], { resetFs: false });
+
+		expect(errors.join("\n")).toContain(
+			"set up for Auth0 tenant https://client-a.us.auth0.com",
+		);
+		expect(mockUpdateApiScopes).not.toHaveBeenCalled();
+		expect(mockEnsureSpaApp).not.toHaveBeenCalled();
+		expect(mockEnsureM2mApp).not.toHaveBeenCalled();
+		expect(readFileSync("/my-app/.env", "utf8")).toBe(env);
 	});
 
 	it("sets up a token app allowed the API's permissions", async () => {
@@ -691,7 +719,7 @@ describe("auth0 login and configure", () => {
 		writeFileSync(
 			"/my-app/.env",
 			[
-				"AUTH0_ISSUER_BASE_URL=https://old.example.com",
+				"AUTH0_ISSUER_BASE_URL=https://dev-tenant.us.auth0.com",
 				"AUTH0_AUDIENCE=https://api.my-app",
 				"AUTH0_ADMIN_USER_SUB=auth0|admin",
 				"",
