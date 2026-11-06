@@ -82,6 +82,12 @@ async function finalize(
 		await pm.install({ cwd: workspace.targetDir });
 	}
 
+	// Whatever started the scaffolder says what to do next: only it knows where the project ends up.
+	if (process.env.DECOHERE_BUILDER === "1") {
+		closePrompt();
+		return;
+	}
+
 	const apiNames = workspace
 		.getProjects()
 		.map((project) => project.dir.replace(/^projects\//, ""));

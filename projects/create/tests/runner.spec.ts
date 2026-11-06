@@ -1,20 +1,31 @@
+import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockExecFileSync, mockSpawnSync, mockMkdirSync, mockExistsSync } = vi.hoisted(() => ({
-	mockExecFileSync: vi.fn(),
-	mockSpawnSync: vi.fn(),
-	mockMkdirSync: vi.fn(),
-	mockExistsSync: vi.fn().mockReturnValue(false),
+const mocks = vi.hoisted(() => ({
+	execFileSync: vi.fn(),
+	spawn: vi.fn(),
+	spawnSync: vi.fn(),
+	existsSync: vi.fn(),
+	mkdirSync: vi.fn(),
+	mkdtempSync: vi.fn(),
+	readdirSync: vi.fn(),
+	renameSync: vi.fn(),
+	rmSync: vi.fn(),
 }));
 
 vi.mock("node:child_process", () => ({
-	execFileSync: mockExecFileSync,
-	spawnSync: mockSpawnSync,
+	execFileSync: mocks.execFileSync,
+	spawn: mocks.spawn,
+	spawnSync: mocks.spawnSync,
 }));
 
 vi.mock("node:fs", () => ({
-	mkdirSync: mockMkdirSync,
-	existsSync: mockExistsSync,
+	existsSync: mocks.existsSync,
+	mkdirSync: mocks.mkdirSync,
+	mkdtempSync: mocks.mkdtempSync,
+	readdirSync: mocks.readdirSync,
+	renameSync: mocks.renameSync,
+	rmSync: mocks.rmSync,
 }));
 
 vi.mock(
@@ -26,49 +37,84 @@ vi.mock(
 		}) as const,
 );
 
-const { runInBuilder } = await import("../src/runner.js");
+const { launch } = await import("../src/runner.js");
 const { containerArgvFromHost, resolveLaunch } = await import("../src/resolve-launch.js");
 
 const IMAGE = "ghcr.io/typesmiths/decohere/create:0.0.1-test";
 
 let exitCode: number | undefined;
-vi.spyOn(process, "exit").mockImplementation((code?: number | string) => {
-	exitCode = typeof code === "number" ? code : 0;
-	throw new Error(`process.exit(${exitCode})`);
-});
 
-function run(argv: string[]): void {
+async function run(argv: string[]): Promise<void> {
 	try {
-		runInBuilder(argv);
-	} catch {
-		// process.exit throws in tests — expected.
+		await launch(argv);
+	} catch (reason) {
+		// process.exit throws in tests; anything else is a real failure.
+		if (!String(reason).includes("process.exit(")) throw reason;
 	}
 }
 
-function getRunArgs(): string[] {
-	const runCall = mockSpawnSync.mock.calls.find(
-		(c) => c[0] === "docker" && c[1].includes("run"),
-	);
-	expect(runCall).toBeDefined();
-	if (runCall == null) {
-		throw new Error("Expected docker run to be called");
-	}
-	return runCall[1];
+/** The container's exit code, as `docker start --attach` reports it. */
+let containerExit = 0;
+
+/** Captured so a test's handlers never stay on the real process. */
+const signalHandlers = new Map<string, () => void>();
+
+function dockerCalls(command: string): string[][] {
+	return mocks.spawnSync.mock.calls
+		.filter((c) => c[0] === "docker" && c[1][0] === command)
+		.map((c) => c[1] as string[]);
 }
+
+function createArgs(): string[] {
+	const [args] = dockerCalls("create");
+	if (args == null) throw new Error("Expected docker create to be called");
+	return args;
+}
+
+function containerName(): string {
+	const args = createArgs();
+	return args[args.indexOf("--name") + 1]!;
+}
+
+const spyOutput = (method: "log" | "error") => {
+	const lines: string[] = [];
+	vi.spyOn(console, method).mockImplementation((msg?: unknown) => {
+		lines.push(String(msg ?? ""));
+	});
+	return lines;
+};
 
 beforeEach(() => {
 	exitCode = undefined;
-	mockExecFileSync.mockReset();
-	mockSpawnSync.mockReset();
-	mockMkdirSync.mockReset();
-	mockExistsSync.mockReset();
-	mockExecFileSync.mockReturnValue(Buffer.from(""));
-	mockSpawnSync.mockReturnValue({ status: 0 });
-	mockExistsSync.mockReturnValue(false);
+	containerExit = 0;
+	vi.spyOn(process, "exit").mockImplementation((code?: number | string) => {
+		exitCode = typeof code === "number" ? code : 0;
+		throw new Error(`process.exit(${exitCode})`);
+	});
+	for (const mock of Object.values(mocks)) mock.mockReset();
+	mocks.execFileSync.mockReturnValue(Buffer.from(""));
+	mocks.spawnSync.mockReturnValue({ status: 0 });
+	mocks.spawn.mockImplementation(() => {
+		const child = new EventEmitter();
+		queueMicrotask(() => child.emit("close", containerExit));
+		return child;
+	});
+	mocks.existsSync.mockReturnValue(false);
+	mocks.readdirSync.mockReturnValue([]);
+	mocks.mkdtempSync.mockReturnValue("/target/.decohere-create-temp");
+	signalHandlers.clear();
+	vi.spyOn(process, "once").mockImplementation(((signal: string, handler: () => void) => {
+		signalHandlers.set(signal, handler);
+		return process;
+	}) as typeof process.once);
+	vi.stubEnv("DECOHERE_TOOLS", "");
+	vi.stubEnv("REMOTE_CONTAINERS", "");
+	vi.stubEnv("CODESPACES", "");
 });
 
 afterEach(() => {
-	vi.clearAllMocks();
+	vi.unstubAllEnvs();
+	vi.restoreAllMocks();
 });
 
 describe("resolveLaunch", () => {
@@ -118,14 +164,14 @@ describe("resolveLaunch", () => {
 	it("forwards auth0 login without wrapping as create webapi", () => {
 		const plan = resolveLaunch(["auth0", "login"], "/cwd");
 		expect(plan.targetDir).toBe("/cwd");
-		expect(plan.kind).toBe("auth0");
+		expect(plan.kind).toBe("project");
 		expect(plan.containerArgv).toEqual(["auth0", "login", "-d", "."]);
 	});
 
 	it("forwards auth0 configure -d onto the mounted workspace", () => {
 		const plan = resolveLaunch(["auth0", "configure", "-d", "my-app"], "/cwd");
 		expect(plan.targetDir).toBe("/cwd/my-app");
-		expect(plan.kind).toBe("auth0");
+		expect(plan.kind).toBe("project");
 		expect(plan.containerArgv).toEqual(["auth0", "configure", "-d", "."]);
 	});
 });
@@ -135,7 +181,7 @@ describe("resolveLaunch with a bare project name", () => {
 		const plan = resolveLaunch(["my-app"], "/cwd");
 		expect(plan.targetDir).toBe("/cwd/my-app");
 		expect(plan.projectName).toBe("my-app");
-		expect(plan.kind).toBe("scaffold");
+		expect(plan.kind).toBe("create");
 		expect(plan.containerArgv).toEqual(["create", "webapi", "-d", "."]);
 	});
 
@@ -192,228 +238,292 @@ describe("containerArgvFromHost", () => {
 	});
 });
 
-describe("runInBuilder", () => {
-	it("creates the target directory", () => {
-		run(["webapi", "-d", "/tmp/my-project"]);
-		expect(mockMkdirSync).toHaveBeenCalledWith("/tmp/my-project", { recursive: true });
-		expect(mockMkdirSync.mock.calls.some((c) => String(c[0]).includes(".devcontainer"))).toBe(
-			false,
-		);
+describe("launch outside the tools", () => {
+	it("checks that Docker is available", async () => {
+		await run(["webapi", "-d", "/tmp/my-project"]);
+		expect(mocks.execFileSync).toHaveBeenCalledWith("docker", ["info"], { stdio: "pipe" });
 	});
 
-	it("checks docker availability via docker info", () => {
-		run(["webapi", "-d", "/tmp/my-project"]);
-		expect(mockExecFileSync).toHaveBeenCalledWith("docker", ["info"], { stdio: "pipe" });
-	});
-
-	it("exits with code 1 if docker is not available", () => {
-		mockExecFileSync.mockImplementation(() => {
+	it("exits 1 and starts nothing when Docker isn't available", async () => {
+		mocks.execFileSync.mockImplementation(() => {
 			throw new Error("docker not found");
 		});
-		expect(() => runInBuilder(["webapi", "-d", "/tmp/my-project"])).toThrow("process.exit(1)");
+		const errors = spyOutput("error");
+
+		await run(["webapi", "-d", "/tmp/my-project"]);
+
 		expect(exitCode).toBe(1);
+		expect(errors.join("\n")).toContain("Install Docker Desktop");
+		expect(mocks.spawnSync).not.toHaveBeenCalled();
 	});
 
-	it("runs docker with correct image, env var, and working directory", () => {
-		run(["webapi", "-d", "/tmp/my-project"]);
+	it("doesn't suggest Docker Desktop inside a container with no Docker", async () => {
+		vi.stubEnv("REMOTE_CONTAINERS", "true");
+		mocks.execFileSync.mockImplementation(() => {
+			throw new Error("docker not found");
+		});
+		const errors = spyOutput("error");
 
-		const args = getRunArgs();
-		expect(args).toContain("--rm");
-		expect(args.some((a) => a === "-i" || a === "-it")).toBe(true);
-		expect(args).toContain("DECOHERE_BUILDER=1");
-		expect(args).toContain("/workspace");
-		expect(args).toContain(IMAGE);
-		expect(args).toContain("create");
-		expect(args).toContain("webapi");
-		expect(args).not.toContain("decohere");
+		await run(["webapi", "-d", "/tmp/my-project"]);
+
+		expect(errors.join("\n")).toContain("can't reach it");
+		expect(errors.join("\n")).not.toContain("Docker Desktop");
 	});
 
-	it("mounts the target directory as /workspace", () => {
-		run(["webapi", "-d", "/tmp/my-project"]);
+	it("shares nothing from this machine with the container", async () => {
+		await run(["webapi", "-d", "/tmp/my-project"]);
 
-		const args = getRunArgs();
-		const vIdx = args.indexOf("-v");
-		expect(vIdx).toBeGreaterThan(-1);
-		expect(args[vIdx + 1]).toBe("/tmp/my-project:/workspace");
-	});
-
-	it("mounts a host-writable npm cache (not an anonymous root volume)", () => {
-		run(["webapi", "-d", "/tmp/my-project"]);
-
-		const args = getRunArgs();
-		const cacheMount = args.find(
-			(a) => typeof a === "string" && a.includes("decohere-create/npm:/npm-cache"),
-		);
-		expect(cacheMount).toBeDefined();
-	});
-
-	it("sets npm cache env vars for faster repeated installs", () => {
-		run(["webapi", "-d", "/tmp/my-project"]);
-
-		const args = getRunArgs();
-		expect(args).toContain("NPM_CONFIG_CACHE=/npm-cache");
-		expect(args).toContain("NPM_CONFIG_PREFER_OFFLINE=true");
-	});
-
-	it("runs the builder as the host uid/gid so files are never root-owned", () => {
-		run(["webapi", "-d", "/tmp/my-project"]);
-
-		const args = getRunArgs();
-		const uid = process.getuid?.();
-		const gid = process.getgid?.();
-		if (uid != null && gid != null) {
-			expect(args).toContain("--user");
-			expect(args).toContain(`${uid}:${gid}`);
-			expect(args).not.toContain(`HOST_UID=${uid}`);
+		const args = createArgs();
+		for (const flag of ["-v", "--volume", "--mount", "--user"]) {
+			expect(args).not.toContain(flag);
 		}
+		expect(args.join(" ")).not.toMatch(/npmrc|\.config\/auth0|npm-cache/);
 	});
 
-	it("passes the host directory basename as DECOHERE_PROJECT_NAME", () => {
-		run(["webapi", "-d", "/data/das974/test1"]);
+	it("creates the container from the pinned image, working in /workspace", async () => {
+		await run(["webapi", "-d", "/tmp/my-project"]);
 
-		const args = getRunArgs();
-		expect(args).toContain("DECOHERE_PROJECT_NAME=test1");
+		const args = createArgs();
+		expect(args).toContain(IMAGE);
+		expect(args[args.indexOf("--workdir") + 1]).toBe("/workspace");
+		expect(args).toContain("DECOHERE_BUILDER=1");
+		expect(args).toContain("DECOHERE_PROJECT_NAME=my-project");
 	});
 
-	it("mounts host .npmrc when present for private registry credentials", () => {
-		mockExistsSync.mockImplementation((p: string) => String(p).endsWith("/.npmrc"));
-
-		run(["webapi", "-d", "/tmp/my-project"]);
-
-		const args = getRunArgs();
-		const mountIdx = args.findIndex(
-			(a) => typeof a === "string" && a.endsWith("/.npmrc:/tmp/host-npmrc:ro"),
-		);
-		expect(mountIdx).toBeGreaterThan(-1);
-		expect(args).toContain("NPM_CONFIG_USERCONFIG=/tmp/host-npmrc");
-	});
-
-	it("does not mount .npmrc when absent", () => {
-		mockExistsSync.mockReturnValue(false);
-
-		run(["webapi", "-d", "/tmp/my-project"]);
-
-		const args = getRunArgs();
-		expect(args.some((a) => typeof a === "string" && a.includes("host-npmrc"))).toBe(false);
-	});
-
-	it("always creates and mounts host ~/.config/auth0 into builder HOME", () => {
-		run(["webapi", "-d", "/tmp/my-project"]);
-
-		const args = getRunArgs();
-		const mount = args.find(
-			(a) =>
-				typeof a === "string" &&
-				a.includes(".config/auth0") &&
-				a.includes("/tmp/decohere-create-home/.config/auth0"),
-		);
-		expect(mount).toBeDefined();
-		expect(mockMkdirSync).toHaveBeenCalledWith(expect.stringContaining(".config/auth0"), {
-			recursive: true,
-		});
-	});
-
-	it("does not create .devcontainer for auth0 login", () => {
-		run(["auth0", "login"]);
-
-		expect(
-			mockMkdirSync.mock.calls.some(
-				(c) => typeof c[0] === "string" && String(c[0]).includes(".devcontainer"),
-			),
-		).toBe(false);
-		expect(getRunArgs()).toEqual(expect.arrayContaining(["auth0", "login"]));
-	});
-
-	it("does not print scaffold-complete after auth0 login", () => {
-		const logs: string[] = [];
-		vi.spyOn(console, "log").mockImplementation((msg?: unknown) => {
-			logs.push(String(msg ?? ""));
-		});
-		run(["auth0", "login"]);
-		expect(logs.join("\n")).toContain("Running Auth0 CLI");
-		expect(logs.join("\n")).not.toContain("Scaffold complete");
-	});
-
-	it("forwards predefined scaffold options into the container command", () => {
-		run([
+	it("forwards scaffold options to the container", async () => {
+		await run([
 			"webapi",
 			"-d",
 			"/tmp/my-project",
 			"--database",
 			"postgres/typeorm",
-			"--auth",
-			"auth0",
-			"--install",
-			"no",
+			"--name",
+			"billing",
 		]);
 
-		const args = getRunArgs();
-		expect(args).toEqual(
+		expect(createArgs()).toEqual(
 			expect.arrayContaining([
 				"create",
 				"webapi",
 				"--database",
 				"postgres/typeorm",
-				"--auth",
-				"auth0",
-				"--install",
-				"no",
-				"-d",
-				".",
-			]),
-		);
-	});
-
-	it("forwards --name into the container command", () => {
-		run(["webapi", "-d", "/tmp/my-project", "--name", "billing", "--name", "admin"]);
-
-		const args = getRunArgs();
-		expect(args).toEqual(
-			expect.arrayContaining([
-				"create",
-				"webapi",
 				"--name",
 				"billing",
-				"--name",
-				"admin",
 				"-d",
 				".",
 			]),
 		);
 	});
 
-	it("forwards webapi add into the container as add api", () => {
-		run(["webapi", "add", "billing"]);
-
-		const args = getRunArgs();
-		expect(args).toEqual(expect.arrayContaining(["add", "api", "billing", "-d", "."]));
-		expect(args).not.toContain("--name");
-	});
-
-	it("forwards decohere add api into the container as-is", () => {
-		run(["add", "api", "billing"]);
-
-		const args = getRunArgs();
-		expect(args).toEqual(expect.arrayContaining(["add", "api", "billing", "-d", "."]));
-	});
-
-	it("defaults to current directory when -d is not provided", () => {
-		const cwd = process.cwd();
-		run(["webapi"]);
-		expect(mockMkdirSync).toHaveBeenCalledWith(cwd, { recursive: true });
-	});
-
-	it("propagates the container exit code", () => {
-		mockSpawnSync.mockReturnValueOnce({ status: 42 });
-		expect(() => runInBuilder(["webapi", "-d", "/tmp/my-project"])).toThrow(
-			"process.exit(42)",
+	it("copies the project out through a temporary folder, then removes the container", async () => {
+		mocks.readdirSync.mockImplementation((dir: string) =>
+			dir.includes(".decohere-create-") ? ["package.json", ".env"] : [],
 		);
-		expect(exitCode).toBe(42);
+		const logs = spyOutput("log");
+
+		await run(["webapi", "-d", "/tmp/my-project"]);
+
+		const name = containerName();
+		expect(dockerCalls("cp")).toEqual([
+			["cp", `${name}:/workspace/.`, "/target/.decohere-create-temp"],
+		]);
+		expect(mocks.renameSync).toHaveBeenCalledWith(
+			"/target/.decohere-create-temp/package.json",
+			"/tmp/my-project/package.json",
+		);
+		expect(mocks.renameSync).toHaveBeenCalledWith(
+			"/target/.decohere-create-temp/.env",
+			"/tmp/my-project/.env",
+		);
+		expect(dockerCalls("rm")).toEqual([["rm", "-f", name]]);
+		expect(exitCode).toBe(0);
+		expect(logs.join("\n")).toContain("Scaffold complete");
 	});
 
-	it("exits 0 when container exits successfully", () => {
-		mockSpawnSync.mockReturnValueOnce({ status: 0 });
-		expect(() => runInBuilder(["webapi", "-d", "/tmp/my-project"])).toThrow("process.exit(0)");
+	it("suggests opening the Dev Container only outside a container", async () => {
+		const onHost = spyOutput("log");
+		await run(["webapi", "-d", "/tmp/my-project"]);
+		expect(onHost.join("\n")).toContain("Dev Container");
+
+		vi.stubEnv("REMOTE_CONTAINERS", "true");
+		const inContainer = spyOutput("log");
+		await run(["webapi", "-d", "/tmp/my-project"]);
+		expect(inContainer.join("\n")).not.toContain("Dev Container");
+		expect(inContainer.join("\n")).toContain("pnpm install");
+	});
+
+	it("copies nothing after a failure, passes on the exit code and removes the container", async () => {
+		containerExit = 7;
+		const logs = spyOutput("log");
+
+		await run(["webapi", "-d", "/tmp/my-project"]);
+
+		expect(exitCode).toBe(7);
+		expect(dockerCalls("cp")).toEqual([]);
+		expect(mocks.mkdirSync).not.toHaveBeenCalled();
+		expect(dockerCalls("rm")).toEqual([["rm", "-f", containerName()]]);
+		expect(logs.join("\n")).not.toContain("Scaffold complete");
+	});
+
+	it("reports a failed copy, cleans up a folder it made, and removes the container", async () => {
+		mocks.spawnSync.mockImplementation((_cmd: string, args: string[]) => ({
+			status: args[0] === "cp" ? 1 : 0,
+		}));
+		const errors = spyOutput("error");
+
+		await run(["webapi", "-d", "/tmp/my-project"]);
+
+		expect(exitCode).toBe(1);
+		expect(errors.join("\n")).toContain("docker cp failed");
+		expect(mocks.rmSync).toHaveBeenCalledWith("/tmp/my-project", {
+			recursive: true,
+			force: true,
+		});
+		expect(dockerCalls("rm")).toEqual([["rm", "-f", containerName()]]);
+	});
+
+	it("removes only its temporary folder when the target already existed", async () => {
+		mocks.existsSync.mockImplementation((path: string) => path === "/tmp/my-project");
+		mocks.spawnSync.mockImplementation((_cmd: string, args: string[]) => ({
+			status: args[0] === "cp" ? 1 : 0,
+		}));
+		spyOutput("error");
+
+		await run(["webapi", "-d", "/tmp/my-project"]);
+
+		expect(mocks.rmSync).toHaveBeenCalledWith("/target/.decohere-create-temp", {
+			recursive: true,
+			force: true,
+		});
+		expect(mocks.rmSync).not.toHaveBeenCalledWith("/tmp/my-project", expect.anything());
+	});
+
+	it("removes the container when interrupted", async () => {
+		mocks.spawn.mockImplementation(() => new EventEmitter());
+
+		// Never settles: the container is still running when the signal arrives.
+		void run(["webapi", "-d", "/tmp/my-project"]);
+		await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalled());
+
+		expect(() => signalHandlers.get("SIGTERM")?.()).toThrow("process.exit(143)");
+		expect(dockerCalls("rm")).toEqual([["rm", "-f", containerName()]]);
+		expect(dockerCalls("cp")).toEqual([]);
+	});
+
+	it("refuses a folder that already has files, before starting anything", async () => {
+		mocks.existsSync.mockImplementation((path: string) => path === "/tmp/my-project");
+		mocks.readdirSync.mockReturnValue(["package.json"]);
+		const errors = spyOutput("error");
+
+		await run(["webapi", "-d", "/tmp/my-project"]);
+
+		expect(exitCode).toBe(1);
+		expect(errors.join("\n")).toContain("already has files");
+		expect(mocks.spawnSync).not.toHaveBeenCalled();
+	});
+
+	it("accepts a folder holding only .git", async () => {
+		mocks.existsSync.mockImplementation((path: string) => path === "/tmp/my-project");
+		mocks.readdirSync.mockImplementation((dir: string) =>
+			dir === "/tmp/my-project" ? [".git"] : [],
+		);
+
+		await run(["webapi", "-d", "/tmp/my-project"]);
+
 		expect(exitCode).toBe(0);
+		expect(dockerCalls("cp")).toHaveLength(1);
+	});
+
+	it("copies nothing for --help", async () => {
+		mocks.existsSync.mockReturnValue(true);
+		mocks.readdirSync.mockReturnValue(["package.json"]);
+
+		await run(["--help"]);
+
+		expect(createArgs()).toContain("--help");
+		expect(dockerCalls("cp")).toEqual([]);
+		expect(exitCode).toBe(0);
+	});
+
+	it.each([
+		[["add", "auth0"]],
+		[["add", "api", "billing"]],
+		[["webapi", "add", "billing"]],
+		[["auth0", "login"]],
+		[["auth0", "configure"]],
+	])("%j says to open the Dev Container and starts no container", async (argv) => {
+		const errors = spyOutput("error");
+
+		await run(argv);
+
+		expect(exitCode).toBe(1);
+		expect(errors.join("\n")).toContain("Dev Container");
+		expect(mocks.spawnSync).not.toHaveBeenCalled();
+		expect(mocks.execFileSync).not.toHaveBeenCalled();
+		expect(mocks.mkdirSync).not.toHaveBeenCalled();
+	});
+});
+
+describe("launch inside a container with Decohere's tools", () => {
+	beforeEach(() => {
+		vi.stubEnv("DECOHERE_TOOLS", "1");
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	function scaffoldCall(): { args: string[]; cwd: string; env: NodeJS.ProcessEnv } {
+		const call = mocks.spawnSync.mock.calls.find((c) => c[0] === "npx");
+		if (call == null) throw new Error("Expected the scaffolder to run with npx");
+		return { args: call[1], cwd: call[2].cwd, env: call[2].env };
+	}
+
+	it("runs create right here, without Docker", async () => {
+		await run(["my-app", "--database", "none"]);
+
+		expect(mocks.spawnSync.mock.calls.some((c) => c[0] === "docker")).toBe(false);
+		expect(mocks.execFileSync).not.toHaveBeenCalled();
+		const { args, cwd, env } = scaffoldCall();
+		expect(args).toEqual([
+			"--yes",
+			"@decohere/scaffold@0.0.1-test",
+			"create",
+			"webapi",
+			"--database",
+			"none",
+			"-d",
+			".",
+		]);
+		expect(cwd.endsWith("/my-app")).toBe(true);
+		expect(env.DECOHERE_PROJECT_NAME).toBe("my-app");
+		expect(mocks.mkdirSync).toHaveBeenCalledWith(cwd, { recursive: true });
+	});
+
+	it("runs commands on an existing project right here, in that project", async () => {
+		await run(["add", "auth0"]);
+
+		expect(mocks.spawnSync.mock.calls.some((c) => c[0] === "docker")).toBe(false);
+		expect(scaffoldCall().args).toEqual(expect.arrayContaining(["add", "auth0", "-d", "."]));
+		expect(mocks.mkdirSync).not.toHaveBeenCalled();
+	});
+
+	it("passes on the scaffolder's exit code", async () => {
+		mocks.spawnSync.mockReturnValue({ status: 7 });
+		await run(["add", "auth0"]);
+		expect(exitCode).toBe(7);
+	});
+
+	it("reports a failure to start, rather than success", async () => {
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
+		mocks.spawnSync.mockReturnValue({ status: null, error: new Error("spawn npx ENOENT") });
+
+		await run(["add", "auth0"]);
+
+		expect(exitCode).toBe(1);
+		expect(errors.join("\n")).toContain("spawn npx ENOENT");
 	});
 });

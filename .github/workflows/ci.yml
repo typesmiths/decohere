@@ -328,6 +328,13 @@ jobs:
             echo "::error::The generated Dev Container should run as node and own node_modules. User: $user. Owner: $owner."
             exit 1
           fi
+          docker run --rm --entrypoint auth0 generated-devcontainer --version
+          tools="$(docker run --rm --entrypoint printenv generated-devcontainer DECOHERE_TOOLS)"
+          login_owner="$(docker run --rm --entrypoint stat generated-devcontainer -c %U /home/node/.config/auth0)"
+          if [[ "$tools" != "1" || "$login_owner" != "node" ]]; then
+            echo "::error::The generated Dev Container should say it has the tools and let node own the Auth0 login. Tools: $tools. Owner: $login_owner."
+            exit 1
+          fi
 
   # Uses the build `build` stamped, from a temporary registry, the way a user would. Publish only
   # runs if this passes, and uploads this same build. Only on main: too slow for every PR.

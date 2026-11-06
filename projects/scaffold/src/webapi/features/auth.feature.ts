@@ -5,7 +5,12 @@ import { WELL_KNOWN_FILES } from "../../models/const.js";
 import type { EnvFile } from "../../models/env-file.model.js";
 import type { WorkspaceScaffold } from "../../models/project.model.js";
 import type { Feature } from "../../services/scaffold.service.js";
-import { ensureLoggedIn, ensureLoginApp, readEnvFile } from "../auth0-commands.js";
+import {
+	ensureLoggedIn,
+	ensureLoginApp,
+	ensureTokenApp,
+	readEnvFile,
+} from "../auth0-commands.js";
 import { AUTH_CONFIG_SECTION, AuthConfigModel } from "../models/auth-config.model.js";
 import { ControllerSourceFile } from "../models/controller-source-file.model.js";
 import type { MainSourceFile } from "../models/main-source-file.model.js";
@@ -343,7 +348,7 @@ function scaffoldLocalUserProfile(workspace: WorkspaceScaffold): void {
  */
 function resolveLoginClientId(workspace: WorkspaceScaffold): string {
 	try {
-		return ensureLoginApp(workspace.name);
+		return ensureLoginApp(workspace.name, workspace.getProjects().length);
 	} catch (err) {
 		const detail = err instanceof Error ? err.message : String(err);
 		const existing = readEnvFile(join(workspace.targetDir, ".env")).AUTH0_CLIENT_ID?.trim();
@@ -431,6 +436,15 @@ function scaffold(workspace: WorkspaceScaffold, options: AuthOptions): void {
 		workspace
 			.getModel<EnvFile>(WELL_KNOWN_FILES.ENV_FILE)
 			?.addEntry("AUTH0_CLIENT_ID", clientId);
+	}
+
+	if (options.issuerBaseUrl && options.audience) {
+		workspace
+			.getModel<EnvFile>(WELL_KNOWN_FILES.ENV_FILE)
+			?.addEntry(
+				"AUTH0_TOKEN_CLIENT_ID",
+				ensureTokenApp(workspace.name, options.audience, auth0Cli.HELLO_API_SCOPES),
+			);
 	}
 
 	const authConfig = new AuthConfigModel({

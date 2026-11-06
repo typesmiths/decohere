@@ -279,10 +279,7 @@ describe("ensureSpaApp", () => {
 				error: undefined,
 			});
 
-		const app = ensureSpaApp("webapi Dev", [
-			"https://oauth.pstmn.io/v1/callback",
-			"https://oauth.pstmn.io/v1/browser-callback",
-		]);
+		const app = ensureSpaApp("webapi Dev", ["http://localhost:3000", "http://localhost:3001"]);
 
 		expect(app).toEqual({ client_id: "spa_existing", reused: true });
 		const updateArgs = mockSpawnSync.mock.calls[1]?.[1] as string[];
@@ -292,7 +289,11 @@ describe("ensureSpaApp", () => {
 				"update",
 				"spa_existing",
 				"--callbacks",
-				"https://oauth.pstmn.io/v1/callback,https://oauth.pstmn.io/v1/browser-callback",
+				"http://localhost:3000,http://localhost:3001",
+				"--logout-urls",
+				"http://localhost:3000,http://localhost:3001",
+				"--web-origins",
+				"http://localhost:3000,http://localhost:3001",
 			]),
 		);
 	});
@@ -312,7 +313,7 @@ describe("ensureSpaApp", () => {
 				error: undefined,
 			});
 
-		const app = ensureSpaApp("webapi Dev", ["https://oauth.pstmn.io/v1/callback"]);
+		const app = ensureSpaApp("webapi Dev", ["http://localhost:3000"]);
 		expect(app).toEqual({ client_id: "spa_new", reused: false });
 	});
 
@@ -336,7 +337,7 @@ describe("ensureSpaApp", () => {
 				error: undefined,
 			});
 
-		expect(() => ensureSpaApp("crypto Dev", ["https://oauth.pstmn.io/v1/callback"])).toThrow(
+		expect(() => ensureSpaApp("crypto Dev", ["http://localhost:3000"])).toThrow(
 			/tenant application limit reached[\s\S]*delete unused apps/i,
 		);
 	});

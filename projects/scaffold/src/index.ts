@@ -7,6 +7,8 @@ export { Auth0Module } from "./auth0.module.js";
 export type { Auth0ConfigureOptions } from "./auth0-configure.action.js";
 export { Auth0ConfigureAction } from "./auth0-configure.action.js";
 export { Auth0LoginAction } from "./auth0-login.action.js";
+export type { Auth0TokenOptions } from "./auth0-token.action.js";
+export { Auth0TokenAction } from "./auth0-token.action.js";
 export { CreateModule } from "./create.module.js";
 export { runCli } from "./program.js";
 export type { ApiOptions } from "./webapi/create-api.js";

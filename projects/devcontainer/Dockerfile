@@ -25,6 +25,12 @@ RUN mkdir -p /home/${USERNAME}/.config/pnpm /home/${USERNAME}/.pnpm-store && cho
 
 RUN apt-get update && apt-get install -y --no-install-recommends gh && rm -rf /var/lib/apt/lists/*
 
+RUN curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/v1.39.0/install.sh | sh -s -- -b /usr/local/bin v1.39.0
+
+RUN mkdir -p /home/${USERNAME}/.config/auth0 && chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}/.config/auth0
+
+ENV DECOHERE_TOOLS=1
+
 RUN mkdir -p /workspace/node_modules && chown ${USERNAME}:${USERNAME} /workspace/node_modules
 
 # VS Code / Cursor js-debug Auto Attach injects --require …/bootloader.js into

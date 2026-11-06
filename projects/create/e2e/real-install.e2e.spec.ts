@@ -364,6 +364,14 @@ cat /tmp/dev.log
 exit 1`),
 					);
 				});
+
+				it("runs add right there, without starting another container", async () => {
+					expectOk(
+						await inside(`if command -v docker; then echo "docker should not be here"; exit 1; fi
+pnpm decohere add api billing --database postgres/typeorm --auth none --install no
+test -f projects/billing/package.json`),
+					);
+				});
 			},
 			{ skip: !containerRegistry },
 		);

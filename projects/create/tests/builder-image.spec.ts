@@ -121,18 +121,19 @@ describe("builder image", () => {
 		expect(fs.readFileSync(h.log, "utf8")).not.toContain("@decohere/create@");
 	});
 
-	it("installs CREATE_LOCAL_TGZ then runs decohere", () => {
-		const h = harness({ createBin: false, npmInstallsCreate: true });
-		const tgz = join(h.home, "create.tgz");
-		fs.writeFileSync(tgz, "tarball");
-		const result = runEntrypoint(h, ["create", "webapi", "-d", "."], {
-			CREATE_LOCAL_TGZ: tgz,
-		});
+	it("runs as a non-root user, and owns the folder it writes to", () => {
+		const dockerfile = fs.readFileSync(DOCKERFILE, "utf8");
+		expect(dockerfile).toContain("chown node:node /workspace");
+		expect(dockerfile).toMatch(/^USER node$/m);
+	});
 
-		expect(result.status, result.stderr).toBe(0);
-		const log = fs.readFileSync(h.log, "utf8");
-		expect(log).toContain(`npm install -g ${tgz}`);
-		expect(log).toContain("decohere create webapi -d .");
-		expect(log).not.toMatch(/npm exec/);
+	it("pins the same Auth0 CLI version as the Dev Container", () => {
+		const version = (file: string) =>
+			fs.readFileSync(file, "utf8").match(/auth0-cli\/(v\d+\.\d+\.\d+)\/install\.sh/)?.[1];
+		const devContainer = fileURLToPath(
+			new URL("../../devcontainer/Dockerfile", import.meta.url),
+		);
+		expect(version(DOCKERFILE)).toBeDefined();
+		expect(version(DOCKERFILE)).toBe(version(devContainer));
 	});
 });

@@ -1,27 +1,26 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { CreateCliError, isDecohereWorkspace } from "./api-name.js";
+import { CreateCliError, isDecohereWorkspace, listExistingApiNames } from "./api-name.js";
 import { discoverAuthorizeScopes, mergeApiScopes } from "./authorize-scopes.js";
+import { webapiPort } from "./const.js";
 import * as auth0Cli from "./features/auth0-cli.js";
-
-/** Postman's OAuth callbacks, so a token can be fetched from Postman without more setup. */
-const LOGIN_APP_CALLBACKS = [
-	"https://oauth.pstmn.io/v1/callback",
-	"https://oauth.pstmn.io/v1/browser-callback",
-] as const;
 
 export const AUTH0_CLI_INSTALL_MESSAGE =
 	"The Auth0 CLI is required.\n" +
-	"  It is bundled in the Decohere create image (`npx @decohere/create auth0 login`).\n" +
-	"  Host install: brew install auth0/auth0-cli/auth0\n" +
-	"  Or visit: https://github.com/auth0/auth0-cli";
+	"  It comes with the Decohere Dev Container image. If this project was created before that,\n" +
+	"  update the image version in .devcontainer/Dockerfile and rebuild the Dev Container.\n" +
+	"  Or install it yourself: https://github.com/auth0/auth0-cli";
 
 /**
- * Create or reuse the app people log in through to get a token during development, and
- * return its client id.
+ * Create or reuse the app a web app's users log in through, allowing the local URL of each API,
+ * and return its client id.
  */
-export function ensureLoginApp(projectName: string): string {
-	const app = auth0Cli.ensureSpaApp(`${projectName} Dev`, [...LOGIN_APP_CALLBACKS]);
+export function ensureLoginApp(projectName: string, apiCount: number): string {
+	const urls = Array.from(
+		{ length: Math.max(apiCount, 1) },
+		(_, index) => `http://localhost:${webapiPort(index)}`,
+	);
+	const app = auth0Cli.ensureSpaApp(`${projectName} Dev`, urls);
 	console.log(
 		app.reused
 			? `  ✓ Reusing Auth0 login app (${app.client_id})`
@@ -35,6 +34,25 @@ export function ensureLoginApp(projectName: string): string {
 			`  ✗ Failed to enable DB connection on the login app: ${err instanceof Error ? err.message : err}`,
 		);
 	}
+	return app.client_id;
+}
+
+/**
+ * Create or reuse the machine app `decohere auth0 token` uses, allowed exactly the API's
+ * permissions, and return its client id.
+ */
+export function ensureTokenApp(
+	projectName: string,
+	audience: string,
+	scopes: readonly string[],
+): string {
+	const app = auth0Cli.ensureM2mApp(`${projectName} Token`);
+	auth0Cli.ensureClientGrant(app.client_id, audience, scopes);
+	console.log(
+		app.reused
+			? `  ✓ Reusing Auth0 token app (${app.client_id}) with ${scopes.length} permission(s)`
+			: `  ✓ Auth0 token app created (${app.client_id}) with ${scopes.length} permission(s)`,
+	);
 	return app.client_id;
 }
 
@@ -89,8 +107,8 @@ export function runAuth0Login(): void {
 	const active = tenants.find((t) => t.active) ?? tenants[0];
 	if (active == null) fail("No Auth0 tenant after login.");
 	console.log(`\n  ✓ Auth0 tenant: https://${active.name}`);
-	console.log("    Tokens are stored in ~/.config/auth0 (mounted into the create image).");
-	console.log("    Next: npx @decohere/create auth0 configure");
+	console.log("    Tokens are stored in ~/.config/auth0.");
+	console.log("    Next: pnpm decohere auth0 configure");
 }
 
 export function runAuth0Configure(directory = "."): void {
@@ -140,14 +158,18 @@ export function runAuth0Configure(directory = "."): void {
 		console.log(`  ✓ API created: ${audience}`);
 	}
 
-	const clientId = ensureLoginApp(projectName);
+	const clientId = ensureLoginApp(projectName, listExistingApiNames(targetDir).length);
+	const tokenClientId = ensureTokenApp(projectName, audience, apiScopes);
 
 	upsertEnv(envPath, {
 		AUTH0_ISSUER_BASE_URL: issuerBaseUrl,
 		AUTH0_AUDIENCE: audience,
 		AUTH0_CLIENT_ID: clientId,
+		AUTH0_TOKEN_CLIENT_ID: tokenClientId,
 	});
-	console.log("  ✓ Wrote AUTH0_ISSUER_BASE_URL, AUTH0_AUDIENCE and AUTH0_CLIENT_ID to .env");
+	console.log(
+		"  ✓ Wrote AUTH0_ISSUER_BASE_URL, AUTH0_AUDIENCE, AUTH0_CLIENT_ID and AUTH0_TOKEN_CLIENT_ID to .env",
+	);
 
 	const adminSub = existing.AUTH0_ADMIN_USER_SUB?.trim();
 	if (adminSub) {
@@ -159,6 +181,35 @@ export function runAuth0Configure(directory = "."): void {
 				`  ✗ Failed to assign admin permissions: ${err instanceof Error ? err.message : err}`,
 			);
 		}
+	}
+}
+
+/**
+ * `decohere auth0 token`: print only the token, so `$(pnpm -s decohere auth0 token)` works. It's
+ * printed because that's what was asked for, and it expires. Everything else goes to stderr.
+ */
+export function runAuth0Token(directory = "."): void {
+	const targetDir = resolve(directory);
+	if (!isDecohereWorkspace(targetDir)) {
+		fail(`Not a Decohere workspace: ${targetDir}.`);
+	}
+	requireInstalled();
+
+	const env = readEnvFile(join(targetDir, ".env"));
+	const audience = env.AUTH0_AUDIENCE?.trim();
+	const clientId = env.AUTH0_TOKEN_CLIENT_ID?.trim();
+	if (!audience || !clientId) {
+		fail("This project has no Auth0 token app yet. Run: pnpm decohere auth0 configure");
+	}
+
+	try {
+		const scopes = auth0Cli.listApiScopes(audience);
+		process.stdout.write(`${auth0Cli.requestAccessToken(clientId, audience, scopes)}\n`);
+	} catch (err) {
+		if (err instanceof auth0Cli.Auth0AuthError) {
+			fail("Your Auth0 login has expired. Run: pnpm decohere auth0 login");
+		}
+		throw err;
 	}
 }
 
