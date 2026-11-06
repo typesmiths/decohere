@@ -164,6 +164,21 @@ export function withPostgresqlClient(options?: {
 	};
 }
 
+/** What a slim Node base leaves out and this image, Git or VS Code's server needs. */
+export function withBaseTools(options?: { order?: number }): LayerWriter {
+	const order = options?.order ?? StepOrder.features + 50;
+
+	return (dockerfile) => {
+		dockerfile.addStep(
+			DockerStep.run(
+				"base-tools",
+				"apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git less openssh-client procps && rm -rf /var/lib/apt/lists/*",
+				order,
+			),
+		);
+	};
+}
+
 /** GitHub CLI — install before USER switches away from root. */
 export function withGithubCli(options?: { order?: number }): LayerWriter {
 	const order = options?.order ?? StepOrder.features + 140;
@@ -382,6 +397,7 @@ export class AppDevContainerBaseImage extends DockerfileModel {
 		super.registerBaseLayers();
 		this.addLayer(withCommandHistory())
 			.addLayer(withNodeUser())
+			.addLayer(withBaseTools())
 			.addLayer(withPnpm())
 			.addLayer(withGithubCli())
 			.addLayer(withAuth0Cli())
