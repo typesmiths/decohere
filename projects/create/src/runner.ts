@@ -62,9 +62,29 @@ function generateAdminPassword(): string {
 	return `${randomBytes(18).toString("base64url")}aA1!`;
 }
 
+/** Store it in the Linux key store, if there is one. The value goes over stdin, never in argv. */
+function saveToKeyStore(projectName: string, password: string): boolean {
+	if (process.platform !== "linux") return false;
+	const stored = spawnSync(
+		"secret-tool",
+		[
+			"store",
+			`--label=Decohere ${projectName} Auth0 admin`,
+			...keyStoreAttributes(projectName),
+		],
+		{ input: password, stdio: ["pipe", "ignore", "ignore"] },
+	);
+	return stored.error == null && stored.status === 0;
+}
+
+function keyStoreAttributes(projectName: string): string[] {
+	return ["service", "decohere", "project", projectName, "account", "auth0-admin"];
+}
+
 /**
- * After a successful run, save the generated password in one private file outside the project.
- * It's only for logging in, so nothing in the app reads it. Nothing is saved if no admin was made.
+ * After a successful run, save the generated password: in the OS key store where there is one,
+ * otherwise in one private file outside the project. It's only for logging in, so nothing in
+ * the app reads it. Nothing is saved if no admin was made.
  */
 function saveAdminPassword(targetDir: string, projectName: string, password: string): void {
 	const env = join(targetDir, ".env");
@@ -75,6 +95,14 @@ function saveAdminPassword(targetDir: string, projectName: string, password: str
 
 	const folder = join(homedir(), ".config", "decohere");
 	const file = join(folder, `${projectName}.env`);
+	if (saveToKeyStore(projectName, password)) {
+		// A file from an earlier run would hold a password that no longer works.
+		rmSync(file, { force: true });
+		console.log("\n  Auth0 admin password saved in your key store. To read it:");
+		console.log(`\n    secret-tool lookup ${keyStoreAttributes(projectName).join(" ")}`);
+		return;
+	}
+
 	mkdirSync(folder, { recursive: true, mode: 0o700 });
 	writeFileSync(
 		file,
@@ -82,7 +110,9 @@ function saveAdminPassword(targetDir: string, projectName: string, password: str
 		{ mode: 0o600 },
 	);
 	chmodSync(file, 0o600);
-	console.log(`\n  Auth0 admin password saved on this machine: ${file}`);
+	console.log(
+		`\n  No key store found, so the Auth0 admin password is in a private file: ${file}`,
+	);
 	if (isInContainer()) {
 		console.log("  That's inside this container, so copy it if the container may be rebuilt.");
 	}

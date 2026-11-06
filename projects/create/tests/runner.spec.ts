@@ -460,7 +460,53 @@ describe("launch outside the tools", () => {
 			expect(createArgs().join(" ")).not.toContain(password);
 		});
 
-		it("is saved in a private file outside the project, and never printed", async () => {
+		const noKeyStore = () => {
+			mocks.spawnSync.mockImplementation((command: string) =>
+				command === "secret-tool"
+					? { status: null, error: new Error("spawn secret-tool ENOENT") }
+					: { status: 0 },
+			);
+		};
+
+		it("goes in the Linux key store over stdin, and isn't printed or put in a file", async () => {
+			vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+			writtenProject();
+			const logs = spyOutput("log");
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			const password = createEnv().DECOHERE_ADMIN_PASSWORD!;
+			const call = mocks.spawnSync.mock.calls.find((c) => c[0] === "secret-tool")!;
+			expect(call[1]).toEqual(
+				expect.arrayContaining(["store", "service", "decohere", "project", "my-project"]),
+			);
+			expect(call[1].join(" ")).not.toContain(password);
+			expect(call[2].input).toBe(password);
+			expect(mocks.writeFileSync).not.toHaveBeenCalled();
+			expect(mocks.rmSync).toHaveBeenCalledWith(
+				expect.stringMatching(/\.config\/decohere\/my-project\.env$/),
+				{ force: true },
+			);
+			expect(logs.join("\n")).toContain(
+				"secret-tool lookup service decohere project my-project",
+			);
+			expect(logs.join("\n")).not.toContain(password);
+		});
+
+		it("doesn't try the key store outside Linux", async () => {
+			vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+			writtenProject();
+			spyOutput("log");
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			expect(mocks.spawnSync.mock.calls.some((c) => c[0] === "secret-tool")).toBe(false);
+			expect(mocks.writeFileSync).toHaveBeenCalledOnce();
+		});
+
+		it("falls back to a private file with no key store, and never prints it", async () => {
+			vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+			noKeyStore();
 			writtenProject();
 			const logs = spyOutput("log");
 			const errors = spyOutput("error");
@@ -493,6 +539,7 @@ describe("launch outside the tools", () => {
 			await run(["webapi", "-d", "/tmp/my-project"]);
 
 			expect(mocks.writeFileSync).not.toHaveBeenCalled();
+			expect(mocks.spawnSync.mock.calls.some((c) => c[0] === "secret-tool")).toBe(false);
 		});
 
 		it("isn't saved after a failed run", async () => {
@@ -502,6 +549,7 @@ describe("launch outside the tools", () => {
 			await run(["webapi", "-d", "/tmp/my-project"]);
 
 			expect(mocks.writeFileSync).not.toHaveBeenCalled();
+			expect(mocks.spawnSync.mock.calls.some((c) => c[0] === "secret-tool")).toBe(false);
 		});
 	});
 
