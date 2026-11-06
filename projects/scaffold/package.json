@@ -34,7 +34,6 @@
     "@decohere/crucible": "0.0.1-dev.5",
     "@decohere/devkit": "0.0.1-dev.5",
     "commander": "^13.1.0",
-    "openapi-to-postmanv2": "^5.0.0",
     "yaml": "^2.9.1"
   },
   "devDependencies": {},

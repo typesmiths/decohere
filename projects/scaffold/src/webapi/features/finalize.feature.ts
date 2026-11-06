@@ -30,7 +30,6 @@ type FinalizeOptions = {
 	add?: boolean;
 	databaseProvider?: "none" | "postgres/typeorm";
 	authProvider?: "auth0" | "none";
-	postmanProvider?: "api" | "local" | "none";
 };
 
 async function getOptions(

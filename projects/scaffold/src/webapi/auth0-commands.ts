@@ -1,20 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { CreateCliError, isDecohereWorkspace } from "./api-name.js";
-import {
-	discoverAuthorizeScopes,
-	mergeApiScopes,
-	postmanRequestedScopes,
-} from "./authorize-scopes.js";
+import { discoverAuthorizeScopes, mergeApiScopes } from "./authorize-scopes.js";
 import * as auth0Cli from "./features/auth0-cli.js";
-
-/** Same Postman OAuth callbacks as `PostmanFeature`. */
-const POSTMAN_CALLBACKS = [
-	"https://oauth.pstmn.io/v1/callback",
-	"https://oauth.pstmn.io/v1/browser-callback",
-] as const;
-
-const SPA_SUFFIX = " Postman";
 
 export const AUTH0_CLI_INSTALL_MESSAGE =
 	"The Auth0 CLI is required.\n" +
@@ -124,22 +112,6 @@ export function runAuth0Configure(directory = "."): void {
 		console.log(`  ✓ API created: ${audience}`);
 	}
 
-	const appName = `${projectName}${SPA_SUFFIX}`;
-	const app = auth0Cli.ensureSpaApp(appName, [...POSTMAN_CALLBACKS]);
-	console.log(
-		app.reused
-			? `  ✓ Reusing Auth0 SPA app (${app.client_id})`
-			: `  ✓ Auth0 SPA app created (${app.client_id})`,
-	);
-	try {
-		auth0Cli.enableConnectionForClient(auth0Cli.DB_CONNECTION_NAME, app.client_id);
-		console.log(`  ✓ Enabled ${auth0Cli.DB_CONNECTION_NAME} on SPA`);
-	} catch (err) {
-		console.error(
-			`  ✗ Failed to enable DB connection on SPA: ${err instanceof Error ? err.message : err}`,
-		);
-	}
-
 	upsertEnv(envPath, {
 		AUTH0_ISSUER_BASE_URL: issuerBaseUrl,
 		AUTH0_AUDIENCE: audience,
@@ -157,14 +129,6 @@ export function runAuth0Configure(directory = "."): void {
 			);
 		}
 	}
-
-	const domain = issuerBaseUrl.replace(/^https?:\/\//, "");
-	patchPostmanAuth(targetDir, projectName, {
-		domain,
-		audience,
-		clientId: app.client_id,
-		scopes: postmanRequestedScopes(apiScopes),
-	});
 }
 
 function readEnvFile(path: string): Record<string, string> {
@@ -200,53 +164,4 @@ function upsertEnv(path: string, entries: Record<string, string>): void {
 	}
 	if (text !== "" && !text.endsWith("\n")) text = `${text}\n`;
 	writeFileSync(path, text);
-}
-
-function patchPostmanAuth(
-	targetDir: string,
-	projectName: string,
-	auth: { domain: string; audience: string; clientId: string; scopes: string },
-): void {
-	const envYaml = join(
-		targetDir,
-		"postman/environments",
-		`${projectName}-Local.environment.yaml`,
-	);
-	if (existsSync(envYaml)) {
-		let yaml = readFileSync(envYaml, "utf8");
-		yaml = replaceYamlKeyedValue(yaml, "auth0Domain", auth.domain);
-		yaml = replaceYamlKeyedValue(yaml, "auth0Audience", auth.audience);
-		yaml = replaceYamlKeyedValue(yaml, "auth0ClientId", auth.clientId);
-		yaml = replaceYamlKeyedValue(
-			yaml,
-			"authUrl",
-			`https://${auth.domain}/authorize?audience=${auth.audience}`,
-		);
-		yaml = replaceYamlKeyedValue(yaml, "accessTokenUrl", `https://${auth.domain}/oauth/token`);
-		yaml = replaceYamlKeyedValue(yaml, "scope", auth.scopes);
-		writeFileSync(envYaml, yaml);
-		console.log(`  ✓ Updated Postman environment auth0ClientId (${auth.clientId})`);
-		console.log(`  ✓ Updated Postman token scopes`);
-	}
-
-	const collectionDef = join(
-		targetDir,
-		"postman/collections",
-		`${projectName} WebAPI`,
-		".resources/definition.yaml",
-	);
-	if (existsSync(collectionDef)) {
-		let yaml = readFileSync(collectionDef, "utf8");
-		yaml = yaml.replace(/^(\s*clientId:\s*).+$/m, `$1${JSON.stringify(auth.clientId)}`);
-		yaml = yaml.replace(/^(\s*scope:\s*).+$/m, `$1${JSON.stringify(auth.scopes)}`);
-		writeFileSync(collectionDef, yaml);
-	}
-}
-
-/** Replace `key: <name>` / `value: …` pairs in Postman Local View environment YAML. */
-function replaceYamlKeyedValue(yaml: string, key: string, value: string): string {
-	const quoted = JSON.stringify(value);
-	const re = new RegExp(`(key:\\s*${key}\\s*\\n\\s*value:\\s*)[^\\n]+`, "m");
-	if (!re.test(yaml)) return yaml;
-	return yaml.replace(re, `$1${quoted}`);
 }

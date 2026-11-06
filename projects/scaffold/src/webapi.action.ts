@@ -8,7 +8,6 @@ export type WebapiOptions = {
 	name?: string | string[];
 	database?: string;
 	auth?: string;
-	postman?: string;
 	yes?: boolean;
 	install?: string;
 };

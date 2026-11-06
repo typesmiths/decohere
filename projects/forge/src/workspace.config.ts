@@ -22,10 +22,7 @@ export const Release: ForgeConfiguration = {
 	ignore: ["**/*.spec.ts", "**/*.test.ts", "**/*.bench.ts", "tests/**", "e2e/**", "bench/**"],
 	// Sit next to emitted JS under es6/types (import.meta.url).
 	// Do not put package.json here — that stays on workspace copyFiles (root only).
-	copyFiles: [
-		"**/webapi/devcontainer/templates/**",
-		"**/webapi/devcontainer/codebase-rag-mcp.ts",
-	],
+	copyFiles: ["**/webapi/devcontainer/templates/**"],
 };
 
 /**

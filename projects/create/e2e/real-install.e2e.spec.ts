@@ -151,8 +151,6 @@ describe.skipIf(!registry || !version)(
 						database,
 						"--auth",
 						"none",
-						"--postman",
-						"none",
 						"-y",
 					],
 					root,

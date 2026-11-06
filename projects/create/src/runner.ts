@@ -14,9 +14,6 @@ const BUILDER_IMAGE = `${CREATE_IMAGE_REPOSITORY}:${CREATE_VERSION}`;
 export function runInBuilder(argv: string[]): never {
 	const { targetDir, containerArgv, projectName, kind } = resolveLaunch(argv);
 	mkdirSync(targetDir, { recursive: true });
-	if (kind === "scaffold") {
-		mkdirSync(resolve(targetDir, ".devcontainer", "npm-auth"), { recursive: true });
-	}
 
 	try {
 		execFileSync("docker", ["info"], { stdio: "pipe" });

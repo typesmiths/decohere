@@ -196,9 +196,9 @@ describe("runInBuilder", () => {
 	it("creates the target directory", () => {
 		run(["webapi", "-d", "/tmp/my-project"]);
 		expect(mockMkdirSync).toHaveBeenCalledWith("/tmp/my-project", { recursive: true });
-		expect(mockMkdirSync).toHaveBeenCalledWith("/tmp/my-project/.devcontainer/npm-auth", {
-			recursive: true,
-		});
+		expect(mockMkdirSync.mock.calls.some((c) => String(c[0]).includes(".devcontainer"))).toBe(
+			false,
+		);
 	});
 
 	it("checks docker availability via docker info", () => {
@@ -343,8 +343,6 @@ describe("runInBuilder", () => {
 			"postgres/typeorm",
 			"--auth",
 			"auth0",
-			"--postman",
-			"local",
 			"--install",
 			"no",
 		]);
@@ -358,8 +356,6 @@ describe("runInBuilder", () => {
 				"postgres/typeorm",
 				"--auth",
 				"auth0",
-				"--postman",
-				"local",
 				"--install",
 				"no",
 				"-d",

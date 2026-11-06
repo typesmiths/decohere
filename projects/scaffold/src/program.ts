@@ -54,9 +54,7 @@ export function createProgram(): Command {
 		});
 	auth0
 		.command("configure")
-		.description(
-			"Update Auth0 API permissions and Postman SPA from @Authorize in this workspace",
-		)
+		.description("Update Auth0 API permissions from @Authorize in this workspace")
 		.action((_opts: unknown, cmd: Command) => {
 			const d = cmd.optsWithGlobals().d;
 			runAuth0Configure(typeof d === "string" ? d : ".");

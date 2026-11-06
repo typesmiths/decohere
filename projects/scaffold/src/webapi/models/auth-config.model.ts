@@ -17,8 +17,8 @@ export type AuthConfig = {
 /**
  * Data-carrier model for auth configuration.
  *
- * Registered by AuthFeature when auth0 is configured. Other features (e.g.
- * PostmanFeature) retrieve it via workspace.getModel(WELL_KNOWN_FILES.AUTH_CONFIG).
+ * Registered by AuthFeature when auth0 is configured. Other features retrieve it
+ * via workspace.getModel(WELL_KNOWN_FILES.AUTH_CONFIG).
  * Produces no files — exists solely so features can communicate auth details.
  */
 export class AuthConfigModel implements KeyedModel {

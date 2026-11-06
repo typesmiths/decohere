@@ -318,7 +318,7 @@ jobs:
           app="$(mktemp -d)"
           repo_root="$PWD"
           (cd "$app" && printf 'pnpm\n' | node --import "$repo_root/tools/register.mjs" "$repo_root/projects/scaffold/src/cli.ts" \
-            create webapi orders --database none --auth none --postman none --install no)
+            create webapi orders --database none --auth none --install no)
           from="$(sed -n 's/^FROM //p' "$app/orders/.devcontainer/Dockerfile")"
           docker tag "${{ steps.docker_meta.outputs.devcontainer_repository }}:${{ steps.docker_meta.outputs.image_tag }}" "$from"
           docker build -t generated-devcontainer "$app/orders/.devcontainer"

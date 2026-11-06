@@ -22,7 +22,7 @@ cd orders
 pnpm dev
 ```
 
-You get a working app with config and environment conventions, structured logging, health and readiness routes, tests, lint and typecheck, reload on save, CI, a production build and Dockerfiles, plus a Dev Container. The scaffolder can also wire Postgres/TypeORM, Auth0 and Postman. Options: [`@decohere/create`](../projects/create/README.md).
+You get a working app with config and environment conventions, structured logging, health and readiness routes, tests, lint and typecheck, reload on save, CI, a production build and Dockerfiles, plus a Dev Container. The scaffolder can also wire Postgres/TypeORM and Auth0. Options: [`@decohere/create`](../projects/create/README.md).
 
 Saving a file reloads the API through Flux, including changes in workspace libraries, without prebuilding them. `pnpm build` runs the same compiler through Forge and emits what `pnpm start` and the Dockerfile run.
 
