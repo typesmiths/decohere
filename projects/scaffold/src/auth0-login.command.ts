@@ -8,6 +8,6 @@ export class Auth0LoginCommand extends DecohereCommand {
 
 	public constructor(name: string) {
 		super(name);
-		this.description("Authenticate the Auth0 CLI (device URL; tokens persist on the host)");
+		this.description("Authenticate the Auth0 CLI (device URL)");
 	}
 }

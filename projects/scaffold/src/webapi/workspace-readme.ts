@@ -128,21 +128,21 @@ export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
 			"pnpm decohere auth0 configure  # after new @Authorize decorators",
 			"```",
 			"",
-			"To get a token for protected routes in Postman, use Authorization → OAuth 2.0 → Authorization Code (With PKCE):",
+			"With Auth0 on, every route needs a token unless it has `@AllowAnonymous()`. Call one with a token, in the Dev Container:",
 			"",
-			"- Auth URL: `<AUTH0_ISSUER_BASE_URL>/authorize?audience=<AUTH0_AUDIENCE>`",
-			"- Access Token URL: `<AUTH0_ISSUER_BASE_URL>/oauth/token`",
-			"- Client ID: `AUTH0_CLIENT_ID` from `.env`",
-			"- Scope: `openid profile email`, plus the permissions you need, like `read:Invoice`",
+			"```bash",
+			'curl -H "Authorization: Bearer $(pnpm -s decohere auth0 token)" localhost:3000/<route>',
+			"```",
+			"",
+			"That token comes from a machine app with every permission on the API, so use it only for development.",
 			"",
 		);
 	}
 
 	lines.push(
-		"## Try the API in Postman",
+		"## Try the API",
 		"",
-		"While the API is running, choose Import in Postman and paste `http://localhost:3000/openapi.json`.",
-		"Import it again after you change a route.",
+		"While the API is running, `http://localhost:3000/openapi.json` describes every route.",
 		"",
 	);
 

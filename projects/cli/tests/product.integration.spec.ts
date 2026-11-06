@@ -47,7 +47,7 @@ describe("product CLI shape", () => {
 		expect(names(add?.commands ?? [])).toEqual(["api", "auth0"]);
 
 		const auth0 = app.commands.find((c) => c.name() === "auth0");
-		expect(names(auth0?.commands ?? [])).toEqual(["login", "configure"]);
+		expect(names(auth0?.commands ?? [])).toEqual(["login", "configure", "token"]);
 	});
 
 	it.each([
@@ -62,6 +62,7 @@ describe("product CLI shape", () => {
 		[["auth0", "--help"]],
 		[["auth0", "login", "--help"]],
 		[["auth0", "configure", "--help"]],
+		[["auth0", "token", "--help"]],
 	] as const)("routes decohere %s", async (argv) => {
 		const app = await productCli.create();
 		await expect(app.run([...argv])).resolves.toEqual(CommandResponse.help());
@@ -78,6 +79,7 @@ describe("commands on an existing project", () => {
 		[["add", "auth0"]],
 		[["auth0", "login"]],
 		[["auth0", "configure"]],
+		[["auth0", "token"]],
 	])("%j says to open the Dev Container when the tools aren't here", async (argv) => {
 		vi.stubEnv("DECOHERE_TOOLS", "");
 		const app = await productCli.create();

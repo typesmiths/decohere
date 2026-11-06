@@ -19,6 +19,8 @@ const {
 	mockEnsureSpaApp,
 	mockEnableConnectionForClient,
 	mockIsInstalled,
+	mockEnsureM2mApp,
+	mockEnsureClientGrant,
 } = vi.hoisted(() => ({
 	mockAsk: vi.fn((_q: string, fallback = "") => Promise.resolve(fallback)),
 	mockPick: vi.fn(
@@ -30,6 +32,8 @@ const {
 	mockEnsureSpaApp: vi.fn(),
 	mockEnableConnectionForClient: vi.fn(),
 	mockIsInstalled: vi.fn(() => true),
+	mockEnsureM2mApp: vi.fn(() => ({ client_id: "m2m_1", reused: false })),
+	mockEnsureClientGrant: vi.fn(),
 }));
 
 const mockPm = {
@@ -57,6 +61,8 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 	return {
 		...actual,
 		isInstalled: mockIsInstalled,
+		ensureM2mApp: mockEnsureM2mApp,
+		ensureClientGrant: mockEnsureClientGrant,
 		login: () => true,
 		listTenants: () => [{ name: "dev-tenant.us.auth0.com", active: true }],
 		listApis: () => [{ name: "webapi API", identifier: "https://api.webapi" }],
@@ -160,6 +166,20 @@ describe("scaffoldApi auth0 wiring", () => {
 		expect(env).toContain("AUTH0_ADMIN_USER_PASSWORD=Generated1!");
 	});
 
+	it("creates the token app and writes its client id to .env", async () => {
+		await scaffoldApi(baseOpts());
+
+		expect(mockEnsureM2mApp).toHaveBeenCalledWith("my-api Token");
+		expect(mockEnsureClientGrant).toHaveBeenCalledWith(
+			"m2m_1",
+			expect.any(String),
+			expect.arrayContaining(["read:Hello"]),
+		);
+		expect(read(".env")).toContain("AUTH0_TOKEN_CLIENT_ID=m2m_1");
+		expect(read("README.md")).toContain("decohere auth0 token");
+		expect(read("README.md")).not.toContain("Postman");
+	});
+
 	it("creates the login app and writes its client id to .env", async () => {
 		await scaffoldApi(baseOpts());
 
@@ -172,7 +192,6 @@ describe("scaffoldApi auth0 wiring", () => {
 			expect.any(String),
 			"spa_client_123",
 		);
-		expect(read("README.md")).toContain("`AUTH0_CLIENT_ID` from `.env`");
 	});
 
 	it("keeps the client id from .env when Auth0 fails on a later run", async () => {

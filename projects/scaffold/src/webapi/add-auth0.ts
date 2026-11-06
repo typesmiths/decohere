@@ -73,7 +73,12 @@ export function runAddAuth0(directory = "."): void {
 		console.log("\n  and call .withAuth() on the builder, before .build().");
 	}
 	console.log(
-		'\n  ✓ Auth0 added. Protect a route with @Authorize("read", "Invoice"), then run:',
+		"\n  ✓ Auth0 added. Every route now needs a token, unless it has @AllowAnonymous().",
 	);
-	console.log("\n    decohere auth0 configure\n");
+	console.log('    After adding @Authorize("read", "Invoice") to a route, run:');
+	console.log("\n    pnpm decohere auth0 configure\n");
+	console.log("  Call your API with a token:");
+	console.log(
+		'\n    curl -H "Authorization: Bearer $(pnpm -s decohere auth0 token)" localhost:3000/<route>\n',
+	);
 }

@@ -38,6 +38,25 @@ export function ensureLoginApp(projectName: string): string {
 	return app.client_id;
 }
 
+/**
+ * Create or reuse the machine app `decohere auth0 token` uses, allowed exactly the API's
+ * permissions, and return its client id.
+ */
+export function ensureTokenApp(
+	projectName: string,
+	audience: string,
+	scopes: readonly string[],
+): string {
+	const app = auth0Cli.ensureM2mApp(`${projectName} Token`);
+	auth0Cli.ensureClientGrant(app.client_id, audience, scopes);
+	console.log(
+		app.reused
+			? `  ✓ Reusing Auth0 token app (${app.client_id}) with ${scopes.length} permission(s)`
+			: `  ✓ Auth0 token app created (${app.client_id}) with ${scopes.length} permission(s)`,
+	);
+	return app.client_id;
+}
+
 function fail(message: string): never {
 	throw new CreateCliError(message);
 }
@@ -141,13 +160,17 @@ export function runAuth0Configure(directory = "."): void {
 	}
 
 	const clientId = ensureLoginApp(projectName);
+	const tokenClientId = ensureTokenApp(projectName, audience, apiScopes);
 
 	upsertEnv(envPath, {
 		AUTH0_ISSUER_BASE_URL: issuerBaseUrl,
 		AUTH0_AUDIENCE: audience,
 		AUTH0_CLIENT_ID: clientId,
+		AUTH0_TOKEN_CLIENT_ID: tokenClientId,
 	});
-	console.log("  ✓ Wrote AUTH0_ISSUER_BASE_URL, AUTH0_AUDIENCE and AUTH0_CLIENT_ID to .env");
+	console.log(
+		"  ✓ Wrote AUTH0_ISSUER_BASE_URL, AUTH0_AUDIENCE, AUTH0_CLIENT_ID and AUTH0_TOKEN_CLIENT_ID to .env",
+	);
 
 	const adminSub = existing.AUTH0_ADMIN_USER_SUB?.trim();
 	if (adminSub) {
@@ -159,6 +182,35 @@ export function runAuth0Configure(directory = "."): void {
 				`  ✗ Failed to assign admin permissions: ${err instanceof Error ? err.message : err}`,
 			);
 		}
+	}
+}
+
+/**
+ * `decohere auth0 token`: print only the token, so `$(pnpm -s decohere auth0 token)` works. It's
+ * printed because that's what was asked for, and it expires. Everything else goes to stderr.
+ */
+export function runAuth0Token(directory = "."): void {
+	const targetDir = resolve(directory);
+	if (!isDecohereWorkspace(targetDir)) {
+		fail(`Not a Decohere workspace: ${targetDir}.`);
+	}
+	requireInstalled();
+
+	const env = readEnvFile(join(targetDir, ".env"));
+	const audience = env.AUTH0_AUDIENCE?.trim();
+	const clientId = env.AUTH0_TOKEN_CLIENT_ID?.trim();
+	if (!audience || !clientId) {
+		fail("This project has no Auth0 token app yet. Run: pnpm decohere auth0 configure");
+	}
+
+	try {
+		const scopes = auth0Cli.listApiScopes(audience);
+		process.stdout.write(`${auth0Cli.requestAccessToken(clientId, audience, scopes)}\n`);
+	} catch (err) {
+		if (err instanceof auth0Cli.Auth0AuthError) {
+			fail("Your Auth0 login has expired. Run: pnpm decohere auth0 login");
+		}
+		throw err;
 	}
 }
 

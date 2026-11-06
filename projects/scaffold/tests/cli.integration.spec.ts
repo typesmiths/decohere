@@ -30,6 +30,9 @@ const {
 	mockEnsureSpaApp,
 	mockEnableConnection,
 	mockAssignUserPermissions,
+	mockEnsureM2mApp,
+	mockEnsureClientGrant,
+	mockRequestAccessToken,
 } = vi.hoisted(() => ({
 	mockAsk: vi.fn((_q: string, fallback = "") => Promise.resolve(fallback)),
 	mockPick: vi.fn(
@@ -47,6 +50,9 @@ const {
 	mockEnableConnection: vi.fn(),
 	mockListApiScopes: vi.fn(() => [] as string[]),
 	mockAssignUserPermissions: vi.fn(),
+	mockEnsureM2mApp: vi.fn(() => ({ client_id: "m2m_123", reused: false })),
+	mockEnsureClientGrant: vi.fn(),
+	mockRequestAccessToken: vi.fn(() => "a-token"),
 }));
 
 const mockPm = {
@@ -83,6 +89,9 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 		createApi: mockCreateApi,
 		listApiScopes: mockListApiScopes,
 		assignUserPermissions: mockAssignUserPermissions,
+		ensureM2mApp: mockEnsureM2mApp,
+		ensureClientGrant: mockEnsureClientGrant,
+		requestAccessToken: mockRequestAccessToken,
 	};
 });
 
@@ -617,6 +626,64 @@ describe("auth0 login and configure", () => {
 		expect(env).toContain("AUTH0_CLIENT_ID=spa_123");
 		expect(mockEnsureSpaApp).toHaveBeenCalledWith("my-app Dev", expect.any(Array));
 		expect(mockAssignUserPermissions).not.toHaveBeenCalled();
+	});
+
+	it("sets up a token app allowed the API's permissions", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		writeFileSync("/my-app/.env", "AUTH0_AUDIENCE=https://api.my-app\n");
+		mockIsInstalled.mockReturnValue(true);
+		mockListTenants.mockReturnValue([{ name: "dev-tenant.us.auth0.com", active: true }]);
+
+		await runCliAsNodeBin(["auth0", "configure", "-d", "my-app"], { resetFs: false });
+
+		expect(mockEnsureM2mApp).toHaveBeenCalledWith("my-app Token");
+		expect(mockEnsureClientGrant).toHaveBeenCalledWith("m2m_123", "https://api.my-app", [
+			"create:Hello",
+			"delete:Hello",
+			"read:Hello",
+			"update:Hello",
+		]);
+		expect(readFileSync("/my-app/.env", "utf8")).toContain("AUTH0_TOKEN_CLIENT_ID=m2m_123");
+	});
+
+	it("auth0 token prints only the token, with the API's permissions", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		writeFileSync(
+			"/my-app/.env",
+			"AUTH0_AUDIENCE=https://api.my-app\nAUTH0_TOKEN_CLIENT_ID=m2m_123\n",
+		);
+		mockIsInstalled.mockReturnValue(true);
+		mockListApiScopes.mockReturnValue(["read:Hello"]);
+		const written: string[] = [];
+		const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+			written.push(String(chunk));
+			return true;
+		});
+		const logs = vi.spyOn(console, "log");
+
+		await runCliAsNodeBin(["auth0", "token", "-d", "my-app"], { resetFs: false });
+
+		write.mockRestore();
+		expect(mockRequestAccessToken).toHaveBeenCalledWith("m2m_123", "https://api.my-app", [
+			"read:Hello",
+		]);
+		expect(written.join("")).toBe("a-token\n");
+		expect(logs).not.toHaveBeenCalled();
+	});
+
+	it("auth0 token says what to run when there's no token app", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		writeFileSync("/my-app/.env", "AUTH0_AUDIENCE=https://api.my-app\n");
+		mockIsInstalled.mockReturnValue(true);
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
+
+		await runCliAsNodeBin(["auth0", "token", "-d", "my-app"], { resetFs: false });
+
+		expect(errors.join("\n")).toContain("pnpm decohere auth0 configure");
+		expect(mockRequestAccessToken).not.toHaveBeenCalled();
 	});
 
 	it("adds controller @Authorize scopes to the Auth0 API", async () => {

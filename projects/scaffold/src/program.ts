@@ -1,7 +1,7 @@
 import { Command, CommanderError } from "commander";
 import { runAddAuth0 } from "./webapi/add-auth0.js";
 import { CreateCliError } from "./webapi/api-name.js";
-import { runAuth0Configure, runAuth0Login } from "./webapi/auth0-commands.js";
+import { runAuth0Configure, runAuth0Login, runAuth0Token } from "./webapi/auth0-commands.js";
 import {
 	addWebapiFeatureOptions,
 	collectName,
@@ -54,7 +54,7 @@ export function createProgram(): Command {
 		.description("Log in to Auth0 and update a scaffolded client");
 	auth0
 		.command("login")
-		.description("Authenticate the Auth0 CLI (device URL; tokens persist on the host)")
+		.description("Authenticate the Auth0 CLI (device URL)")
 		.action(() => {
 			runAuth0Login();
 		});
@@ -64,6 +64,13 @@ export function createProgram(): Command {
 		.action((_opts: unknown, cmd: Command) => {
 			const d = cmd.optsWithGlobals().d;
 			runAuth0Configure(typeof d === "string" ? d : ".");
+		});
+	auth0
+		.command("token")
+		.description("Print an access token for calling this workspace's API in development")
+		.action((_opts: unknown, cmd: Command) => {
+			const d = cmd.optsWithGlobals().d;
+			runAuth0Token(typeof d === "string" ? d : ".");
 		});
 
 	return program;

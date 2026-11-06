@@ -14,6 +14,10 @@ const REQUIRED_SCOPES = [
 	"create:users",
 	"read:users",
 	"update:users",
+	"create:client_grants",
+	"read:client_grants",
+	"update:client_grants",
+	"read:client_keys",
 ].join(",");
 
 /** Hard timeout for any Management API call. Prevents indefinite hangs on token re-auth. */
@@ -266,6 +270,89 @@ export function createSpaApp(
 }
 
 export type Auth0App = { client_id: string; name: string };
+
+/** Create or reuse a machine app, which can get a token with no browser and no user. */
+export function ensureM2mApp(name: string): { client_id: string; reused: boolean } {
+	const existing = listApps().find((app) => app.name === name);
+	if (existing != null) return { client_id: existing.client_id, reused: true };
+
+	const out = runAuth0([
+		"apps",
+		"create",
+		"--name",
+		name,
+		"--type",
+		"m2m",
+		"--json",
+		"--no-input",
+	]);
+	const app = parseJsonOutput<{ client_id?: string; clientId?: string }>(out);
+	const clientId = app.client_id ?? app.clientId;
+	if (!clientId) throw new Error("Auth0's response to creating the app had no client_id.");
+	return { client_id: clientId, reused: false };
+}
+
+/** Let a machine app ask the API for exactly these permissions. */
+export function ensureClientGrant(
+	clientId: string,
+	audience: string,
+	scopes: readonly string[],
+): void {
+	const query = new URLSearchParams({ client_id: clientId, audience }).toString();
+	const found = parseJsonOutput<Array<{ id: string }>>(
+		runAuth0(["api", "get", `client-grants?${query}`, "--no-input"]),
+	);
+	const [grant] = found;
+	if (grant != null) {
+		runAuth0([
+			"api",
+			"patch",
+			`client-grants/${encodeURIComponent(grant.id)}`,
+			"--data",
+			JSON.stringify({ scope: scopes }),
+			"--no-input",
+		]);
+		return;
+	}
+	runAuth0([
+		"api",
+		"post",
+		"client-grants",
+		"--data",
+		JSON.stringify({ client_id: clientId, audience, scope: scopes }),
+		"--no-input",
+	]);
+}
+
+/** A token for a machine app. Errors never include the CLI's output, which holds the token. */
+export function requestAccessToken(
+	clientId: string,
+	audience: string,
+	scopes: readonly string[],
+): string {
+	const out = runAuth0([
+		"test",
+		"token",
+		clientId,
+		"--audience",
+		audience,
+		"--scopes",
+		scopes.join(","),
+		"--force",
+		"--json",
+		"--no-input",
+	]);
+	let token: unknown;
+	try {
+		token = JSON.parse(out.slice(out.indexOf("{"))).access_token;
+	} catch {
+		throw new Error("The Auth0 CLI's token response wasn't valid JSON.");
+	}
+	if (typeof token !== "string" || token === "") {
+		throw new Error("The Auth0 CLI's token response had no access_token.");
+	}
+	return token;
+}
 
 export function listApps(): Auth0App[] {
 	try {

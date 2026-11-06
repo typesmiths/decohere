@@ -121,8 +121,11 @@ Run these in the project's Dev Container, which has the Auth0 CLI. Its login is 
 # Device/URL login — open the printed URL in your browser
 pnpm decohere auth0 login
 
-# Update the Auth0 API and login app for this workspace
+# Update the Auth0 API, login app and token app for this workspace
 pnpm decohere auth0 configure
+
+# Print a token for calling the API in development
+pnpm decohere auth0 token
 ```
 
 `configure` does **not** rewrite application source. It ensures a `<project> Dev` login app (written to `.env` as `AUTH0_CLIENT_ID`), scans `projects/*/src` for `@Authorize("action", "Subject")`, adds those permissions to the Auth0 API (keeping any already on the API) and assigns them to `AUTH0_ADMIN_USER_SUB` when set.
@@ -135,7 +138,15 @@ In the project's Dev Container:
 pnpm decohere add auth0
 ```
 
-This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.withAuth()` to each API's `main.ts`. Running it again changes nothing. If a `main.ts` no longer has the generated shape, the command leaves it alone and prints the lines to add. It doesn't protect any routes for you, and it doesn't add the local user profile a new project with Postgres gets.
+This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.withAuth()` to each API's `main.ts`. Running it again changes nothing. If a `main.ts` no longer has the generated shape, the command leaves it alone and prints the lines to add. It also creates a `<project> Token` machine app (written to `.env` as `AUTH0_TOKEN_CLIENT_ID`). It doesn't add the local user profile a new project with Postgres gets.
+
+Once Auth0 is added, **every route needs a token** unless it has `@AllowAnonymous()`, because `withAuth()` is secure by default. To call one, in the Dev Container:
+
+```bash
+curl -H "Authorization: Bearer $(pnpm -s decohere auth0 token)" localhost:3000/hello/1
+```
+
+`auth0 token` prints a short-lived token from the machine app, with no browser, and it's allowed every permission on the API. Keep it to development. Your Auth0 login has to be current, because the Auth0 CLI fetches the token.
 
 #### Keep Auth0 in sync with controllers
 
@@ -202,9 +213,9 @@ override `defineAbilitiesFor` for product CASL rules, and `mapPrincipal` for IdP
 (including the `AUTH0_ADMIN_USER_SUB` admin bootstrap). `@decohere/http`'s default already maps
 `admin` → `manage`/`all` and `action:Subject` scopes.
 
-#### Postman
+#### Try the API
 
-While the API is running, choose Import in Postman and paste `http://localhost:3000/openapi.json`. Import it again after you change a route.
+While the API is running, `http://localhost:3000/openapi.json` describes every route.
 
 ## Options
 
@@ -215,7 +226,8 @@ While the API is running, choose Import in Postman and paste `http://localhost:3
 | `add api <name>` | `decohere add api` | Add an API to an existing Decohere workspace |
 | `add auth0` | `decohere add auth0` | Add Auth0 to an existing workspace |
 | `auth0 login` | `decohere auth0` | Device/URL login; keeps tokens in `~/.config/auth0` |
-| `auth0 configure` | `decohere auth0` | Update the Auth0 API and login app for an existing workspace |
+| `auth0 configure` | `decohere auth0` | Update the Auth0 API, login app and token app for an existing workspace |
+| `auth0 token` | `decohere auth0` | Print an access token for calling the API in development |
 | `--database <provider>` | `webapi` / `add` | `none` \| `postgres/typeorm` |
 | `--auth <provider>` | `webapi` / `add` | `none` \| `auth0` |
 | `-y, --yes` | `webapi` / `add` | Install dependencies without prompting |

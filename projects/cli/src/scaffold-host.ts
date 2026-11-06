@@ -15,6 +15,8 @@ import {
 	Auth0ConfigureAction,
 	type Auth0ConfigureOptions,
 	Auth0LoginAction,
+	Auth0TokenAction,
+	type Auth0TokenOptions,
 	Auth0Module,
 	CreateModule,
 	WebapiAction,
@@ -78,10 +80,19 @@ class HostAuth0ConfigureAction extends Auth0ConfigureAction {
 	}
 }
 
+@injectable()
+class HostAuth0TokenAction extends Auth0TokenAction {
+	public override async run(options: Auth0TokenOptions): Promise<ActionResponse> {
+		if (!hasDecohereTools()) return needsDevContainer("token");
+		return super.run(options);
+	}
+}
+
 /** `decohere auth0` — runs only where the Dev Container's tools are. */
 export class HostAuth0Module extends Auth0Module {
 	public override readonly actions = {
 		login: HostAuth0LoginAction,
 		configure: HostAuth0ConfigureAction,
+		token: HostAuth0TokenAction,
 	};
 }
