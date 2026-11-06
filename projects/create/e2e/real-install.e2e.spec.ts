@@ -356,7 +356,7 @@ describe.skipIf(!registry || !version)(
 PORT=3200 pnpm run dev > /tmp/dev.log 2>&1 &
 for _ in $(seq 1 60); do
   if curl -sf localhost:3200/health; then
-    PGPASSWORD="$API_DB_PASSWORD" exec psql -h "$API_DB_HOST" -p "$API_DB_PORT" -U "$API_DB_USER" -d "$API_DB_NAME" -c "select 1"
+    exec psql -h "$API_DB_HOST" -p "$API_DB_PORT" -U "$API_DB_USER" -d "$API_DB_NAME" -c "select 1"
   fi
   sleep 1
 done

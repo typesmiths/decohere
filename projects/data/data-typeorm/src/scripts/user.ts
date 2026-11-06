@@ -40,14 +40,14 @@ export function roleExistsQuery(username: string): SqlQuery {
  * Username is validated + quoted as an identifier (cannot be parameterized in DDL).
  * Password cannot use bind params in CREATE USER … PASSWORD (Postgres syntax error).
  *
- * `password` omitted (undefined) creates a role with no password, for a local dev server that
+ * `password` omitted (undefined, or null from a config file) creates a role with no password, for a local dev server that
  * trusts every connection. An empty string is still an error: that is a typo, not a choice.
  * Callers decide when no password is allowed (see PostgresServerManager).
  */
-export function createUserQuery(username: string, password?: string): SqlQuery {
+export function createUserQuery(username: string, password?: string | null): SqlQuery {
 	const userIdent = quoteIdent(username, "username");
 	const attributes = "NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE";
-	if (password === undefined) {
+	if (password == null) {
 		return { text: `CREATE USER ${userIdent} WITH LOGIN ${attributes}`, values: [] };
 	}
 	if (typeof password !== "string" || password.length === 0) {
