@@ -11,9 +11,40 @@ export type DeferredScriptStart = {
 	readonly workspaceRoot: string;
 };
 
+/** How long a script gets to stop after SIGTERM before it's killed. */
+const STOP_TIMEOUT_MS = 2_000;
+/** Windows has no process groups. There, only the package manager itself gets the signal. */
+const USE_PROCESS_GROUP = process.platform !== "win32";
+
+/** Signal the script's whole group: the package manager exits without stopping what it started. */
+function signal(child: ChildProcess, name: NodeJS.Signals): void {
+	if (!USE_PROCESS_GROUP || child.pid == null) {
+		child.kill(name);
+		return;
+	}
+	try {
+		process.kill(-child.pid, name);
+	} catch (error) {
+		// The whole group has already gone, which is what we wanted.
+		if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+	}
+}
+
+/** Resolves true once the package manager has exited, or false if it hasn't within `ms`. */
+function waitForExit(child: ChildProcess, ms: number): Promise<boolean> {
+	if (child.exitCode != null || child.signalCode != null) return Promise.resolve(true);
+	return new Promise((resolve) => {
+		const timer = setTimeout(() => resolve(false), ms);
+		child.once("exit", () => {
+			clearTimeout(timer);
+			resolve(true);
+		});
+	});
+}
+
 /**
  * Nixpacks-style child processes for foreign packages in a flux serve slice.
- * Killed when the Flux container disposes (SIGINT → RootModule teardown).
+ * Stopped when the Flux container disposes (SIGINT → RootModule teardown).
  */
 @injectable()
 export class DeferredScriptRunner implements AsyncDisposable {
@@ -27,7 +58,10 @@ export class DeferredScriptRunner implements AsyncDisposable {
 		);
 		const child = spawn(pm.name, ["run", options.script], {
 			cwd: options.cwd,
-			stdio: "inherit",
+			// Its own process group, so stopping it reaches what the package manager started. A
+			// process in another group can't read the terminal, so it gets no stdin.
+			stdio: USE_PROCESS_GROUP ? ["ignore", "inherit", "inherit"] : "inherit",
+			detached: USE_PROCESS_GROUP,
 			env: process.env,
 			shell: false,
 		});
@@ -42,11 +76,12 @@ export class DeferredScriptRunner implements AsyncDisposable {
 	}
 
 	public async [Symbol.asyncDispose]() {
-		for (const child of this.children) {
-			if (!child.killed) {
-				child.kill("SIGTERM");
-			}
-		}
-		this.children.length = 0;
+		const children = this.children.splice(0);
+		await Promise.all(
+			children.map(async (child) => {
+				signal(child, "SIGTERM");
+				if (!(await waitForExit(child, STOP_TIMEOUT_MS))) signal(child, "SIGKILL");
+			}),
+		);
 	}
 }

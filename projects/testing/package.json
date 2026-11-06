@@ -37,6 +37,6 @@
   "devDependencies": {},
   "peerDependencies": {
     "memfs": "^4.17.0",
-    "vitest": "^3.2.6"
+    "vitest": "^4.1.12"
   }
 }

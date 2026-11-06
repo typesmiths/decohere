@@ -90,6 +90,16 @@ async function stopServer(runPromise: Promise<unknown>) {
 	await runPromise;
 }
 
+function isRunning(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+		throw error;
+	}
+}
+
 function waitForReboot(ms = 5000): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 		const timer = setTimeout(() => reject(new Error("reboot timed out")), ms);
@@ -503,14 +513,20 @@ describe("flux serve — directory slice", () => {
 
 		expect(vol.existsSync("/slice-api-booted")).toBe(true);
 		expect(vol.existsSync("/slice-svc-booted")).toBe(true);
-		await vi.waitFor(
+		// `pnpm run` starts the script as its own process, and that's what has to stop.
+		const scriptPid = await vi.waitFor(
 			() => {
 				expect(realFs.existsSync(webMarker)).toBe(true);
+				const pid = Number(realFs.readFileSync(webMarker, "utf8"));
+				expect(pid).toBeGreaterThan(0);
+				return pid;
 			},
 			{ timeout: 4_000 },
 		);
 
 		await stopServer(runPromise);
+
+		await vi.waitFor(() => expect(isRunning(scriptPid)).toBe(false), { timeout: 4_000 });
 	}, 20_000);
 
 	it("rejects combining slices with --project", async () => {

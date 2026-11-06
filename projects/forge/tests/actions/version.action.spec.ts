@@ -23,6 +23,9 @@ const mockFiles = {
 	}),
 };
 
+/** The private method these tests replace, so that no real git command runs. */
+type VersionInternals = { resolveVersionFromGitTag(): string | undefined };
+
 afterEach(() => {
 	vi.restoreAllMocks();
 });
@@ -31,7 +34,9 @@ it("should update package versions for root and projects", async () => {
 	vol.fromJSON(mockFiles);
 	const workspace = await WorkspaceFactory.create({ ...WorkspaceDefaults, rootDir: "." });
 	const action = new Version(null as unknown as Workspace);
-	vi.spyOn(action as never, "resolveVersionFromGitTag").mockReturnValue(undefined);
+	vi.spyOn(action as unknown as VersionInternals, "resolveVersionFromGitTag").mockReturnValue(
+		undefined,
+	);
 	const responses = await action.version(workspace);
 	expect(responses.data).toEqual(
 		expect.arrayContaining([
@@ -75,7 +80,9 @@ it("should default base version from latest git tag", async () => {
 	vol.fromJSON(mockFiles);
 	const workspace = await WorkspaceFactory.create({ ...WorkspaceDefaults, rootDir: "." });
 	const action = new Version(null as unknown as Workspace);
-	vi.spyOn(action as never, "resolveVersionFromGitTag").mockReturnValue("2.1.3");
+	vi.spyOn(action as unknown as VersionInternals, "resolveVersionFromGitTag").mockReturnValue(
+		"2.1.3",
+	);
 
 	await action.version(workspace, {
 		releaseType: "patch",
@@ -91,7 +98,7 @@ it("should use explicit version when provided", async () => {
 	const workspace = await WorkspaceFactory.create({ ...WorkspaceDefaults, rootDir: "." });
 	const action = new Version(null as unknown as Workspace);
 	const tagSpy = vi
-		.spyOn(action as never, "resolveVersionFromGitTag")
+		.spyOn(action as unknown as VersionInternals, "resolveVersionFromGitTag")
 		.mockReturnValue("9.9.9");
 
 	await action.version(workspace, {

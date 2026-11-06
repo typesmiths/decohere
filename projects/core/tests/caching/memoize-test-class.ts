@@ -1,4 +1,4 @@
-import { vi } from "vitest";
+import { type Mock, vi } from "vitest";
 import { memoize } from "../../src/caching/index.js";
 
 // Simple memoization cache implementation for testing
@@ -33,7 +33,7 @@ export const MEMOIZE_CACHE = new MockMemoizeCache();
 
 export class MemoizeTestClass {
 	public callCount = 0;
-	public counter = vi.fn();
+	public counter: Mock = vi.fn();
 
 	public reset(): void {
 		this.callCount = 0;
