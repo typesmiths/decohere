@@ -210,15 +210,22 @@ export function runAuth0Token(directory = "."): void {
 		fail("This project has no Auth0 token app yet. Run: pnpm decohere auth0 configure");
 	}
 
-	try {
+	const requestToken = () => {
 		const scopes = auth0Cli.listApiScopes(audience);
-		process.stdout.write(`${auth0Cli.requestAccessToken(clientId, audience, scopes)}\n`);
+		return auth0Cli.requestAccessToken(clientId, audience, scopes);
+	};
+
+	let token: string;
+	try {
+		token = requestToken();
 	} catch (err) {
-		if (err instanceof auth0Cli.Auth0AuthError) {
-			fail("Your Auth0 login has expired. Run: pnpm decohere auth0 login");
-		}
-		throw err;
+		if (!(err instanceof auth0Cli.Auth0AuthError)) throw err;
+		// A new Dev Container starts logged out. Only the token may go to stdout.
+		console.error("  Logging in to Auth0 (open the URL in your browser)...");
+		if (!auth0Cli.login()) fail("Auth0 login failed.");
+		token = requestToken();
 	}
+	process.stdout.write(`${token}\n`);
 }
 
 export function readEnvFile(path: string): Record<string, string> {
