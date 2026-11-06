@@ -13,9 +13,7 @@ if (repo == null || token == null) {
 
 const workflowFileName = "ci.yml";
 
-const branches = [
-	{ branch: "main", label: "CI Main", file: "ci-main.svg" },
-];
+const branches = [{ branch: "main", label: "CI Main", file: "ci-main.svg" }];
 
 async function getLatestWorkflowRun(branch) {
 	const url =
