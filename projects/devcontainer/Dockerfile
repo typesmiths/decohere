@@ -8,7 +8,7 @@
 #   FROM ghcr.io/typesmiths/decohere/devcontainer:<version>
 #
 
-FROM node:24
+FROM node:24-trixie-slim
 
 RUN mkdir -p /commandhistory && touch /commandhistory/.bash_history && chown -R node /commandhistory
 
@@ -18,6 +18,8 @@ RUN SNIPPET="export PROMPT_COMMAND='history -a' && export HISTFILE=/commandhisto
 	&& echo "$SNIPPET" >> "/home/node/.bashrc"
 
 ARG USERNAME=node
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git less openssh-client procps && rm -rf /var/lib/apt/lists/*
 
 RUN npm install --global npm@latest && npm add --global pnpm@10
 

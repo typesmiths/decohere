@@ -91,6 +91,14 @@ Every API gets its own `projects/<name>/Dockerfile`; that folder is the Docker b
 
 The app Dev Container is a thin `FROM ghcr.io/typesmiths/decohere/devcontainer:<version>` (pinned to the scaffolder version). Shared layers (bash history, pnpm, `gh`, js-debug bootloader fix) update via `docker pull` / Dev Container rebuild — Compose mounts and lifecycle scripts stay in the app repo. Rebuild with pull after upgrading `@decohere/create`.
 
+The base image is `node:24-trixie-slim`, with no compilers. If an npm package has to compile on install because it has no prebuilt binary, add what it needs to your project's `.devcontainer/Dockerfile`:
+
+```dockerfile
+USER root
+RUN apt-get update && apt-get install -y --no-install-recommends g++ make python3 && rm -rf /var/lib/apt/lists/*
+USER node
+```
+
 #### Scripts
 
 | Script | Command | When |
