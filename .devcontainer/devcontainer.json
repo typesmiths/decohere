@@ -1,9 +1,11 @@
 {
   "name": "decohere",
-  "image": "mcr.microsoft.com/devcontainers/javascript-node:24",
+  // The image Decohere's projects get, built from this checkout, so working here tests it.
+  "build": { "dockerfile": "../projects/devcontainer/Dockerfile", "context": "../projects/devcontainer" },
   "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {},
-    // The node:24 image is Debian trixie, which has no moby packages; use Docker's own CLI packages.
+    // sudo, which the shipped image leaves out and this repo's setup and the Docker feature below use.
+    "ghcr.io/devcontainers/features/common-utils:2": { "installZsh": false, "upgradePackages": false, "username": "node" },
+    // Debian trixie has no moby packages; use Docker's own CLI packages.
     "ghcr.io/devcontainers/features/docker-outside-of-docker:1": { "moby": false }
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/src,type=bind",
@@ -20,8 +22,8 @@
     "GH_TOKEN": "${localEnv:GH_TOKEN}",
     "BWS_ACCESS_TOKEN": "${localEnv:BWS_ACCESS_TOKEN}"
   },
-  // Volumes are created root-owned; hand them to `node`, then install with the pnpm pinned in package.json.
-  "postCreateCommand": "sudo chown node node_modules /home/node/.config/gh /home/node/.claude && sudo corepack enable && pnpm install",
+  // Volumes are created root-owned; hand them to `node`, then install; pnpm switches itself to the version pinned in package.json.
+  "postCreateCommand": "sudo chown node node_modules /home/node/.config/gh /home/node/.claude && pnpm install",
   "remoteUser": "node",
   "customizations": {
     "vscode": {
