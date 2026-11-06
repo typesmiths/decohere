@@ -20,6 +20,8 @@ export type AuthOptions = {
 	authProvider?: "auth0" | "none";
 	issuerBaseUrl?: string;
 	audience?: string;
+	/** Set by the questions. Nothing changes on Auth0 until they're all answered. */
+	auth0ApiAction?: "create" | "update";
 	databaseProvider?: "none" | "postgres/typeorm";
 	adminUsername?: string;
 	adminPassword?: string;
@@ -202,23 +204,15 @@ async function getAuth0Options(
 	const apiSelected = await pick("\n  Select Auth0 API: ", apiChoices, (c) => c.label);
 
 	let audience: string;
+	let auth0ApiAction: AuthOptions["auth0ApiAction"];
 	if (!apiSelected || apiSelected.existing === null) {
 		const defaultId = `https://api.${projectName}`;
 		audience = await ask(`  API Identifier [${defaultId}]: `, defaultId);
-		console.log("\n  Creating Auth0 API...");
-		audience = auth0Cli.createApi(`${projectName} API`, audience).identifier;
-		console.log(`  \u2713 API created: ${audience}`);
+		auth0ApiAction = "create";
 	} else {
 		audience = apiSelected.existing;
+		auth0ApiAction = "update";
 		console.log(`  \u2713 Selected: ${audience}`);
-		try {
-			auth0Cli.updateApiScopes(audience);
-			console.log(`  \u2713 API scopes ensured (${auth0Cli.HELLO_API_SCOPES.join(", ")})`);
-		} catch {
-			console.error(
-				"  ✗ Failed to update API scopes — add Hello scopes in the Auth0 dashboard.",
-			);
-		}
 	}
 
 	const withLocalUsers = cliOptions.databaseProvider === "postgres/typeorm";
@@ -234,6 +228,7 @@ async function getAuth0Options(
 		authProvider: "auth0",
 		issuerBaseUrl,
 		audience,
+		auth0ApiAction,
 		...(withLocalUsers ? { adminUsername, adminPassword } : {}),
 	};
 }
@@ -357,8 +352,38 @@ function resolveLoginClientId(workspace: WorkspaceScaffold): string {
 	}
 }
 
-function scaffold(workspace: WorkspaceScaffold, options: AuthOptions): void {
-	if (options.authProvider !== "auth0") return;
+/** Make the change on Auth0 that the questions chose. Returns the API's identifier. */
+function applyAuth0ApiChoice(
+	workspace: WorkspaceScaffold,
+	action: AuthOptions["auth0ApiAction"],
+	audience: string | undefined,
+): string | undefined {
+	if (audience == null) return audience;
+	if (action === "create") {
+		console.log("\n  Creating Auth0 API...");
+		const { identifier } = auth0Cli.createApi(`${workspace.name} API`, audience);
+		console.log(`  \u2713 API created: ${identifier}`);
+		return identifier;
+	}
+	if (action === "update") {
+		try {
+			auth0Cli.updateApiScopes(audience);
+			console.log(`  \u2713 API scopes ensured (${auth0Cli.HELLO_API_SCOPES.join(", ")})`);
+		} catch {
+			console.error(
+				"  ✗ Failed to update API scopes — add Hello scopes in the Auth0 dashboard.",
+			);
+		}
+	}
+	return audience;
+}
+
+function scaffold(workspace: WorkspaceScaffold, chosen: AuthOptions): void {
+	if (chosen.authProvider !== "auth0") return;
+	const options: AuthOptions = {
+		...chosen,
+		audience: applyAuth0ApiChoice(workspace, chosen.auth0ApiAction, chosen.audience),
+	};
 
 	const resource = "Hello";
 	const withLocalUsers = options.databaseProvider === "postgres/typeorm";
