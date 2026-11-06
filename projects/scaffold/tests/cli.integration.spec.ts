@@ -200,6 +200,8 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	expect(compose).toContain("./gh.env");
 	expect(compose).toContain("bashhistory:/commandhistory");
 	expect(compose).toMatch(/^ {2}bashhistory:\s*$/m);
+	expect(compose).toContain("auth0-login:/home/node/.config/auth0");
+	expect(compose).toMatch(/^ {2}auth0-login:\s*$/m);
 
 	const appDevDockerfile = readFileSync(join(root, ".devcontainer/Dockerfile"), "utf8");
 	expect(appDevDockerfile).toMatch(/^FROM ghcr\.io\/typesmiths\/decohere\/devcontainer:/m);

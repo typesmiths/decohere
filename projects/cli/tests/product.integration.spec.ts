@@ -67,3 +67,28 @@ describe("product CLI shape", () => {
 		await expect(app.run([...argv])).resolves.toEqual(CommandResponse.help());
 	});
 });
+
+describe("commands on an existing project", () => {
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	it.each([
+		[["add", "api", "billing"]],
+		[["add", "auth0"]],
+		[["auth0", "login"]],
+		[["auth0", "configure"]],
+	])("%j says to open the Dev Container when the tools aren't here", async (argv) => {
+		vi.stubEnv("DECOHERE_TOOLS", "");
+		const app = await productCli.create();
+
+		await expect(app.run([...argv])).rejects.toThrow("Dev Container");
+	});
+
+	it("runs the command itself when the tools are here", async () => {
+		vi.stubEnv("DECOHERE_TOOLS", "1");
+		const app = await productCli.create();
+
+		await expect(app.run(["add", "api", ""])).rejects.toThrow("API name is required");
+	});
+});

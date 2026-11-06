@@ -19,6 +19,14 @@ describe("published app Dev Container base image", () => {
 		expect(body).toBe(expected);
 	});
 
+	it("has the Auth0 CLI at a pinned version, and says it has Decohere's tools", () => {
+		const content = new AppDevContainerBaseImage("node:24").build();
+		expect(content).toMatch(
+			/auth0-cli\/v\d+\.\d+\.\d+\/install\.sh \| sh -s -- -b \/usr\/local\/bin v\d+\.\d+\.\d+/,
+		);
+		expect(content).toContain("ENV DECOHERE_TOOLS=1");
+	});
+
 	it("includes writable bash history, pnpm, gh, and node user", () => {
 		const content = new AppDevContainerBaseImage("node:24").build();
 		expect(content).toContain("ENV HISTFILE=/commandhistory/.bash_history");

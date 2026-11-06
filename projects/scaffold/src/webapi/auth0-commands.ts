@@ -12,9 +12,9 @@ const LOGIN_APP_CALLBACKS = [
 
 export const AUTH0_CLI_INSTALL_MESSAGE =
 	"The Auth0 CLI is required.\n" +
-	"  It is bundled in the Decohere create image (`npx @decohere/create auth0 login`).\n" +
-	"  Host install: brew install auth0/auth0-cli/auth0\n" +
-	"  Or visit: https://github.com/auth0/auth0-cli";
+	"  It comes with the Decohere Dev Container image. If this project was created before that,\n" +
+	"  update the image version in .devcontainer/Dockerfile and rebuild the Dev Container.\n" +
+	"  Or install it yourself: https://github.com/auth0/auth0-cli";
 
 /**
  * Create or reuse the app people log in through to get a token during development, and
@@ -89,8 +89,8 @@ export function runAuth0Login(): void {
 	const active = tenants.find((t) => t.active) ?? tenants[0];
 	if (active == null) fail("No Auth0 tenant after login.");
 	console.log(`\n  ✓ Auth0 tenant: https://${active.name}`);
-	console.log("    Tokens are stored in ~/.config/auth0 (mounted into the create image).");
-	console.log("    Next: npx @decohere/create auth0 configure");
+	console.log("    Tokens are stored in ~/.config/auth0.");
+	console.log("    Next: pnpm decohere auth0 configure");
 }
 
 export function runAuth0Configure(directory = "."): void {

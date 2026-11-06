@@ -2,10 +2,43 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { resolve } from "node:path";
-import { resolveLaunch } from "./resolve-launch.js";
+import { type LaunchPlan, resolveLaunch } from "./resolve-launch.js";
+import { hasDecohereTools, OPEN_DEV_CONTAINER_MESSAGE } from "./tools.js";
 import { CREATE_IMAGE_REPOSITORY, CREATE_VERSION } from "./version.js";
 
 const BUILDER_IMAGE = `${CREATE_IMAGE_REPOSITORY}:${CREATE_VERSION}`;
+
+const SCAFFOLD_PACKAGE = `@decohere/scaffold@${CREATE_VERSION}`;
+
+/**
+ * Where a command runs: right here if this container has Decohere's tools, otherwise in
+ * the scaffolder image. Commands on an existing project need that project's Dev Container.
+ */
+export function launch(argv: string[]): never {
+	const plan = resolveLaunch(argv);
+	if (hasDecohereTools()) runHere(plan);
+	if (plan.kind === "project") {
+		console.error(OPEN_DEV_CONTAINER_MESSAGE);
+		process.exit(1);
+	}
+	runInBuilder(argv);
+}
+
+/** Run the scaffolder in this container, without starting another one. */
+function runHere({ targetDir, containerArgv, projectName, kind }: LaunchPlan): never {
+	if (kind === "create") mkdirSync(targetDir, { recursive: true });
+
+	const result = spawnSync("npx", ["--yes", SCAFFOLD_PACKAGE, ...containerArgv], {
+		cwd: targetDir,
+		stdio: "inherit",
+		env: { ...process.env, DECOHERE_BUILDER: "1", DECOHERE_PROJECT_NAME: projectName },
+	});
+	if (result.error != null) {
+		console.error(`\n  Could not start the scaffolder: ${result.error.message}\n`);
+		process.exit(1);
+	}
+	process.exit(result.status ?? 1);
+}
 
 /**
  * Pull/run the Decohere scaffolder image. Host `@decohere/create` does not load
@@ -72,11 +105,7 @@ export function runInBuilder(argv: string[]): never {
 		if (hostGid != null) envArgs.push("-e", `HOST_GID=${hostGid}`);
 	}
 
-	console.log(
-		kind === "auth0"
-			? "  Running Auth0 CLI in the scaffolder image...\n"
-			: "  Running scaffolding in a sandboxed container...\n",
-	);
+	console.log("  Running scaffolding in a sandboxed container...\n");
 
 	const ttyFlags = process.stdin.isTTY ? ["-it"] : ["-i"];
 
@@ -97,7 +126,7 @@ export function runInBuilder(argv: string[]): never {
 		{ stdio: "inherit" },
 	);
 
-	if (result.status === 0 && kind === "scaffold") {
+	if (result.status === 0 && kind === "create") {
 		console.log(`\n  Scaffold complete!\n\n  Open your project:\n\n    code ${targetDir}\n`);
 	}
 

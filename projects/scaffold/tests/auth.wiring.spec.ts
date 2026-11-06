@@ -140,8 +140,8 @@ describe("scaffoldApi auth0 wiring", () => {
 		const readme = read("README.md");
 		expect(readme).toContain("## Auth0");
 		expect(readme).toContain("AUTH0_ISSUER_BASE_URL");
-		expect(readme).toContain("npx @decohere/create auth0 login");
-		expect(readme).toContain("npx @decohere/create auth0 configure");
+		expect(readme).toContain("pnpm decohere auth0 login");
+		expect(readme).toContain("pnpm decohere auth0 configure");
 		expect(readme).toContain("@Authorize");
 	});
 

@@ -60,6 +60,8 @@ export type ApiOptions = {
 
 const features = [DatabaseFeature, AuthFeature, FinalizeFeature];
 
+const AUTH0_LOGIN_VOLUME = "auth0-login";
+
 export async function scaffoldApi(cliOptions: ApiOptions) {
 	const targetDir = resolve(cliOptions.d ?? ".");
 	const projectName =
@@ -99,13 +101,16 @@ function createWorkspace(
 				`webapi-node-modules:${workspaceRoot}/node_modules`,
 				// Named volume (not a Cursor-only mount) so CLI recreates keep Up-arrow history.
 				`${commandHistory.volumeName}:${commandHistory.dir}`,
+				// Named volume so a rebuild keeps the Auth0 CLI login.
+				`${AUTH0_LOGIN_VOLUME}:/home/node/.config/auth0`,
 			],
 			env_file: ["./gh.env"],
 			command: "sleep infinity",
 			networks: [name],
 		})
 		.addVolume("webapi-node-modules")
-		.addVolume(commandHistory.volumeName);
+		.addVolume(commandHistory.volumeName)
+		.addVolume(AUTH0_LOGIN_VOLUME);
 
 	const installCmd = "bash .devcontainer/post-create.sh";
 	const devContainer = new DevContainer()

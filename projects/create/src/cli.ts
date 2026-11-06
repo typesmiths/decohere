@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { runInBuilder } from "./runner.js";
+import { launch } from "./runner.js";
 
-runInBuilder(process.argv.slice(2));
+launch(process.argv.slice(2));

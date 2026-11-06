@@ -179,6 +179,45 @@ export function withGithubCli(options?: { order?: number }): LayerWriter {
 	};
 }
 
+/** Pinned so a rebuild can't change what runs with someone's Auth0 login. */
+const AUTH0_CLI_VERSION = "v1.39.0";
+
+/** The Auth0 CLI, and a `node`-owned login folder for a named volume to inherit. */
+export function withAuth0Cli(options?: {
+	usernameExpr?: string;
+	order?: number;
+}): LayerWriter {
+	const usernameExpr = options?.usernameExpr ?? "${USERNAME}";
+	const order = options?.order ?? StepOrder.features + 150;
+
+	return (dockerfile) => {
+		dockerfile
+			.addStep(
+				DockerStep.run(
+					"auth0-cli",
+					`curl -sSfL https://raw.githubusercontent.com/auth0/auth0-cli/${AUTH0_CLI_VERSION}/install.sh | sh -s -- -b /usr/local/bin ${AUTH0_CLI_VERSION}`,
+					order,
+				),
+			)
+			.addStep(
+				DockerStep.run(
+					"auth0-config",
+					`mkdir -p /home/${usernameExpr}/.config/auth0 && chown -R ${usernameExpr}:${usernameExpr} /home/${usernameExpr}/.config/auth0`,
+					order + 1,
+				),
+			);
+	};
+}
+
+/** Tells `decohere` commands that this container has the tools to run right here. */
+export function withDecohereTools(options?: { order?: number }): LayerWriter {
+	const order = options?.order ?? StepOrder.features + 160;
+
+	return (dockerfile) => {
+		dockerfile.addStep(DockerStep.raw("decohere-tools", "ENV DECOHERE_TOOLS=1", order));
+	};
+}
+
 export function withWorkspaceNodeModulesOwnership(options?: {
 	workspaceDir?: string;
 	usernameExpr?: string;
@@ -345,6 +384,8 @@ export class AppDevContainerBaseImage extends DockerfileModel {
 			.addLayer(withNodeUser())
 			.addLayer(withPnpm())
 			.addLayer(withGithubCli())
+			.addLayer(withAuth0Cli())
+			.addLayer(withDecohereTools())
 			.addLayer(withWorkspaceNodeModulesOwnership())
 			.addLayer(withVsCodeJsDebugBootloaderFix());
 	}

@@ -1,6 +1,7 @@
 import { basename, resolve } from "node:path";
 
-export type LaunchKind = "scaffold" | "auth0";
+/** `create` makes a new project. `project` works on one that already exists. */
+export type LaunchKind = "create" | "project";
 
 export type LaunchPlan = {
 	targetDir: string;
@@ -60,7 +61,7 @@ export function resolveLaunch(argv: string[], cwd = process.cwd()): LaunchPlan {
 			targetDir: cwd,
 			containerArgv: argv,
 			projectName: basename(cwd),
-			kind: "scaffold",
+			kind: "create",
 		};
 	}
 	let directoryFlag: string | undefined;
@@ -95,6 +96,6 @@ export function resolveLaunch(argv: string[], cwd = process.cwd()): LaunchPlan {
 		targetDir,
 		containerArgv: [...withoutPositional, "-d", "."],
 		projectName: basename(targetDir),
-		kind: product[0] === "auth0" ? "auth0" : "scaffold",
+		kind: product[0] === "auth0" || isAdd ? "project" : "create",
 	};
 }

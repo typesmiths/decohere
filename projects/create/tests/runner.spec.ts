@@ -26,7 +26,7 @@ vi.mock(
 		}) as const,
 );
 
-const { runInBuilder } = await import("../src/runner.js");
+const { launch } = await import("../src/runner.js");
 const { containerArgvFromHost, resolveLaunch } = await import("../src/resolve-launch.js");
 
 const IMAGE = "ghcr.io/typesmiths/decohere/create:0.0.1-test";
@@ -39,7 +39,7 @@ vi.spyOn(process, "exit").mockImplementation((code?: number | string) => {
 
 function run(argv: string[]): void {
 	try {
-		runInBuilder(argv);
+		launch(argv);
 	} catch {
 		// process.exit throws in tests — expected.
 	}
@@ -118,14 +118,14 @@ describe("resolveLaunch", () => {
 	it("forwards auth0 login without wrapping as create webapi", () => {
 		const plan = resolveLaunch(["auth0", "login"], "/cwd");
 		expect(plan.targetDir).toBe("/cwd");
-		expect(plan.kind).toBe("auth0");
+		expect(plan.kind).toBe("project");
 		expect(plan.containerArgv).toEqual(["auth0", "login", "-d", "."]);
 	});
 
 	it("forwards auth0 configure -d onto the mounted workspace", () => {
 		const plan = resolveLaunch(["auth0", "configure", "-d", "my-app"], "/cwd");
 		expect(plan.targetDir).toBe("/cwd/my-app");
-		expect(plan.kind).toBe("auth0");
+		expect(plan.kind).toBe("project");
 		expect(plan.containerArgv).toEqual(["auth0", "configure", "-d", "."]);
 	});
 });
@@ -135,7 +135,7 @@ describe("resolveLaunch with a bare project name", () => {
 		const plan = resolveLaunch(["my-app"], "/cwd");
 		expect(plan.targetDir).toBe("/cwd/my-app");
 		expect(plan.projectName).toBe("my-app");
-		expect(plan.kind).toBe("scaffold");
+		expect(plan.kind).toBe("create");
 		expect(plan.containerArgv).toEqual(["create", "webapi", "-d", "."]);
 	});
 
@@ -192,7 +192,7 @@ describe("containerArgvFromHost", () => {
 	});
 });
 
-describe("runInBuilder", () => {
+describe("launch outside the tools", () => {
 	it("creates the target directory", () => {
 		run(["webapi", "-d", "/tmp/my-project"]);
 		expect(mockMkdirSync).toHaveBeenCalledWith("/tmp/my-project", { recursive: true });
@@ -210,7 +210,7 @@ describe("runInBuilder", () => {
 		mockExecFileSync.mockImplementation(() => {
 			throw new Error("docker not found");
 		});
-		expect(() => runInBuilder(["webapi", "-d", "/tmp/my-project"])).toThrow("process.exit(1)");
+		expect(() => launch(["webapi", "-d", "/tmp/my-project"])).toThrow("process.exit(1)");
 		expect(exitCode).toBe(1);
 	});
 
@@ -313,27 +313,6 @@ describe("runInBuilder", () => {
 		});
 	});
 
-	it("does not create .devcontainer for auth0 login", () => {
-		run(["auth0", "login"]);
-
-		expect(
-			mockMkdirSync.mock.calls.some(
-				(c) => typeof c[0] === "string" && String(c[0]).includes(".devcontainer"),
-			),
-		).toBe(false);
-		expect(getRunArgs()).toEqual(expect.arrayContaining(["auth0", "login"]));
-	});
-
-	it("does not print scaffold-complete after auth0 login", () => {
-		const logs: string[] = [];
-		vi.spyOn(console, "log").mockImplementation((msg?: unknown) => {
-			logs.push(String(msg ?? ""));
-		});
-		run(["auth0", "login"]);
-		expect(logs.join("\n")).toContain("Running Auth0 CLI");
-		expect(logs.join("\n")).not.toContain("Scaffold complete");
-	});
-
 	it("forwards predefined scaffold options into the container command", () => {
 		run([
 			"webapi",
@@ -382,19 +361,25 @@ describe("runInBuilder", () => {
 		);
 	});
 
-	it("forwards webapi add into the container as add api", () => {
-		run(["webapi", "add", "billing"]);
+	it.each([
+		[["add", "auth0"]],
+		[["add", "api", "billing"]],
+		[["webapi", "add", "billing"]],
+		[["auth0", "login"]],
+		[["auth0", "configure"]],
+	])("%j says to open the Dev Container and starts no container", (argv) => {
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
 
-		const args = getRunArgs();
-		expect(args).toEqual(expect.arrayContaining(["add", "api", "billing", "-d", "."]));
-		expect(args).not.toContain("--name");
-	});
+		run(argv);
 
-	it("forwards decohere add api into the container as-is", () => {
-		run(["add", "api", "billing"]);
-
-		const args = getRunArgs();
-		expect(args).toEqual(expect.arrayContaining(["add", "api", "billing", "-d", "."]));
+		expect(exitCode).toBe(1);
+		expect(errors.join("\n")).toContain("Dev Container");
+		expect(mockSpawnSync).not.toHaveBeenCalled();
+		expect(mockExecFileSync).not.toHaveBeenCalled();
+		expect(mockMkdirSync).not.toHaveBeenCalled();
 	});
 
 	it("defaults to current directory when -d is not provided", () => {
@@ -405,15 +390,77 @@ describe("runInBuilder", () => {
 
 	it("propagates the container exit code", () => {
 		mockSpawnSync.mockReturnValueOnce({ status: 42 });
-		expect(() => runInBuilder(["webapi", "-d", "/tmp/my-project"])).toThrow(
-			"process.exit(42)",
-		);
+		expect(() => launch(["webapi", "-d", "/tmp/my-project"])).toThrow("process.exit(42)");
 		expect(exitCode).toBe(42);
 	});
 
 	it("exits 0 when container exits successfully", () => {
 		mockSpawnSync.mockReturnValueOnce({ status: 0 });
-		expect(() => runInBuilder(["webapi", "-d", "/tmp/my-project"])).toThrow("process.exit(0)");
+		expect(() => launch(["webapi", "-d", "/tmp/my-project"])).toThrow("process.exit(0)");
 		expect(exitCode).toBe(0);
+	});
+});
+
+describe("launch inside a container with Decohere's tools", () => {
+	beforeEach(() => {
+		vi.stubEnv("DECOHERE_TOOLS", "1");
+	});
+
+	afterEach(() => {
+		vi.unstubAllEnvs();
+	});
+
+	function scaffoldCall(): { args: string[]; cwd: string; env: NodeJS.ProcessEnv } {
+		const call = mockSpawnSync.mock.calls.find((c) => c[0] === "npx");
+		if (call == null) throw new Error("Expected the scaffolder to run with npx");
+		return { args: call[1], cwd: call[2].cwd, env: call[2].env };
+	}
+
+	it("runs create right here, without Docker", () => {
+		run(["my-app", "--database", "none"]);
+
+		expect(mockSpawnSync.mock.calls.some((c) => c[0] === "docker")).toBe(false);
+		expect(mockExecFileSync).not.toHaveBeenCalled();
+		const { args, cwd, env } = scaffoldCall();
+		expect(args).toEqual([
+			"--yes",
+			"@decohere/scaffold@0.0.1-test",
+			"create",
+			"webapi",
+			"--database",
+			"none",
+			"-d",
+			".",
+		]);
+		expect(cwd.endsWith("/my-app")).toBe(true);
+		expect(env.DECOHERE_PROJECT_NAME).toBe("my-app");
+		expect(mockMkdirSync).toHaveBeenCalledWith(cwd, { recursive: true });
+	});
+
+	it("runs commands on an existing project right here, in that project", () => {
+		run(["add", "auth0"]);
+
+		expect(mockSpawnSync.mock.calls.some((c) => c[0] === "docker")).toBe(false);
+		expect(scaffoldCall().args).toEqual(expect.arrayContaining(["add", "auth0", "-d", "."]));
+		expect(mockMkdirSync).not.toHaveBeenCalled();
+	});
+
+	it("passes on the scaffolder's exit code", () => {
+		mockSpawnSync.mockReturnValue({ status: 7 });
+		run(["add", "auth0"]);
+		expect(exitCode).toBe(7);
+	});
+
+	it("reports a failure to start, rather than success", () => {
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
+		mockSpawnSync.mockReturnValue({ status: null, error: new Error("spawn npx ENOENT") });
+
+		run(["add", "auth0"]);
+
+		expect(exitCode).toBe(1);
+		expect(errors.join("\n")).toContain("spawn npx ENOENT");
 	});
 });
