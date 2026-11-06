@@ -21,6 +21,8 @@ const {
 	mockIsInstalled,
 	mockEnsureM2mApp,
 	mockEnsureClientGrant,
+	mockCreateApi,
+	mockUpdateApiScopes,
 } = vi.hoisted(() => ({
 	mockAsk: vi.fn((_q: string, fallback = "") => Promise.resolve(fallback)),
 	mockPick: vi.fn(
@@ -34,6 +36,8 @@ const {
 	mockIsInstalled: vi.fn(() => true),
 	mockEnsureM2mApp: vi.fn(() => ({ client_id: "m2m_1", reused: false })),
 	mockEnsureClientGrant: vi.fn(),
+	mockCreateApi: vi.fn((_name: string, identifier: string) => ({ identifier })),
+	mockUpdateApiScopes: vi.fn(),
 }));
 
 const mockPm = {
@@ -66,7 +70,8 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 		login: () => true,
 		listTenants: () => [{ name: "dev-tenant.us.auth0.com", active: true }],
 		listApis: () => [{ name: "webapi API", identifier: "https://api.webapi" }],
-		updateApiScopes: vi.fn(),
+		updateApiScopes: mockUpdateApiScopes,
+		createApi: mockCreateApi,
 		createAdminDatabaseUser: mockCreateAdminDatabaseUser,
 		ensureSpaApp: mockEnsureSpaApp,
 		enableConnectionForClient: mockEnableConnectionForClient,
@@ -116,6 +121,8 @@ beforeEach(() => {
 	seedDevcontainerTemplates();
 	mockInstall.mockClear();
 	mockAsk.mockClear();
+	mockCreateApi.mockClear();
+	mockUpdateApiScopes.mockClear();
 	mockCreateAdminDatabaseUser.mockReset();
 	mockEnsureSpaApp.mockReset();
 	mockEnableConnectionForClient.mockReset();
@@ -136,6 +143,64 @@ afterEach(() => {
 });
 
 describe("scaffoldApi auth0 wiring", () => {
+	describe("when you answer the questions yourself", () => {
+		const asked = (): ScaffoldOpts => {
+			const { issuerBaseUrl: _i, audience: _a, adminUsername: _u, ...options } = baseOpts();
+			return options;
+		};
+		const quitAtAdminPrompt = () => {
+			mockAsk.mockImplementation((question: string, fallback = "") =>
+				question.includes("Admin username")
+					? Promise.reject(new Error("quit"))
+					: Promise.resolve(fallback),
+			);
+		};
+
+		afterEach(() => {
+			mockAsk.mockReset();
+			mockAsk.mockImplementation((_q: string, fallback = "") => Promise.resolve(fallback));
+			mockPick.mockReset();
+			mockPick.mockImplementation((_label, items) => Promise.resolve(items[0] ?? null));
+		});
+
+		it("creates nothing on Auth0 if you quit at a question", async () => {
+			quitAtAdminPrompt();
+
+			await expect(scaffoldApi(asked())).rejects.toThrow("quit");
+
+			expect(mockCreateApi).not.toHaveBeenCalled();
+			expect(mockEnsureSpaApp).not.toHaveBeenCalled();
+			expect(mockCreateAdminDatabaseUser).not.toHaveBeenCalled();
+		});
+
+		it("changes nothing on an existing Auth0 API if you quit at a question", async () => {
+			quitAtAdminPrompt();
+			mockPick.mockImplementation((_label, items) => Promise.resolve(items[1] ?? null));
+
+			await expect(scaffoldApi(asked())).rejects.toThrow("quit");
+
+			expect(mockUpdateApiScopes).not.toHaveBeenCalled();
+		});
+
+		it("creates the Auth0 API you chose once the questions are done", async () => {
+			await scaffoldApi(asked());
+
+			expect(mockCreateApi).toHaveBeenCalledOnce();
+			expect(mockCreateApi.mock.calls[0]?.[0]).toBe("my-api API");
+			expect(read(".env")).toContain("AUTH0_AUDIENCE=https://api.my-api");
+		});
+
+		it("updates the existing Auth0 API you chose once the questions are done", async () => {
+			mockPick.mockImplementation((_label, items) => Promise.resolve(items[1] ?? null));
+
+			await scaffoldApi(asked());
+
+			expect(mockCreateApi).not.toHaveBeenCalled();
+			expect(mockUpdateApiScopes).toHaveBeenCalledWith("https://api.webapi");
+			expect(read(".env")).toContain("AUTH0_AUDIENCE=https://api.webapi");
+		});
+	});
+
 	it("writes AUTH0_ADMIN_* to .env", async () => {
 		await scaffoldApi(baseOpts());
 

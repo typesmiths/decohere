@@ -727,6 +727,20 @@ describe("auth0 login and configure", () => {
 		expect(readFileSync("/my-app/.env", "utf8")).toContain("AUTH0_TOKEN_CLIENT_ID=m2m_123");
 	});
 
+	it("says so plainly when Auth0 has no tenant after you log in", async () => {
+		mockIsInstalled.mockReturnValue(true);
+		mockListTenants.mockReturnValue([]);
+		mockLogin.mockReturnValue(true);
+		const errors: string[] = [];
+		vi.spyOn(console, "error").mockImplementation((msg?: unknown) => {
+			errors.push(String(msg ?? ""));
+		});
+
+		await runCliAsNodeBin(["auth0", "login"]);
+
+		expect(errors.join("\n")).toContain("No Auth0 tenant after login.");
+	});
+
 	it("auth0 token prints only the token, with the API's permissions", async () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
 		writeFileSync(
