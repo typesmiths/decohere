@@ -2,7 +2,7 @@ import {
 	containerArgvFromHost,
 	hasDecohereTools,
 	OPEN_DEV_CONTAINER_MESSAGE,
-	runInBuilder,
+	launch,
 } from "@decohere/create";
 import { injectable } from "@decohere/crucible/decorators";
 import { ActionResponse } from "@decohere/devkit/cli";
@@ -31,9 +31,8 @@ function needsDevContainer(name: string): ActionResponse {
 @injectable()
 class HostWebapiAction extends WebapiAction {
 	public override async run(options: WebapiOptions): Promise<ActionResponse> {
-		if (!hasDecohereTools()) {
-			await runInBuilder(containerArgvFromHost(process.argv));
-		}
+		// One path for every way of creating a project, so the admin password is handled once.
+		await launch(containerArgvFromHost(process.argv));
 		return super.run(options);
 	}
 }

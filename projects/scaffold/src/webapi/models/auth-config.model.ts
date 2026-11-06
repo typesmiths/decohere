@@ -8,7 +8,6 @@ export const AUTH_CONFIG_SECTION =
 export type AdminUserConfig = {
 	sub: string;
 	email: string;
-	password: string;
 	username: string;
 };
 

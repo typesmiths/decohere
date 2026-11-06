@@ -9,8 +9,11 @@ const mocks = vi.hoisted(() => ({
 	mkdirSync: vi.fn(),
 	mkdtempSync: vi.fn(),
 	readdirSync: vi.fn(),
+	readFileSync: vi.fn(),
 	renameSync: vi.fn(),
 	rmSync: vi.fn(),
+	writeFileSync: vi.fn(),
+	chmodSync: vi.fn(),
 }));
 
 vi.mock("node:child_process", () => ({
@@ -24,8 +27,11 @@ vi.mock("node:fs", () => ({
 	mkdirSync: mocks.mkdirSync,
 	mkdtempSync: mocks.mkdtempSync,
 	readdirSync: mocks.readdirSync,
+	readFileSync: mocks.readFileSync,
 	renameSync: mocks.renameSync,
 	rmSync: mocks.rmSync,
+	writeFileSync: mocks.writeFileSync,
+	chmodSync: mocks.chmodSync,
 }));
 
 vi.mock(
@@ -432,6 +438,119 @@ describe("launch outside the tools", () => {
 
 		expect(exitCode).toBe(0);
 		expect(dockerCalls("cp")).toHaveLength(1);
+	});
+
+	describe("the generated admin password", () => {
+		const writtenProject = () => {
+			mocks.existsSync.mockImplementation((path: string) => path.endsWith("/.env"));
+			mocks.readFileSync.mockReturnValue(
+				"AUTH0_ADMIN_USER_SUB=auth0|1\nAUTH0_ADMIN_USER_EMAIL=admin@my-app.example\n",
+			);
+		};
+		const createEnv = () =>
+			mocks.spawnSync.mock.calls.find((c) => c[1][0] === "create")?.[2]
+				.env as NodeJS.ProcessEnv;
+
+		it("reaches the container by name only, never on the command line", async () => {
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			const password = createEnv().DECOHERE_ADMIN_PASSWORD!;
+			expect(password.length).toBeGreaterThan(20);
+			expect(createArgs()).toContain("DECOHERE_ADMIN_PASSWORD");
+			expect(createArgs().join(" ")).not.toContain(password);
+		});
+
+		const noKeyStore = () => {
+			mocks.spawnSync.mockImplementation((command: string) =>
+				command === "secret-tool"
+					? { status: null, error: new Error("spawn secret-tool ENOENT") }
+					: { status: 0 },
+			);
+		};
+
+		it("goes in the Linux key store over stdin, and isn't printed or put in a file", async () => {
+			vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+			writtenProject();
+			const logs = spyOutput("log");
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			const password = createEnv().DECOHERE_ADMIN_PASSWORD!;
+			const call = mocks.spawnSync.mock.calls.find((c) => c[0] === "secret-tool")!;
+			expect(call[1]).toEqual(
+				expect.arrayContaining(["store", "service", "decohere", "project", "my-project"]),
+			);
+			expect(call[1].join(" ")).not.toContain(password);
+			expect(call[2].input).toBe(password);
+			expect(mocks.writeFileSync).not.toHaveBeenCalled();
+			expect(mocks.rmSync).toHaveBeenCalledWith(
+				expect.stringMatching(/\.config\/decohere\/my-project\.env$/),
+				{ force: true },
+			);
+			expect(logs.join("\n")).toContain(
+				"secret-tool lookup service decohere project my-project",
+			);
+			expect(logs.join("\n")).not.toContain(password);
+		});
+
+		it("doesn't try the key store outside Linux", async () => {
+			vi.spyOn(process, "platform", "get").mockReturnValue("darwin");
+			writtenProject();
+			spyOutput("log");
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			expect(mocks.spawnSync.mock.calls.some((c) => c[0] === "secret-tool")).toBe(false);
+			expect(mocks.writeFileSync).toHaveBeenCalledOnce();
+		});
+
+		it("falls back to a private file with no key store, and never prints it", async () => {
+			vi.spyOn(process, "platform", "get").mockReturnValue("linux");
+			noKeyStore();
+			writtenProject();
+			const logs = spyOutput("log");
+			const errors = spyOutput("error");
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			const password = createEnv().DECOHERE_ADMIN_PASSWORD!;
+			const [file, content, options] = mocks.writeFileSync.mock.calls[0]!;
+			expect(file).toMatch(/\.config\/decohere\/my-project\.env$/);
+			expect(file).not.toContain("/tmp/my-project/");
+			expect(content).toContain(`AUTH0_ADMIN_USER_PASSWORD=${password}`);
+			expect(content).toContain("AUTH0_ADMIN_USER_EMAIL=admin@my-app.example");
+			expect(options).toEqual({ mode: 0o600 });
+			expect(mocks.chmodSync).toHaveBeenCalledWith(file, 0o600);
+			expect(mocks.mkdirSync).toHaveBeenCalledWith(
+				expect.stringMatching(/\.config\/decohere$/),
+				{
+					recursive: true,
+					mode: 0o700,
+				},
+			);
+			expect(logs.join("\n")).toContain(file);
+			expect([...logs, ...errors].join("\n")).not.toContain(password);
+		});
+
+		it("isn't saved when no admin user was created", async () => {
+			mocks.existsSync.mockImplementation((path: string) => path.endsWith("/.env"));
+			mocks.readFileSync.mockReturnValue("NODE_ENV=dev\n");
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			expect(mocks.writeFileSync).not.toHaveBeenCalled();
+			expect(mocks.spawnSync.mock.calls.some((c) => c[0] === "secret-tool")).toBe(false);
+		});
+
+		it("isn't saved after a failed run", async () => {
+			writtenProject();
+			containerExit = 1;
+
+			await run(["webapi", "-d", "/tmp/my-project"]);
+
+			expect(mocks.writeFileSync).not.toHaveBeenCalled();
+			expect(mocks.spawnSync.mock.calls.some((c) => c[0] === "secret-tool")).toBe(false);
+		});
 	});
 
 	it("copies nothing for --help", async () => {
