@@ -54,3 +54,15 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: node projects/ci-tools/src/audit/upsert-issue.mjs npm-audit.json
+
+  failure-report:
+    needs: [audit]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/failure-report

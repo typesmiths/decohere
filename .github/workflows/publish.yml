@@ -424,3 +424,15 @@ jobs:
           git push origin "$branch"
           echo "### Next: open the PR that raises main's base version to $next" >> "$GITHUB_STEP_SUMMARY"
           echo "https://github.com/$REPO/compare/main...$branch?expand=1" >> "$GITHUB_STEP_SUMMARY"
+
+  failure-report:
+    needs: [guard, release-build, verify, npm, docker, check-images, tag, release-finish]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/failure-report
