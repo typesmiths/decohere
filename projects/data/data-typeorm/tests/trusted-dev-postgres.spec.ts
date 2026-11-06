@@ -121,6 +121,11 @@ describe("trust auth is declared, never guessed", () => {
 			);
 		});
 
+		it("treats a password a config file set to null as no password", () => {
+			const { text } = createUserQuery("crypto_api_app", null);
+			expect(text).not.toContain("PASSWORD");
+		});
+
 		it("still refuses an empty password, which is a typo and not a choice", () => {
 			expect(() => createUserQuery("crypto_api_app", "")).toThrow(/Invalid password/);
 		});

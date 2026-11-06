@@ -74,13 +74,21 @@ function bootConfig(env: "production" | "dev"): DataSource[] {
 	for (const [key, value] of Object.entries(envFile())) {
 		vi.stubEnv(key, value);
 	}
+	// A deployment gets its passwords from the platform; .env has none.
+	if (env === "production") {
+		for (const key of Object.keys(envFile())) {
+			if (key.endsWith("_DB_USER")) {
+				vi.stubEnv(key.replace(/_USER$/, "_PASSWORD"), "from-the-platform");
+			}
+		}
+	}
 	const config = resolveYamlConfig(files) as { database: { dataSources: DataSource[] } };
 	return config.database.dataSources;
 }
 
 function connection(source: DataSource) {
-	const { provider, host, port, database, username, password } = source;
-	return { provider, host, port, database, username, password };
+	const { provider, host, port, database, username } = source;
+	return { provider, host, port, database, username };
 }
 
 beforeEach(() => {
@@ -109,11 +117,21 @@ describe("scaffolded database config ↔ @decohere/config contract", () => {
 		expect(connection(dev!)).toEqual(connection(production!));
 		expect(dev).toMatchObject({
 			name: "api",
+			auth: "trust",
+			password: null,
 			synchronize: true,
 			seed: true,
 			bootstrap: true,
-			adminUser: expect.any(String),
+			adminUser: "postgres",
 		});
+		expect(production).not.toHaveProperty("auth");
+	});
+
+	it("generates no database passwords", async () => {
+		await scaffold(["api", "billing"]);
+
+		expect(read(".env")).not.toMatch(/PASSWORD/);
+		expect(read("config/config.dev.yaml")).not.toMatch(/adminPassword|migratePassword/);
 	});
 
 	it("pairs every API's dev settings with its own data source", async () => {

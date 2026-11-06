@@ -1,7 +1,7 @@
 # 0011. Database bootstrap: trust is declared, schemas are bootstrapped, each database once
 
 - **Status:** Proposed
-- **Date:** 2026-10-15
+- **Date:** 2026-10-15 · updated 2026-11-06
 
 ## Context
 
@@ -26,8 +26,10 @@
 - A config that relied on development to excuse a missing password fails at startup until it sets `auth: trust` or a password.
 - The migrate role gets no explicit `GRANT ALL ON DATABASE`: it owns the database.
 - If the database is owned by a role the admin cannot become, bootstrap stops with an error saying so.
+- Scaffolded projects use this: their local Postgres has no passwords, `config.dev.yaml` declares `auth: trust`, and `postgres` is the bootstrap admin.
 - Not done: providers other than Postgres; other pg_hba methods (`scram-sha-256` and `md5` are both `password`).
 
 ## History
 
 - 2026-10-15: Decided. Replaces the NODE_ENV-based passwordless rule.
+- 2026-11-06: Scaffolded projects use `auth: trust` locally, with no database passwords. A password set to `null` by a config file means no password.

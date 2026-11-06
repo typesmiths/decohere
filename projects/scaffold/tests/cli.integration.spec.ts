@@ -833,7 +833,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(env).toContain("API_DB_PORT=5432");
 		expect(env).toMatch(/API_DB_NAME=/);
 		expect(env).not.toMatch(/^DB_NAME=/m);
-		expect(env).toContain("DB_ADMIN_USER=decohere_bootstrap");
+		expect(env).not.toContain("PASSWORD");
 
 		const main = readFileSync("/my-app/projects/api/src/main.ts", "utf8");
 		expect(main).toContain("withHealth()");
@@ -841,7 +841,6 @@ describe("each API owns a database on the shared Postgres instance", () => {
 
 		const compose = readFileSync("/my-app/.devcontainer/docker-compose.yml", "utf8");
 		expect(compose).toContain("samples-my-app-postgres");
-		expect(compose).toContain("build: ./postgres");
 		expect(compose).toContain("./postgres-data:/var/lib/postgresql/data");
 		expect(compose).toMatch(/bind mount|dies with the working tree/i);
 		expect(compose).not.toContain("postgres-init");
@@ -858,12 +857,10 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(rootPkg.scripts["db:reset"]).toContain("rm -rf .devcontainer/postgres-data");
 		expect(rootPkg.scripts["db:reset"]).not.toContain("down -v");
 
-		expect(
-			readFileSync("/my-app/.devcontainer/postgres/ensure-bootstrap-role.sh", "utf8"),
-		).toContain("ALTER ROLE");
-		expect(readFileSync("/my-app/.devcontainer/postgres/Dockerfile", "utf8")).toContain(
-			"FROM postgres:16",
-		);
+		expect(compose).toContain("image: postgres:16");
+		expect(compose).toContain("POSTGRES_HOST_AUTH_METHOD: trust");
+		expect(compose).toContain("127.0.0.1:5433:5432");
+		expect(existsSync("/my-app/.devcontainer/postgres")).toBe(false);
 
 		const appDevDockerfile = readFileSync("/my-app/.devcontainer/Dockerfile", "utf8");
 		expect(appDevDockerfile).toContain("postgresql-client");
@@ -974,8 +971,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(compose).toContain("container_name: samples-my-app-postgres");
 		expect(compose).toContain("../.env");
 		expect(compose).toMatch(/^ {2}devcontainer:/m);
-		expect(existsSync("/my-app/.devcontainer/postgres/Dockerfile")).toBe(true);
-		expect(existsSync("/my-app/.devcontainer/postgres/entrypoint.sh")).toBe(true);
+		expect(compose).toContain("POSTGRES_HOST_AUTH_METHOD: trust");
 
 		const gitignore = readFileSync("/my-app/.gitignore", "utf8");
 		expect(gitignore).toContain("coverage");
