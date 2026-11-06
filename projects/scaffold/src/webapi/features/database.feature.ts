@@ -1,6 +1,3 @@
-import { randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { pick } from "../../domain/prompt.js";
 import type { DockerCompose } from "../../models/compose.model.js";
 import type { ConfigYaml } from "../../models/config-yaml.model.js";
@@ -23,6 +20,8 @@ import type { MainSourceFile } from "../models/main-source-file.model.js";
 /** Bind path relative to `.devcontainer/docker-compose.yml` (dies with the working tree). */
 const POSTGRES_DATA_BIND = "./postgres-data:/var/lib/postgresql/data";
 const POSTGRES_DATA_GITIGNORE = ".devcontainer/postgres-data";
+/** The standard image's superuser. Only bootstraps the local server; no API connects as it. */
+const POSTGRES_SUPERUSER = "postgres";
 const DB_RESET_SCRIPT =
 	"rm -rf .devcontainer/postgres-data && docker compose -f .devcontainer/docker-compose.yml down && docker compose -f .devcontainer/docker-compose.yml up -d postgres";
 
@@ -32,40 +31,10 @@ export type DatabaseOptions = {
 	add?: boolean;
 };
 
-/** Read a single KEY= from an existing target `.env` (if any). */
-function readExistingEnvValue(workspace: WorkspaceScaffold, key: string): string | undefined {
-	try {
-		const raw = readFileSync(join(workspace.targetDir, ".env"), "utf8");
-		const line = raw.split("\n").find((l) => l.startsWith(`${key}=`));
-		const value = line?.slice(key.length + 1).trim();
-		return value || undefined;
-	} catch {
-		return undefined;
-	}
-}
-
-function randomPassword(): string {
-	return randomBytes(16).toString("hex");
-}
-
 /** Safe Postgres identifier fragment from the project name. */
 function toSqlIdentFragment(name: string): string {
 	const cleaned = name.replace(/[^A-Za-z0-9_]/g, "_").replace(/^([^A-Za-z_])/, "p_$1");
 	return cleaned.length > 0 ? cleaned.slice(0, 40) : "app";
-}
-
-function passwordOrExisting(
-	workspace: WorkspaceScaffold,
-	key: string,
-	fallbackExistingKeys: string[] = [],
-): string {
-	const existing = readExistingEnvValue(workspace, key);
-	if (existing) return existing;
-	for (const alt of fallbackExistingKeys) {
-		const v = readExistingEnvValue(workspace, alt);
-		if (v) return v;
-	}
-	return randomPassword();
 }
 
 // Production: runtime app role only — no bootstrap, no admin/migrate secrets required.
@@ -86,18 +55,19 @@ function renderBaseDataSource(apiName: string): string {
 }
 
 // Dev overlay: @decohere/config merges it into config.yaml by data source name, so it only states
-// what development changes. Enable bootstrap + migrate role.
+// what development changes. The local server trusts every connection, so there are no passwords;
+// `password: null` replaces the production placeholder so it's never looked up.
 function renderDevDataSource(apiName: string): string {
 	const p = apiEnvPrefix(apiName);
 	return [
 		`    - name: ${apiName}`,
+		`      auth: trust`,
+		`      password: null`,
 		`      synchronize: true`,
 		`      seed: true`,
 		`      bootstrap: true`,
-		`      adminUser: \${DB_ADMIN_USER}`,
-		`      adminPassword: \${DB_ADMIN_PASSWORD}`,
+		`      adminUser: ${POSTGRES_SUPERUSER}`,
 		`      migrateUsername: \${${p}_DB_MIGRATE_USER}`,
-		`      migratePassword: \${${p}_DB_MIGRATE_PASSWORD}`,
 	].join("\n");
 }
 
@@ -107,61 +77,6 @@ function renderDatabaseSection(
 ): string {
 	return `database:\n  dataSources:\n${apiNames.map(items).join("\n")}\n`;
 }
-
-/** Create-or-sync bootstrap role; runs on every Postgres container start (not only empty volume). */
-const POSTGRES_ENSURE_BOOTSTRAP_SH = `#!/bin/bash
-set -euo pipefail
-# Superuser aligns decohere_bootstrap with DB_ADMIN_* from env_file on every start.
-# Initdb.d alone is insufficient: passwords in .env can change while the volume persists.
-: "\${POSTGRES_USER:?POSTGRES_USER is required}"
-: "\${DB_ADMIN_USER:?DB_ADMIN_USER is required}"
-: "\${DB_ADMIN_PASSWORD:?DB_ADMIN_PASSWORD is required}"
-
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres \\
-\t--set=bootstrap_user="$DB_ADMIN_USER" \\
-\t--set=bootstrap_password="$DB_ADMIN_PASSWORD" <<'EOSQL'
-SELECT format(
-\t'CREATE ROLE %I LOGIN PASSWORD %L CREATEDB CREATEROLE NOSUPERUSER NOBYPASSRLS',
-\t:'bootstrap_user',
-\t:'bootstrap_password'
-)
-WHERE NOT EXISTS (
-\tSELECT 1 FROM pg_catalog.pg_roles WHERE rolname = :'bootstrap_user'
-)\\gexec
-
-SELECT format(
-\t'ALTER ROLE %I WITH LOGIN PASSWORD %L CREATEDB CREATEROLE NOSUPERUSER NOBYPASSRLS',
-\t:'bootstrap_user',
-\t:'bootstrap_password'
-)\\gexec
-
-GRANT CONNECT ON DATABASE postgres TO :"bootstrap_user";
-EOSQL
-`;
-
-const POSTGRES_ENTRYPOINT_SH = `#!/bin/bash
-set -euo pipefail
-(
-\tfor _ in $(seq 1 60); do
-\t\tif pg_isready -U "\${POSTGRES_USER:-postgres}" >/dev/null 2>&1; then
-\t\t\t/usr/local/bin/decohere-ensure-bootstrap.sh
-\t\t\texit 0
-\t\tfi
-\t\tsleep 0.5
-\tdone
-\techo "decohere: timed out waiting for Postgres before ensuring bootstrap role" >&2
-\texit 1
-) &
-exec docker-entrypoint.sh "$@"
-`;
-
-const POSTGRES_IMAGE_DOCKERFILE = `FROM postgres:16
-COPY ensure-bootstrap-role.sh /usr/local/bin/decohere-ensure-bootstrap.sh
-COPY entrypoint.sh /usr/local/bin/decohere-postgres-entrypoint.sh
-RUN chmod +x /usr/local/bin/decohere-ensure-bootstrap.sh /usr/local/bin/decohere-postgres-entrypoint.sh
-ENTRYPOINT ["/usr/local/bin/decohere-postgres-entrypoint.sh"]
-CMD ["postgres"]
-`;
 
 const SAMPLE_ENTITY_TS = `import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
 import type { Entity as IEntity } from "@decohere/data";
@@ -215,7 +130,8 @@ export default new DataSource({
 \tport: Number(required("${p}_DB_PORT")),
 \tdatabase: required("${p}_DB_NAME"),
 \tusername: required("${p}_DB_MIGRATE_USER"),
-\tpassword: required("${p}_DB_MIGRATE_PASSWORD"),
+\t// Unset locally, where the server trusts every connection. Set it in CI and deployments.
+\tpassword: process.env.${p}_DB_MIGRATE_PASSWORD,
 \tsynchronize: false,
 \tentities: [join(root, "entities", "*.{ts,js}")],
 \tmigrations: [join(root, "migrations", "*.{ts,js}")],
@@ -231,9 +147,15 @@ const DATABASE_DOCS_MD = `# Database (Postgres / TypeORM)
 |---|---|---|
 | App | \`{PREFIX}_DB_USER\` | Runtime API (DML only in production) |
 | Migrate | \`{PREFIX}_DB_MIGRATE_USER\` | Schema changes / TypeORM migrations (CI/deploy) |
-| Bootstrap | \`DB_ADMIN_USER\` | Create DB + roles when \`bootstrap: true\` (dev) |
+| Bootstrap | \`postgres\` | Create DB + roles when \`bootstrap: true\` (dev) |
 
 \`{PREFIX}\` is the API slug in SCREAMING_SNAKE (\`api\` → \`API\`, \`billing\` → \`BILLING\`).
+
+## No passwords locally
+
+The local Postgres trusts every connection, so nothing here needs a password. \`config/config.dev.yaml\` declares this with \`auth: trust\`, and the app refuses that setting outside development. Its port is bound to \`127.0.0.1\`, so other machines can't connect, but anything on your machine or the Compose network can, so keep only development data in it.
+
+Production still needs real passwords: \`{PREFIX}_DB_PASSWORD\` for the app, and \`{PREFIX}_DB_MIGRATE_PASSWORD\` for migrations.
 
 ## Development (fast iteration)
 
@@ -270,7 +192,7 @@ CLI entry: \`projects/<api>/src/typeorm.data-source.ts\` (migrate credentials, \
 
 ## Browse the database
 
-Prefer the Dev Container **SQLTools** extension (Postgres driver) or any desktop client against \`127.0.0.1:5433\` (see \`.env\` for credentials).
+Prefer the Dev Container **SQLTools** extension (Postgres driver) or any desktop client against \`127.0.0.1:5433\`, as user \`postgres\` with no password.
 
 Adminer is **not** scaffolded. If you want a browser UI in Compose, add this under \`services:\` in \`.devcontainer/docker-compose.yml\` (profile \`tools\` so it stays off by default):
 
@@ -320,14 +242,6 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 	const ident = toSqlIdentFragment(name);
 	const apiProjects = workspace.getProjects();
 	const apiNames = apiProjects.map((project) => apiNameFromProjectDir(project.dir));
-	// Container init superuser — never reused as an API runtime role.
-	const postgresSuperuser = "postgres";
-	const postgresPassword = passwordOrExisting(workspace, "POSTGRES_PASSWORD");
-	const bootstrapUser = "decohere_bootstrap";
-	const bootstrapPassword = passwordOrExisting(workspace, "DB_ADMIN_PASSWORD", [
-		"POSTGRES_PASSWORD",
-	]);
-
 	const devContainer = workspace.getModel<DevContainer>(WELL_KNOWN_FILES.DEVCONTAINER_JSON);
 	const compose = workspace.getModel<DockerCompose>(WELL_KNOWN_FILES.DOCKER_COMPOSE);
 
@@ -337,7 +251,6 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 	if (compose && !compose.hasService("postgres")) {
 		// One shared instance. Each API owns a database on it (created at bootstrap).
 		// Point `{PREFIX}_DB_HOST` / `{PREFIX}_DB_PORT` at another server to split later.
-		// Custom image: sync bootstrap role password on every start (initdb.d is once-only).
 		// Default data is a bind mount under the project so `rm -rf` the tree removes it.
 		compose
 			.addHeaderComment(
@@ -346,43 +259,22 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 				`e.g. "${name}-postgres-data:/var/lib/postgresql/data" and declare it under top-level volumes:.`,
 			)
 			.addService("postgres", {
-				build: "./postgres",
+				image: "postgres:16",
+				environment: { POSTGRES_HOST_AUTH_METHOD: "trust", POSTGRES_DB: ident },
 				container_name: `samples-${name}-postgres`,
 				restart: "unless-stopped",
 				ports: ["127.0.0.1:5433:5432"],
 				volumes: [POSTGRES_DATA_BIND],
 				networks: [{ [networkKey]: { aliases: ["postgres"] } }],
 				healthcheck: {
-					// Ensure role/password match .env before reporting healthy.
-					test: [
-						"CMD-SHELL",
-						`pg_isready -U ${postgresSuperuser} && /usr/local/bin/decohere-ensure-bootstrap.sh`,
-					],
+					test: ["CMD-SHELL", `pg_isready -U ${POSTGRES_SUPERUSER}`],
 					interval: "2s",
 					timeout: "5s",
 					retries: 15,
 				},
-			})
-			.addEnvFile("postgres", "../.env");
+			});
 
 		workspace.getModel<Gitignore>(WELL_KNOWN_FILES.GITIGNORE)?.add(POSTGRES_DATA_GITIGNORE);
-
-		workspace.addFile({
-			files: () => [
-				{
-					filePath: ".devcontainer/postgres/Dockerfile",
-					content: POSTGRES_IMAGE_DOCKERFILE,
-				},
-				{
-					filePath: ".devcontainer/postgres/entrypoint.sh",
-					content: POSTGRES_ENTRYPOINT_SH,
-				},
-				{
-					filePath: ".devcontainer/postgres/ensure-bootstrap-role.sh",
-					content: POSTGRES_ENSURE_BOOTSTRAP_SH,
-				},
-			],
-		});
 
 		compose.addEnvFile("devcontainer", "../.env");
 	}
@@ -432,14 +324,6 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 		wireApiDatabase(project);
 	}
 
-	const env = workspace.getModel<EnvFile>(WELL_KNOWN_FILES.ENV_FILE);
-	env
-		?.addEntry("POSTGRES_DB", ident)
-		.addEntry("POSTGRES_USER", postgresSuperuser)
-		.addEntry("POSTGRES_PASSWORD", postgresPassword)
-		.addEntry("DB_ADMIN_USER", bootstrapUser)
-		.addEntry("DB_ADMIN_PASSWORD", bootstrapPassword);
-
 	for (const apiName of apiNames) {
 		writeApiDatabaseEnv(workspace, ident, apiName);
 	}
@@ -476,12 +360,7 @@ function writeApiDatabaseEnv(
 		.addEntry(`${prefix}_DB_PORT`, "5432")
 		.addEntry(`${prefix}_DB_NAME`, `${ident}_${sqlApi}_dev`)
 		.addEntry(`${prefix}_DB_USER`, `${ident}_${sqlApi}_app`)
-		.addEntry(`${prefix}_DB_PASSWORD`, passwordOrExisting(workspace, `${prefix}_DB_PASSWORD`))
-		.addEntry(`${prefix}_DB_MIGRATE_USER`, `${ident}_${sqlApi}_migrate`)
-		.addEntry(
-			`${prefix}_DB_MIGRATE_PASSWORD`,
-			passwordOrExisting(workspace, `${prefix}_DB_MIGRATE_PASSWORD`),
-		);
+		.addEntry(`${prefix}_DB_MIGRATE_USER`, `${ident}_${sqlApi}_migrate`);
 }
 
 function wireApiDatabase(project: ProjectScaffold): void {
