@@ -29,6 +29,34 @@ describe("PinoAdapter", () => {
 		expect(output).toContain("something went wrong");
 	});
 
+	it("flush finishes through flushSync on a worker transport, whose flush can wait forever", () => {
+		const hangingFlush = vi.fn();
+		const flushSync = vi.fn();
+		const stream = { write: vi.fn(), flush: hangingFlush, flushSync };
+		const adapter = new PinoAdapter({}, stream);
+		adapter.configure({ logLevel: "info" });
+		const done = vi.fn();
+
+		adapter.flush(done);
+
+		expect(flushSync).toHaveBeenCalledOnce();
+		expect(hangingFlush).not.toHaveBeenCalled();
+		expect(done).toHaveBeenCalledOnce();
+	});
+
+	it("flush lets a failed flushSync reach the caller instead of hanging", () => {
+		const stream = {
+			write: vi.fn(),
+			flushSync: () => {
+				throw new Error("_flushSync took too long (10s)");
+			},
+		};
+		const adapter = new PinoAdapter({}, stream);
+		adapter.configure({ logLevel: "info" });
+
+		expect(() => adapter.flush(vi.fn())).toThrow("took too long");
+	});
+
 	it("stop flushes and ends the destination stream", async () => {
 		const { stream } = makeStream();
 		const end = vi.spyOn(stream, "end");

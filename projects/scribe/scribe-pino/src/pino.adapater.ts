@@ -20,6 +20,7 @@ type EndableStream = {
 	destroyed?: boolean;
 	closed?: boolean;
 	writableFinished?: boolean;
+	flushSync?: () => void;
 	once?: (
 		event: "finish" | "close" | "error",
 		listener: (...args: never[]) => void,
@@ -68,6 +69,15 @@ export class PinoAdapter extends LogAdapter {
 
 	public flush(cb?: () => void): void {
 		if (this.retired || !this._pino) {
+			cb?.();
+			return;
+		}
+		// pino.transport() is a ThreadStream: its flush() waits with no time limit and can miss
+		// the wake-up, and its worker then keeps the process alive, so a CLI waiting on this
+		// callback never exits. flushSync() gives up with an error after 10 seconds instead.
+		const dest = this.stream as EndableStream | undefined;
+		if (typeof dest?.flushSync === "function") {
+			dest.flushSync();
 			cb?.();
 			return;
 		}
