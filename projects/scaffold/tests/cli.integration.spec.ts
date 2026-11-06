@@ -955,6 +955,19 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		};
 		expect(rootPkg.scripts["db:reset"]).toContain("rm -rf .devcontainer/postgres-data");
 		expect(rootPkg.scripts["db:reset"]).not.toContain("down -v");
+		// Stops the server before deleting its files, and sets the folder up again as you.
+		const reset = rootPkg.scripts["db:reset"] ?? "";
+		expect(reset.indexOf(" down")).toBeLessThan(reset.indexOf("rm -rf"));
+		expect(reset.indexOf("rm -rf")).toBeLessThan(reset.indexOf("initialize.sh"));
+		expect(reset.indexOf("initialize.sh")).toBeLessThan(reset.indexOf("up -d"));
+		expect(rootPkg.scripts["db:up"]).toMatch(/initialize\.sh.*up -d postgres/);
+
+		// Postgres runs as you, so you can delete its files without sudo.
+		expect(compose).toContain('user: "${DECOHERE_UID:-1000}:${DECOHERE_GID:-1000}"');
+		const initialize = readFileSync("/my-app/.devcontainer/initialize.sh", "utf8");
+		expect(initialize).toContain('mkdir -p "$root/.devcontainer/postgres-data"');
+		expect(initialize).toContain("DECOHERE_UID=");
+		expect(gitignore).toContain(".env");
 
 		expect(compose).toContain("image: postgres:16");
 		expect(compose).toContain("POSTGRES_HOST_AUTH_METHOD: trust");
