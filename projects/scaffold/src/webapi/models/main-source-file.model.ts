@@ -110,7 +110,7 @@ export class MainSourceFile implements KeyedModel {
 		const imports: string[] = ['import "@decohere/scribe-pino";'];
 
 		imports.push(
-			'import { config, YamlDataSource } from "@decohere/config";',
+			'import { config, EnvDataSource, YamlDataSource } from "@decohere/config";',
 			'import { Builder } from "@decohere/core/hosting";',
 			'import { ServiceContainerBuilder } from "@decohere/crucible";',
 			'import { FastifyProvider } from "@decohere/http/providers";',
@@ -151,7 +151,7 @@ export class MainSourceFile implements KeyedModel {
 
 		const builderCalls: string[] = [
 			`\t.use(http(FastifyProvider, { controllers: [HelloController], openApi: { info: { title: "${this.appName}", version: "1.0.0" } } }))`,
-			`\t.use(config(YamlDataSource))`,
+			`\t.use(config(YamlDataSource, EnvDataSource))`,
 			`\t.use(health())`,
 			...this._builderCalls.map((c) => `\t${c}`),
 			`\t.withServices((cb) => { ${serviceRegs} })`,

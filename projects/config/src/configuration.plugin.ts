@@ -5,7 +5,10 @@ import { ConfigurationService } from "./configuration.service.js";
 import type { ConfigurationDataSource } from "./configuration-data-source.js";
 import { ConfigurationDataSourceKey } from "./const.js";
 
-/** Read configuration from the given sources, such as `YamlDataSource`. */
+/**
+ * Read configuration from the given sources, in order: a later source overrides an earlier one,
+ * key by key. For example `config(YamlDataSource, EnvDataSource)`.
+ */
 export function config(
 	...dataSources: Constructable<ConfigurationDataSource>[]
 ): BuilderPlugin {
@@ -15,6 +18,18 @@ export function config(
 			for (const dataSource of dataSources) {
 				containerBuilder.registerSingleton(ConfigurationDataSourceKey, dataSource);
 			}
+		});
+	};
+}
+
+/**
+ * Check this section when the app is built, so bad config stops it at boot, and make it injectable
+ * by its class. Requires `config(...)` on the builder.
+ */
+export function configSection(type: Constructable): BuilderPlugin {
+	return (builder) => {
+		builder.registerPreBuildStep(async (configuration, containerBuilder) => {
+			containerBuilder.registerSingleton(type, await configuration.get(type));
 		});
 	};
 }

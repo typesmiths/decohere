@@ -3,6 +3,7 @@ import { parse } from "yaml";
 import { ConfigurationDataSource } from "./configuration-data-source.js";
 import { DEFAULT_CONFIG_DIR } from "./const.js";
 import { ConfigurationError } from "./errors.js";
+import { isNamedList, isTree, mergeTrees, type Tree } from "./tree-merge.js";
 
 const CONFIG_FILE_NAME = "config";
 /** Unset NODE_ENV must not silently load config.dev.yaml (TypeORM synchronize, etc.). */
@@ -24,58 +25,10 @@ export type ConfigSource = {
 	text: string;
 };
 
-type Tree = Record<string, unknown>;
 type MissingVariable = { name: string; path: string };
 
 /** `${NAME}` or `${NAME:default}`. The default may be empty, and runs up to the first `}`. */
 const PLACEHOLDER = /\$\{(\w+)(?::([^}]*))?\}/g;
-
-function isTree(value: unknown): value is Tree {
-	return value != null && typeof value === "object" && !Array.isArray(value);
-}
-
-/** A non-empty list whose every entry is a mapping with a string `name`, such as `dataSources`. */
-function isNamedList(value: unknown): value is Tree[] {
-	return (
-		Array.isArray(value) &&
-		value.length > 0 &&
-		value.every((item) => isTree(item) && typeof item.name === "string")
-	);
-}
-
-/** Entries with the same name merge in place; new names are added at the end. */
-function mergeNamedLists(base: Tree[], override: Tree[]): Tree[] {
-	const merged = [...base];
-	for (const entry of override) {
-		const index = merged.findIndex((item) => item.name === entry.name);
-		if (index === -1) {
-			merged.push(entry);
-		} else {
-			merged[index] = merge(merged[index]!, entry);
-		}
-	}
-	return merged;
-}
-
-/**
- * Objects merge key by key, and so do lists of named entries (matched by `name`), so an
- * environment file only states what it changes. Any other list, and a scalar, in the later file
- * replaces the earlier value.
- */
-function merge(base: Tree, override: Tree): Tree {
-	const merged: Tree = { ...base };
-	for (const [key, value] of Object.entries(override)) {
-		const existing = merged[key];
-		if (isTree(existing) && isTree(value)) {
-			merged[key] = merge(existing, value);
-		} else if (isNamedList(existing) && isNamedList(value)) {
-			merged[key] = mergeNamedLists(existing, value);
-		} else {
-			merged[key] = value;
-		}
-	}
-	return merged;
-}
 
 /** A named list that repeats a name can't be merged by name, so say which file and where. */
 function assertUniqueNames(value: unknown, source: string, path: string): void {
@@ -172,7 +125,7 @@ export function resolveYamlConfig(sources: ConfigSource[]): Tree {
 	for (const source of sources) {
 		const tree = parseSource(source);
 		if (tree !== undefined) {
-			merged = merge(merged, tree);
+			merged = mergeTrees(merged, tree);
 		}
 	}
 

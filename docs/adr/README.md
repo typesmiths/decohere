@@ -39,6 +39,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 |---|---|---|
 | [0001](0001-record-architecture-decisions.md) | ADRs live in `docs/adr/`, one record per topic, each with a History | Accepted |
 | [0002](0002-secrets-from-the-environment.md) | Secrets come only from the process environment; `.env` files load only via `--env-file`; Bitwarden recommended | Accepted |
+| [0023](0023-config-layers.md) | Config is layered: class defaults, then sources in order. `EnvDataSource` maps `SECTION__KEY`, and a class's `static schema` is checked with errors that never show a value |
 | [0003](0003-no-changesets-until-public-release.md) | No changesets for now | Accepted |
 | [0004](0004-oxlint-and-prettier.md) | Lint with oxlint, format with Prettier | Accepted |
 | [0009](0009-agent-instructions-in-agents-md.md) | Agent instructions live in `AGENTS.md`; `.claude/CLAUDE.md` imports it | Proposed |

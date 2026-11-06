@@ -38,14 +38,15 @@ describe("ConfigurationService", () => {
 			expect(getData2).toHaveBeenCalled();
 		});
 
-		it("should throw if duplicate named datasources exist when get() is called", async () => {
-			const dataSource1 = new MockDataSource1();
-			const dataSource2 = new MockDataSource1();
-			const configService = new ConfigurationService([dataSource1, dataSource2]);
-			const getCall = () => configService.get("field1");
-			await expect(getCall).rejects.toThrow(
-				"Cannot have duplicate data source names. The data sources are: field1,field1",
-			);
+		it("lets a later source override a section an earlier one set", async () => {
+			const later = new (class extends ConfigurationDataSource {
+				public name: string = "";
+				public async getData(): Promise<Record<string, unknown>> {
+					return { field1: "later" };
+				}
+			})();
+			const configService = new ConfigurationService([new MockDataSource1(), later]);
+			await expect(configService.get("field1")).resolves.toBe("later");
 		});
 	});
 

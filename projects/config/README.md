@@ -38,3 +38,44 @@ database:
 `${NAME}` reads an environment variable, and `${NAME:default}` gives it a default. Placeholders are resolved **after** the merge. That way an environment file can replace a production `${VAR}` without the variable being set. Placeholders still unset after the merge fail together, and the error names every variable and where it was used. A variable set to the text `null` means no value.
 
 Secrets come only from the process environment ([ADR 0002](../../docs/adr/0002-secrets-from-the-environment.md)). Nothing here reads a `.env` file; a CLI loads one only with an explicit `--env-file`.
+
+## Layers
+
+`config(...)` lists where configuration comes from, in order. A later source overrides an earlier one, key by key, on top of the defaults in the section's class:
+
+```ts
+builder.use(config(YamlDataSource, EnvDataSource));
+```
+
+## Environment variables
+
+`EnvDataSource` reads `SECTION__KEY_NAME` as `section.keyName`, at any depth: `API__PORT=4000` sets `api.port`, and `DATABASE__POOL__MAX_SIZE=9` sets `database.pool.maxSize`. A name must be upper-case and hold at least one `__`; anything else is ignored.
+
+A list can't be set this way. For a value inside one, such as in `database.dataSources`, use a `${VAR}` placeholder in the YAML.
+
+## Typed sections
+
+A class describes a section. Its name gives the section (`PaymentsConfig` reads `payments`), its field values are the defaults, and an optional `static schema` (JSON Schema) is checked:
+
+```ts
+export class PaymentsConfig {
+	public static schema = {
+		type: "object",
+		required: ["provider"],
+		properties: { provider: { type: "string" }, retries: { type: "integer", minimum: 0 } },
+	};
+	public provider!: string;
+	public retries = 3;
+}
+
+builder.use(configSection(PaymentsConfig));
+```
+
+`configSection` checks the section when the app is built and makes it injectable by its class. Environment values are text, so the schema's types coerce them: `PAYMENTS__RETRIES=5` is the number 5. A bad value stops the app, naming the path and never the value, which may be a secret:
+
+```
+Invalid config in section "payments":
+  - payments.retries: must be integer
+```
+
+Without `configSection`, the check runs on the first `get(PaymentsConfig)`.
