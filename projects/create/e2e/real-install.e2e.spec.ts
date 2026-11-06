@@ -302,13 +302,6 @@ describe.skipIf(!registry || !version)(
 				}, FIVE_MINUTES);
 
 				afterAll(async () => {
-					const containers = await run(
-						"docker",
-						["ps", "-aq", "--filter", `label=devcontainer.local_folder=${dir}`],
-						root,
-					);
-					for (const id of containers.output.split("\n").filter(Boolean)) {
-					}
 					// No need to wait for them to stop cleanly.
 					expectOk(
 						await run(
