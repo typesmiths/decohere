@@ -205,6 +205,10 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	const compose = readFileSync(join(root, ".devcontainer/docker-compose.yml"), "utf8");
 	expect(compose).toContain(`..:${workspaceRoot}`);
 	expect(compose).toContain(`webapi-node-modules:${workspaceRoot}/node_modules`);
+	// A new volume copies this folder's mode, and on another user ID the node user's ID changes.
+	expect(readFileSync(join(root, ".devcontainer/Dockerfile"), "utf8")).toContain(
+		`chmod 777 ${workspaceRoot}/node_modules`,
+	);
 	expect(compose).toContain("command: sleep infinity");
 	expect(compose).not.toContain("codebase-rag");
 	expect(compose).not.toContain("npm-auth");

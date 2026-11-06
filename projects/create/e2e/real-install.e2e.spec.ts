@@ -10,7 +10,6 @@
  */
 import { type ChildProcess, spawn } from "node:child_process";
 import {
-	chmodSync,
 	cpSync,
 	existsSync,
 	mkdirSync,
@@ -19,7 +18,7 @@ import {
 	rmSync,
 	writeFileSync,
 } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -255,37 +254,12 @@ describe.skipIf(!registry || !version)(
 						root,
 					);
 					for (const id of containers.output.split("\n").filter(Boolean)) {
-						// It wrote files the runner's user can't delete.
-						expectOk(
-							await run(
-								"docker",
-								["exec", "-u", "root", id, "chmod", "-R", "a+rwX", "/orders"],
-								root,
-							),
-						);
 						expectOk(await run("docker", ["rm", "-f", id], root));
 					}
 				});
 
 				it("builds, starts and installs the app", async () => {
-					// Behave like a machine whose user ID matches the image's node user. On any other ID the tool
-					// remaps that user, and the node_modules volume keeps the old owner.
-					expectOk(await run("chmod", ["-R", "a+rwX", dir], root));
-					// The same for the Auth0 login folder, which initialize.sh makes private to the host user.
-					const loginRoot =
-						process.env.XDG_RUNTIME_DIR ?? join(homedir(), ".config", "decohere");
-					const loginFolder = join(loginRoot, "decohere-auth0", "orders");
-					mkdirSync(loginFolder, { recursive: true, mode: 0o777 });
-					chmodSync(loginFolder, 0o777);
-					expectOk(
-						await devcontainer(
-							"up",
-							"--workspace-folder",
-							dir,
-							"--update-remote-user-uid-default",
-							"off",
-						),
-					);
+					expectOk(await devcontainer("up", "--workspace-folder", dir));
 				});
 
 				it.each(["typecheck", "build", "test", "lint:check"])(
@@ -297,19 +271,25 @@ describe.skipIf(!registry || !version)(
 					},
 				);
 
+				it("can write to its volumes on any user ID", async () => {
+					expectOk(
+						await devcontainer(
+							"exec",
+							"--workspace-folder",
+							dir,
+							"test",
+							"-w",
+							"/commandhistory/.bash_history",
+						),
+					);
+				});
+
 				it("keeps the Auth0 login through a rebuild", async () => {
 					const exec = (...args: string[]) =>
 						devcontainer("exec", "--workspace-folder", dir, ...args);
 					expectOk(await exec("touch", "/home/node/.config/auth0/still-here"));
 					expectOk(
-						await devcontainer(
-							"up",
-							"--workspace-folder",
-							dir,
-							"--update-remote-user-uid-default",
-							"off",
-							"--remove-existing-container",
-						),
+						await devcontainer("up", "--workspace-folder", dir, "--remove-existing-container"),
 					);
 					expectOk(await exec("test", "-f", "/home/node/.config/auth0/still-here"));
 				});
@@ -335,21 +315,6 @@ describe.skipIf(!registry || !version)(
 				}, FIVE_MINUTES);
 
 				afterAll(async () => {
-					const containers = await run(
-						"docker",
-						["ps", "-aq", "--filter", `label=devcontainer.local_folder=${dir}`],
-						root,
-					);
-					for (const id of containers.output.split("\n").filter(Boolean)) {
-						// It wrote files the runner's user can't delete.
-						expectOk(
-							await run(
-								"docker",
-								["exec", "-u", "root", id, "chmod", "-R", "a+rwX", "/shop"],
-								root,
-							),
-						);
-					}
 					// No need to wait for them to stop cleanly.
 					expectOk(
 						await run(
@@ -361,17 +326,7 @@ describe.skipIf(!registry || !version)(
 				}, FIVE_MINUTES);
 
 				it("builds, starts and installs the app", async () => {
-					// The same user ID workaround as the Dev Container without a database.
-					expectOk(await run("chmod", ["-R", "a+rwX", dir], root));
-					expectOk(
-						await devcontainer(
-							"up",
-							"--workspace-folder",
-							dir,
-							"--update-remote-user-uid-default",
-							"off",
-						),
-					);
+					expectOk(await devcontainer("up", "--workspace-folder", dir));
 				});
 
 				it.each(["typecheck", "build", "test", "lint:check"])(
