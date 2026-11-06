@@ -71,10 +71,14 @@ async function finalize(
 	workspace: WorkspaceScaffold,
 	options: FinalizeOptions,
 ): Promise<void> {
-	const formatPaths = options.add
-		? workspace.getProjects().map((project) => project.dir)
-		: ["."];
-	formatScaffoldedFiles(workspace.targetDir, formatPaths.length > 0 ? formatPaths : ["."]);
+	// The scaffolder image has no Biome. A new project formats itself on its first install, in
+	// `.devcontainer/post-create.sh`.
+	if (process.env.DECOHERE_BUILDER !== "1") {
+		const formatPaths = options.add
+			? workspace.getProjects().map((project) => project.dir)
+			: ["."];
+		formatScaffoldedFiles(workspace.targetDir, formatPaths.length > 0 ? formatPaths : ["."]);
+	}
 
 	if (_shouldInstall) {
 		const pm = _pm!;

@@ -121,6 +121,14 @@ describe("builder image", () => {
 		expect(fs.readFileSync(h.log, "utf8")).not.toContain("@decohere/create@");
 	});
 
+	it("is the bare minimum: plain Alpine, with no Biome, package managers or curl", () => {
+		const dockerfile = fs.readFileSync(DOCKERFILE, "utf8");
+		const finalStage = dockerfile.slice(dockerfile.lastIndexOf("\nFROM "));
+		expect(finalStage).toMatch(/FROM alpine:\d/);
+		expect(finalStage).not.toMatch(/\b(biome|curl|npm install)\b/);
+		expect(finalStage).toContain("/usr/local/bin/node");
+	});
+
 	it("runs as a non-root user, and owns the folder it writes to", () => {
 		const dockerfile = fs.readFileSync(DOCKERFILE, "utf8");
 		expect(dockerfile).toContain("chown node:node /workspace");
