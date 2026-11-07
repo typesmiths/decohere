@@ -24,17 +24,23 @@ chmod 755 "$HOME/.local/bin/claude"
 
 # Remote Control starts with the container, so it can be reached from the phone as soon as it's up.
 # One at a time (a lock), restarted if it exits, and it waits for the launcher's binary, which the
-# VS Code extension brings on a fresh container. Its output goes to the log below.
+# VS Code extension brings on a fresh container. Its output goes to the log below. It redraws its
+# status every few seconds, so awk keeps only the first of each line; the log starts empty, and is
+# emptied on a restart if a loop that keeps failing has grown it past 1 MB.
 rc_log="$HOME/.cache/claude-remote-control.log"
 mkdir -p "$HOME/.cache"
 setsid -f bash -c '
 	exec 9>"$HOME/.cache/claude-remote-control.lock"
 	flock -n 9 || exit 0
+	log="$HOME/.cache/claude-remote-control.log"
+	: >"$log"
 	cd /src
 	while :; do
 		if "$HOME/.local/bin/claude" --version >/dev/null 2>&1; then
-			"$HOME/.local/bin/claude" remote-control --name decohere-container
-			echo "remote-control exited ($?) at $(date -u +%FT%TZ); again in 10 s"
+			[ "$(stat -c %s "$log")" -le 1048576 ] || : >"$log"
+			"$HOME/.local/bin/claude" remote-control --name decohere-container 2>&1 |
+				awk "!seen[\$0]++ { print; fflush() }"
+			echo "remote-control exited (${PIPESTATUS[0]}) at $(date -u +%FT%TZ); again in 10 s"
 		fi
 		sleep 10
 	done
