@@ -154,3 +154,50 @@ describe("bootstrapDataSources", () => {
 		);
 	});
 });
+
+describe("synchronize outside development", () => {
+	const info = (synchronize: unknown) =>
+		({
+			name: "api",
+			auth: "password",
+			password: "p",
+			bootstrap: false,
+			synchronize,
+		}) as ConnectionInfo;
+
+	it.each(["production", "staging", "prod", "test", "", undefined])(
+		"refuses it when NODE_ENV is %j",
+		async (nodeEnv) => {
+			await expect(
+				bootstrapDataSources([info(true)], { applicationName: "app", nodeEnv }),
+			).rejects.toThrow(/"api" sets synchronize.*only in development/);
+		},
+	);
+
+	it.each([true, "true", "false", 1])(
+		"counts %j as on, because TypeORM does",
+		async (synchronize) => {
+			await expect(
+				bootstrapDataSources([info(synchronize)], {
+					applicationName: "app",
+					nodeEnv: "production",
+				}),
+			).rejects.toThrow(/sets synchronize/);
+		},
+	);
+
+	it.each(["development", "dev", "DEV"])("allows it when NODE_ENV is %j", async (nodeEnv) => {
+		await expect(
+			bootstrapDataSources([info(true)], { applicationName: "app", nodeEnv }),
+		).resolves.toBeUndefined();
+	});
+
+	it.each([false, undefined, null])("allows %j in production", async (synchronize) => {
+		await expect(
+			bootstrapDataSources([info(synchronize)], {
+				applicationName: "app",
+				nodeEnv: "production",
+			}),
+		).resolves.toBeUndefined();
+	});
+});

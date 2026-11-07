@@ -40,6 +40,22 @@ export function assertDataSourceAuth(
 }
 
 /**
+ * Refuse `synchronize` outside development: on boot it changes the schema to match the entities,
+ * and can drop columns and data. Anything but `false` or absent counts as on, because a `${VAR}`
+ * placeholder gives text, and TypeORM treats the text "false" as true.
+ */
+export function assertSynchronizeAllowed(
+	info: ConnectionInfo,
+	nodeEnv: string | undefined = process.env.NODE_ENV,
+): void {
+	const synchronize: unknown = info.synchronize;
+	if (synchronize == null || synchronize === false || isDevelopmentEnv(nodeEnv)) return;
+	throw new DataConfigurationError(
+		`Data source "${info.name}" sets synchronize, which is allowed only in development (NODE_ENV is ${JSON.stringify(nodeEnv ?? "")}). Migrations own the schema elsewhere.`,
+	);
+}
+
+/**
  * Decide whether to bootstrap a data source (create its database, roles and schema).
  *
  * - `bootstrap: false` → never

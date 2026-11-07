@@ -2,6 +2,7 @@ import { type ConnectionInfo, DataConfigurationError } from "@decohere/data";
 import {
 	assertBootstrapCredentials,
 	assertDataSourceAuth,
+	assertSynchronizeAllowed,
 	shouldBootstrapDatabase,
 } from "./bootstrap-policy.js";
 import { PostgresServerManager } from "./server-manager.js";
@@ -9,7 +10,7 @@ import { PostgresServerManager } from "./server-manager.js";
 export type BootstrapDataSourcesOptions = {
 	/** Shown as `application_name` on the bootstrap connections. */
 	applicationName: string;
-	/** Defaults to `process.env.NODE_ENV`. Decides whether `auth: trust` is allowed. */
+	/** Defaults to `process.env.NODE_ENV`. Decides whether `auth: trust` and `synchronize` are allowed. */
 	nodeEnv?: string;
 };
 
@@ -17,7 +18,7 @@ export type BootstrapDataSourcesOptions = {
 const SHARED_FIELDS = ["auth", "adminUser", "migrateUsername"] as const;
 
 /**
- * Check every data source's auth, then create the databases, roles and schemas of those that
+ * Check every data source's auth and `synchronize`, then create the databases, roles and schemas of those that
  * bootstrap. Data sources on the same server and database are bootstrapped once, one after the
  * other: in parallel they would race to create the same database and roles. Running it again
  * changes nothing.
@@ -29,7 +30,10 @@ export async function bootstrapDataSources(
 	options: BootstrapDataSourcesOptions,
 ): Promise<void> {
 	const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV;
-	for (const info of dataSources) assertDataSourceAuth(info, nodeEnv);
+	for (const info of dataSources) {
+		assertDataSourceAuth(info, nodeEnv);
+		assertSynchronizeAllowed(info, nodeEnv);
+	}
 
 	const toBootstrap = dataSources.filter((info) => shouldBootstrapDatabase(info, nodeEnv));
 	for (const info of toBootstrap) assertBootstrapCredentials(info);
