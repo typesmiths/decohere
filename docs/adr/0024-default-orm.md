@@ -1,53 +1,83 @@
-# 0024. MikroORM is the default ORM
+# 0024. Data keeps its own contracts, with MikroORM and TypeORM providers under them
 
 - **Status:** Proposed
 - **Date:** 2026-11-07
 
 ## Context
 
-`@decohere/data` defines a repository, a unit of work and a data provider. `@decohere/data-typeorm` is the only adapter, on TypeORM 0.3, and TypeORM leaks into the contracts (`firstOrDefault(FindOneOptions)`). Schema migrations need a second, hand-written `DataSource`, and data migrations have no support at all. Before 0.1.0 we choose the ORM that data and its migrations ([0011](0011-database-bootstrap.md) covers the database bootstrap) are built on.
+`@decohere/data` defines the contracts: `IUnitOfWork` (`beginTransaction`, `commit`, dispose), `IDataProvider` (`findById`, `save`, `delete`, `all`) and an abstract `Repository`, with no ORM import. `@decohere/data-typeorm` is the only provider, on TypeORM 0.3. What the contracts lack shows in apps:
 
-A time-boxed spike built the same small domain on three ORMs: an `Order` aggregate that owns its `OrderLine`s, written as plain classes with no ORM import. Each version has a repository, a unit of work, a generated schema migration, and a data migration that backfills a new `total_cents` column. One scenario ran against all three on Postgres 17: load an aggregate, change it, add another and commit once; drop work that was never committed; insert 500 orders of 3 lines in one commit, then load them back. Each spike also ran under `flux serve` while its domain and mapping files were edited.
+- **Queries.** Past `findById` and `all` there is nothing, so `data-typeorm`'s `TypeOrmRepository.firstOrDefault(FindOneOptions)` hands out TypeORM's own options type, and the scaffolded auth feature calls it with them.
+- **Keys.** `Entity` requires a single `id`. A child keyed by its parent and an owner can't be one.
+- **The unit of work.** It begins and commits a transaction, nothing more. One app's repositories skip it altogether: each method opens its own `db.transaction(…)`, so two calls in one request don't commit together.
+- **Migrations.** There is no contract. Apps hand-write a second `DataSource` to run TypeORM's migrator.
 
-| | TypeORM 1.1.2 (baseline) | MikroORM 7.2.8 | Drizzle 1.0.0-rc.5 |
+Two spikes tested what to build:
+
+1. One `Order` aggregate on TypeORM 1.1.2, MikroORM 7.2.8 and Drizzle 1.0.0-rc.5: repository, unit of work, generated schema migration, data backfill, `flux serve` reboots, deliberate query typos. All three passed. Drizzle was then set aside: it has no unit of work, and its 1.0 isn't final.
+2. A real repository: a private app's `SigningRepository`, with a proposal aggregate whose signatures are its children, versioned signer changes and row locks. It was ported to MikroORM, and its own contract tests pass unchanged on the shipped TypeORM version and on the port (7 of 7 each). Then a proposal repository was written **once** against the contract additions below and run on both providers. The same contract cases pass (3 of 3 each), and so do eight unit-of-work scenarios, with the SQL each provider sent captured.
+
+### The unit of work, side by side
+
+Both providers met the same contract and sent almost the same SQL:
+
+| Scenario | TypeORM provider (tracking in `data`) | MikroORM provider |
+|---|---|---|
+| Change one field of a loaded aggregate, no save call | One `UPDATE … SET note, version = version + 1 WHERE id AND version` | The same, with `RETURNING version` |
+| The same row loaded twice | One `SELECT`, same instance | One `SELECT`, same instance |
+| Two new aggregates (3 children) plus a child on a third, one commit | One multi-row `INSERT` per table, parents first | The same; MikroORM also flushes before a query that might see the new rows |
+| A child removed, another added | `INSERT` and `DELETE` of the child rows only | The same |
+| Disposed without commit; a commit that fails part-way | `ROLLBACK`; nothing kept | `ROLLBACK`; nothing kept |
+| Two units change the same row | The second `UPDATE` matches nothing: `OptimisticLockError` | The same |
+| Domain events | Raised by the aggregate, written to an outbox table in the same commit, by the unit of work in `data` | The same hook, before MikroORM's flush |
+| Concurrent requests through crucible | One unit of work per request scope, separate identity maps, the failed request rolled back | The same |
+
+TypeORM by itself keeps no identity map and tracks no changes, which is why that app's repositories write each change by hand in targeted SQL. A unit of work doesn't remove that need for "insert if absent": `ON CONFLICT DO NOTHING` stays, in both providers.
+
+### Migrations, side by side
+
+| | TypeORM migrator | MikroORM migrator | One Decohere format (prototype) |
 |---|---|---|---|
-| Domain left as written | No. It refuses an initialised relation array (`lines = []`) and calls `new Order()` itself | No. A one-to-many loads as its `Collection` (no `push`), the class must declare the inverse property (`order`), and it patches the class prototype (`toJSON`, field accessors, `__helper`) | Yes. The repository maps rows to domain objects |
-| Query typos caught by `tsc` (field, value type, relation, sort key) | 4 of 4 | 4 of 4, plus `Loaded<>` types that track which relations were loaded | 4 of 4, plus typed SQL builder results |
-| Unit of work | Transactions only. No change tracking, so ours keeps every aggregate it hands out and saves each one | Built in: forked `EntityManager`, identity map, change tracking, one flush | None. Ours upserted every touched aggregate (about 70 lines for one aggregate), with no identity map |
-| Schema migrations | Generated by diffing the live database. Through the CLI this needs a separate `DataSource` file, and class names must end in a timestamp | Generated as TypeScript classes with `up` and `down`. Can be listed in code (`migrationsList`), so nothing is globbed at run time. The diff covers the whole database unless `skipTables` is set | Generated as SQL from a snapshot, with no database needed. No `down`, and no "migrate up to" |
-| Data migrations | Hand-written in the migration class | Hand-written in the migration class, with `execute()` and an `EntityManager` | SQL only. Migrations in TypeScript would need our own runner |
-| `flux serve` reboots | Pass | Pass | Pass |
-| Insert 500 × 3, then load (3 runs) | 530–790 ms, 8 ms | 70–90 ms, 32–52 ms | 55–60 ms, 26–36 ms |
-| Maintenance (November 2026) | 1.x since 2026, releases about monthly, 737 open issues | Releases every few days, 19 open issues, one lead maintainer | Very active, 2,059 open issues. 1.0 is still a release candidate (`latest` is 0.45) |
+| Generated from a model change | Yes, but only through the CLI and a second `DataSource` file (or the schema builder in code) | Yes, as a TypeScript class with `up` and `down` | Yes, from either ORM's diff, as a Decohere file |
+| Data migration with the app's services, batched | Yes, via a class built in a closure | Yes, the same way; raw rows return `timestamptz` as a string | Yes: `up({ sql, container, batch })` |
+| Up, down, up | Works | Works | Works |
+| History | A `migrations` table | A `mikro_orm_migrations` table | One `decohere_migrations` table, the same with either ORM |
+| Two instances starting at once | **No lock**: the backfill ran twice | **No lock**: the backfill ran twice | An advisory lock: the second instance waits, then has nothing to do |
+| Runs under flux; ships with `forge package` | Yes, when listed in code | Yes, when listed in code | Yes, listed in code. Forge warns on a directory scan it can't follow |
+| Diff in a shared database | Ignores tables it doesn't map | Proposes dropping **every** table and schema it can see but doesn't map; `skipTables` matches bare table names only, so it can't tell two apps' `proposal` tables apart | As the ORM generating it |
 
-The issue that asked for this choice describes TypeORM as slow to maintain and loosely typed. That was true of 0.3. TypeORM 1.x is maintained and its find options are fully typed. Its remaining costs are the domain changes, saves about ten times slower (each save reads before it writes), and no change tracking.
+Running as the superuser, MikroORM's generated initial migration dropped five other schemas in the spike's database. Generated as the data source's own migrate role, which the bootstrap ([0011](0011-database-bootstrap.md)) already grants only its own schema, the same diff held just its own changes. MikroORM's initial migration also starts with `create schema`, which that role may not run, and some of its index renames name no schema.
 
-Kysely was not spiked on its own. It is a typed query builder, not an ORM: mapping, a unit of work and generated migrations would all be ours to build. MikroORM 7 is built on Kysely and exposes it, typed from the mappings, as `em.getKysely()`, so choosing MikroORM also gives Kysely's typed SQL for the queries an ORM shouldn't write.
+A migration history can change provider: the prototype applied a migration generated from the TypeORM mapping, then one generated from the MikroORM mapping, on the same database. The cost was one migration's worth of renames, from TypeORM's hashed index and key names to MikroORM's.
 
 ## Decision
 
-Proposed; the owner chooses. **Recommended: MikroORM** as the default ORM, behind a new `@decohere/data-mikro-orm` adapter.
+Proposed; the owner chooses each point.
 
-- Entities are mapped with `defineEntity({ class, … })` in the infrastructure layer. Domain classes take no decorators and import nothing from MikroORM.
-- One-to-many children are typed in the domain by a small collection interface (`add`, iteration, `length`), which MikroORM's `Collection` satisfies. The domain never imports `Collection`.
-- `IUnitOfWork` wraps a forked `EntityManager`: `beginTransaction` begins, `commit` flushes and commits, disposal rolls back whatever wasn't committed.
-- Migrations use MikroORM's migrator, configured from the app's config, so there is no second data-source file. Schema migrations are generated. Data migrations are TypeScript methods on the same classes, run by flux from source and listed in code for `forge package`.
-- TypeORM is not kept as an optional adapter. `data-typeorm` stays until the MikroORM adapter ships, then is removed. Its Postgres bootstrap, role provisioning and policy checks don't use TypeORM, so they move to the new adapter or to `data`.
+1. **`@decohere/data` owns the contracts; ORMs are providers.** `data-typeorm` stays, and a `data-mikro-orm` provider is added beside it.
+2. **The unit of work promises change tracking**, not explicit saves: an identity map, changes to anything loaded written on `commit`, one transaction, rollback on dispose, a version column checked on update, and an outbox for events the aggregates raise.
+3. **The tracking lives once, in `data`** (`TrackingUnitOfWork`), for providers without their own, as TypeORM is. It is modelled on MikroORM's unit of work and written from scratch, so no MikroORM code or licence notice comes with it. A provider supplies metadata, transaction control and five row operations (select, select children, insert, update, delete). The MikroORM provider uses MikroORM's own unit of work.
+4. **Queries go through a Decohere `Query<T>`**: `where` with `in`, `gt`, `gte`, `lt`, `lte`, `ne` and null, plus `orderBy`, `limit`, `include` for children, and `lock`. Each provider translates it in about ten lines. `firstOrDefault(FindOneOptions)` goes. Keys may be composite, so `Entity`'s single `id` goes too.
+5. **Children are a `Children<T>`** (`add`, `remove`, iteration, `length`). MikroORM's `Collection` meets it, and the TypeORM provider loads arrays into a `ChildList`. Records keep their persistence apart from the domain: each provider maps the same classes in its own mapping file, and the domain imports neither ORM.
+6. **One Decohere migration format and runner**, in `data`, on a plain Postgres connection: `defineMigration({ id, up, down })`, one history table, an advisory lock, a transaction per migration, the app's container and a batch helper. Providers supply only the schema diff (TypeORM's schema builder, MikroORM's schema generator). `decohere db generate` connects as the data source's migrate role, and leaves Decohere's history table alone.
+7. **MikroORM is the default** for new apps. TypeORM moves to 1.x.
 
-The other options the owner can pick instead:
+Rejected:
 
-- **Drizzle.** The only one that left the domain exactly as written, and the fastest. But Decohere would own the unit of work, the identity map, change detection and a TypeScript migration runner, and Drizzle 1.0 is not final yet. Reconsider after 1.0 if domain purity outweighs that work.
-- **Stay on TypeORM, upgraded to 1.x.** The least work now, and the typing complaint is gone. But the domain still bends, writes are about ten times slower, and we would still build change tracking.
+- **Each ORM's own migrator behind a common CLI.** Neither migrator locks, so two instances run the same migration twice. Each keeps its own history table, so changing provider means migrating the history, and TypeORM's needs the second config file this design removes.
+- **Explicit `save` in the contract.** MikroORM's tracking would go partly unused, and the TypeORM provider would still need the snapshot to write only what changed.
+- **Drizzle as a provider now.** Decohere would supply its unit of work and migrator anyway; it could become a third provider later through the same row store.
 
 ## Consequences
 
-- The data contracts survive almost as they are. `findById`, `save`, `delete` and `all` map onto `findOne`, `persist`, `remove` and `find`. `firstOrDefault(FindOneOptions)` goes, and repositories query through the `EntityManager` (or `getKysely()` for raw SQL) instead of a leaked options type.
-- Domain classes are changed at run time: MikroORM adds a `toJSON`, field accessors and a hidden `__helper` to their prototypes. A loaded child also carries its parent (`line.order`), which a new one doesn't, so the same object serialises differently depending on where it came from. HTTP responses should map to DTOs, not serialise entities.
-- The `Loaded<Order, "lines">` types are precise, but they show in repository signatures. Repositories return the plain domain type and keep `Loaded` inside the adapter.
-- MikroORM's diff covers every schema in the database. An app that shares its database with another must set `skipTables`, or the generator proposes dropping the other app's tables.
-- MikroORM has one lead maintainer. The adapter keeps MikroORM types out of `data`'s contracts, so a later swap touches the adapter and the mappings, not the domain.
-- Apps on `data-typeorm` move their entities to `defineEntity` mappings and their migrations to the new migrator. Follow-up issues cover the adapter, the contract changes and the removal, and are filed once this record is accepted.
+- The size of what Decohere builds, without blanks or comments: contracts 36 lines, the tracker 200, the TypeORM row store 102, the MikroORM provider 59, the migration runner 84 and the diff and file writer 44. Each still needs tests at production quality.
+- A repository written against the contract runs on both providers: the proposal repository is 59 lines, with no ORM import. Mappings are per provider (27 lines each for the proposal aggregate), so changing provider means rewriting the mappings and one rename migration, not the repositories or the history.
+- The lowest common denominator shows: `Query<T>` covers filters, order, limit, children and locks, not joins across aggregates or aggregates in SQL. Those go through each provider's escape hatch (MikroORM's `em.getKysely()`, TypeORM's query builder), behind the repository.
+- MikroORM changes the classes it maps at run time (`toJSON`, field accessors, `__helper`), and a loaded child carries its parent. HTTP responses should map to DTOs, not serialise records.
+- TypeORM 0.3 ignores `primary: true` on a many-to-one in an `EntitySchema`, silently making the wrong primary key. The TypeORM mapping declares the key column as well, and the row store fills it from the reference.
+- Migrations name their schema in the SQL, so one file set serves one schema.
+- Existing apps move their repositories onto the unit of work and their migrations into the Decohere format, one repository at a time. Follow-up issues cover each piece once this record is accepted.
 
 ## History
 
-- 2026-11-07: Proposed after a spike comparing TypeORM 1.1.2, MikroORM 7.2.8 and Drizzle 1.0.0-rc.5.
+- 2026-11-07: Proposed after a spike on TypeORM 1.1.2, MikroORM 7.2.8 and Drizzle 1.0.0-rc.5. Revised the same day after porting a real repository and comparing the unit of work and migrations on TypeORM 0.3.31 and MikroORM 7.2.8: both providers stay under data's contracts, instead of TypeORM being removed.

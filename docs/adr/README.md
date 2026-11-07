@@ -64,7 +64,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 | ADR | Decision | Status |
 |---|---|---|
 | [0011](0011-database-bootstrap.md) | Database bootstrap: `auth: trust` is declared, never inferred; schemas are created and granted on; each database once, granting only what is missing | Proposed |
-| [0024](0024-default-orm.md) | Proposed: MikroORM is the default ORM, mapped outside the domain; TypeORM is removed once its adapter ships; Drizzle and TypeORM 1.x were the alternatives | Proposed |
+| [0024](0024-default-orm.md) | Proposed: `data` owns the contracts, with a tracked unit of work, a Decohere query and one migration format; MikroORM and TypeORM are providers under them, MikroORM the default | Proposed |
 
 ### Dependency injection
 
