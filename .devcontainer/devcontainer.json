@@ -22,6 +22,13 @@
   ],
   // Volumes are created root-owned; hand them to `node`, then install; pnpm switches itself to the version pinned in package.json.
   "postCreateCommand": "sudo chown node node_modules /home/node/.claude && pnpm install",
+  // A name to find it by in claude.ai/code; otherwise it's a random ID that changes on each rebuild.
+  "runArgs": ["--hostname=decohere-container"],
+  // Every start: Claude Remote Control, so this container is reachable from claude.ai/code.
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+  // Claude's settings file goes in the mounted folder above, so it survives a rebuild.
+  "containerEnv": { "CLAUDE_CONFIG_DIR": "/home/node/.claude" },
+  "remoteEnv": { "PATH": "${containerEnv:PATH}:/home/node/.local/bin" },
   "remoteUser": "node",
   "customizations": {
     "vscode": {
