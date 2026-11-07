@@ -1,4 +1,9 @@
+import { ConfigurationError } from "./errors.js";
+
 export type Tree = Record<string, unknown>;
+
+/** As object keys these reach for what every object inherits, so config may never set them. */
+const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 export function isTree(value: unknown): value is Tree {
 	return value != null && typeof value === "object" && !Array.isArray(value);
@@ -45,4 +50,33 @@ export function mergeTrees(base: Tree, override: Tree): Tree {
 		}
 	}
 	return merged;
+}
+
+/** Refuse a source that sets a key every object inherits, at any depth. */
+export function assertSafeKeys(value: unknown, source: string, path = ""): void {
+	if (Array.isArray(value)) {
+		value.forEach((item, index) => assertSafeKeys(item, source, `${path}[${index}]`));
+	} else if (isTree(value)) {
+		for (const [key, item] of Object.entries(value)) {
+			const here = path === "" ? key : `${path}.${key}`;
+			if (FORBIDDEN_KEYS.has(key)) {
+				throw new ConfigurationError(`Config source ${source}: the key ${here} isn't allowed`);
+			}
+			assertSafeKeys(item, source, here);
+		}
+	}
+}
+
+/**
+ * Null means unset: a key set to null is removed, so the class's default applies, or `required`
+ * fails. Without this, type coercion would turn it into 0, false or "".
+ */
+export function withoutNulls<T>(value: T): T {
+	if (Array.isArray(value)) return value.map(withoutNulls) as T;
+	if (!isTree(value)) return value;
+	const kept: Tree = {};
+	for (const [key, item] of Object.entries(value)) {
+		if (item !== null) kept[key] = withoutNulls(item);
+	}
+	return kept as T;
 }

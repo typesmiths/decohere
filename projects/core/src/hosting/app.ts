@@ -19,6 +19,7 @@ const DEFAULT_SHUTDOWN_TIMEOUT_MS = 10_000;
 export class ApiConfiguration {
 	public static schema = {
 		type: "object",
+		additionalProperties: false,
 		properties: { port: { type: "integer", minimum: 0, maximum: 65535 } },
 	};
 

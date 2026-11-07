@@ -37,7 +37,7 @@ class SecretConfigService implements IConfigurationService {
 		return [];
 	}
 	public async get<T extends object>(type: Constructable<T> | string): Promise<T> {
-		if (type === AuthConfig) {
+		if (Object.is(type, AuthConfig)) {
 			return Object.assign(new AuthConfig(), {
 				secret: "super-secret-key-that-is-long-enough-for-hs256",
 				issuer: "test-issuer",

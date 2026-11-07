@@ -1,7 +1,7 @@
-import { Builder, type HostedService } from "@decohere/core/hosting";
+import { ApiConfiguration, Builder, type HostedService } from "@decohere/core/hosting";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { inject } from "@decohere/crucible/decorators";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	config,
 	configSection,
@@ -11,6 +11,7 @@ import {
 	EnvDataSource,
 	envToTree,
 } from "../src/index.js";
+import { resolveYamlConfig } from "../src/yaml-data-source.js";
 
 function source(data: Record<string, unknown>): ConfigurationDataSource {
 	return new (class extends ConfigurationDataSource {
@@ -215,5 +216,244 @@ describe("configSection", () => {
 		await app.dispose();
 
 		expect(seen[0]?.retries).toBe(5);
+	});
+});
+
+describe("what a later layer can clear", () => {
+	class Auth {
+		public provider = "default";
+		public devUser?: string;
+	}
+	const named = (...sections: Record<string, unknown>[]) =>
+		new ConfigurationService(sections.map(source));
+
+	it("keeps a key a later layer doesn't mention", async () => {
+		const auth = await named(
+			{ auth: { provider: "dev", devUser: "admin" } },
+			{ auth: { provider: "oidc" } },
+		).get(Auth);
+
+		expect(auth).toMatchObject({ provider: "oidc", devUser: "admin" });
+	});
+
+	it("clears nothing with an empty section", async () => {
+		const auth = await named({ auth: { devUser: "admin" } }, { auth: {} }).get(Auth);
+
+		expect(auth.devUser).toBe("admin");
+	});
+
+	it("clears a key set to null, back to the class's default", async () => {
+		const auth = await named(
+			{ auth: { provider: "dev", devUser: "admin" } },
+			{ auth: { provider: null, devUser: null } },
+		).get(Auth);
+
+		expect(auth.provider).toBe("default");
+		expect(auth.devUser).toBeUndefined();
+	});
+
+	it("clears a section set to null, back to the class's defaults", async () => {
+		const auth = await named(
+			{ auth: { provider: "dev", devUser: "admin" } },
+			{ auth: null },
+		).get(Auth);
+
+		expect(auth.provider).toBe("default");
+		expect(auth.devUser).toBeUndefined();
+	});
+
+	it("lets a null clear a key by name too, inside a named list entry", async () => {
+		const service = named(
+			{ database: { dataSources: [{ name: "api", synchronize: true }] } },
+			{ database: { dataSources: [{ name: "api", synchronize: null }] } },
+		);
+
+		expect(await service.get("database")).toEqual({ dataSources: [{ name: "api" }] });
+	});
+
+	it("lets a scalar replace a section, and a section replace a scalar", async () => {
+		await expect(
+			named({ auth: { provider: "a" } }, { auth: "text" }).get("auth"),
+		).resolves.toBe("text");
+		await expect(
+			named({ auth: "text" }, { auth: { provider: "a" } }).get(Auth),
+		).resolves.toMatchObject({ provider: "a" });
+		await expect(
+			named({ auth: { provider: "a" } }, { auth: "text" }).get(Auth),
+		).rejects.toThrow(/must be a mapping/);
+	});
+
+	it("fails required on null, instead of coercing it to an empty value", async () => {
+		const service = named({ payments: { provider: null, retries: null } });
+
+		await expect(service.get(PaymentsConfig)).rejects.toThrow(
+			"payments.provider: must have required",
+		);
+	});
+
+	it("uses the default for a null, instead of coercing it to 0", async () => {
+		const payments = await named({ payments: { provider: "a", retries: null } }).get(
+			PaymentsConfig,
+		);
+
+		expect(payments.retries).toBe(3);
+	});
+});
+
+describe("clashing environment variables", () => {
+	it.each([
+		[{ API__A: "1", API__A__B: "2" }],
+		[{ API__A__B: "2", API__A: "1" }],
+		[{ API__A_1: "1", API__A1: "2" }],
+	])("refuses %j, naming both and neither value", (env) => {
+		const names = Object.keys(env);
+		const check = () => envToTree(env);
+
+		expect(check).toThrow(ConfigurationError);
+		expect(check).toThrow(names[0]!);
+		expect(check).toThrow(names[1]!);
+	});
+
+	it("allows siblings that share a prefix", () => {
+		expect(envToTree({ API__A: "1", API__AB: "2", API__C__D: "3", API__C__E: "4" })).toEqual({
+			api: { a: "1", ab: "2", c: { d: "3", e: "4" } },
+		});
+	});
+});
+
+describe("devOnly in a schema", () => {
+	class DevAuth {
+		public static schema = {
+			type: "object",
+			properties: {
+				provider: { type: "string" },
+				devUser: { type: "string", devOnly: true },
+				nested: { type: "object", properties: { key: { devOnly: true } } },
+			},
+		};
+		public provider?: string;
+		public devUser?: string;
+		public nested?: { key?: string };
+	}
+	const load = (auth: Record<string, unknown>) =>
+		new ConfigurationService([source({ devAuth: auth })]).get(DevAuth);
+
+	afterEach(() => vi.unstubAllEnvs());
+
+	it.each(["production", "staging", "prod", "develop", "test", ""])(
+		"refuses a value when NODE_ENV is %j, naming the path and not the value",
+		async (env) => {
+			vi.stubEnv("NODE_ENV", env);
+
+			const error = await load({ devUser: "sup3r-s3cret", nested: { key: "hunter2" } }).catch(
+				(caught: unknown) => caught as Error,
+			);
+
+			expect(error).toBeInstanceOf(ConfigurationError);
+			const { message } = error as Error;
+			expect(message).toContain("devAuth.devUser: is only allowed when NODE_ENV");
+			expect(message).toContain("devAuth.nested.key: is only allowed when NODE_ENV");
+			expect(message).not.toContain("sup3r-s3cret");
+			expect(message).not.toContain("hunter2");
+		},
+	);
+
+	it("refuses it when NODE_ENV is unset", async () => {
+		vi.stubEnv("NODE_ENV", undefined as unknown as string);
+
+		await expect(load({ devUser: "admin" })).rejects.toThrow("devAuth.devUser");
+	});
+
+	it.each(["development", "dev", "DEV"])("allows it when NODE_ENV is %j", async (env) => {
+		vi.stubEnv("NODE_ENV", env);
+
+		await expect(load({ devUser: "admin" })).resolves.toMatchObject({ devUser: "admin" });
+	});
+
+	it("doesn't mind the key being absent or null outside development", async () => {
+		vi.stubEnv("NODE_ENV", "production");
+
+		await expect(load({ provider: "oidc", devUser: null })).resolves.toMatchObject({
+			provider: "oidc",
+		});
+	});
+
+	it("refuses a dev value left as a class default", async () => {
+		vi.stubEnv("NODE_ENV", "production");
+		class WithDefault {
+			public static schema = { type: "object", properties: { devUser: { devOnly: true } } };
+			public devUser = "admin";
+		}
+
+		await expect(new ConfigurationService([]).get(WithDefault)).rejects.toThrow(
+			"withDefault.devUser",
+		);
+	});
+});
+
+describe("undeclared keys", () => {
+	it("stops the api section, naming the key and not its value", async () => {
+		const service = new ConfigurationService([
+			source({ api: { port: 1, prot: "sup3r-s3cret" } }),
+		]);
+
+		const error = await service
+			.get(ApiConfiguration)
+			.catch((caught: unknown) => caught as Error);
+
+		expect((error as Error).message).toContain(
+			"api.prot: must NOT have additional properties",
+		);
+		expect((error as Error).message).not.toContain("sup3r-s3cret");
+	});
+
+	it("stops it for a stray variable too", async () => {
+		vi.stubEnv("API__PROT", "1");
+		try {
+			const service = new ConfigurationService([new EnvDataSource()]);
+
+			await expect(service.get(ApiConfiguration)).rejects.toThrow("api.prot");
+		} finally {
+			vi.unstubAllEnvs();
+		}
+	});
+});
+
+describe("keys every object inherits", () => {
+	it("refuses them from any source, at any depth", async () => {
+		const parsed = JSON.parse('{"auth":{"list":[{"__proto__":{"polluted":1}}]}}') as Record<
+			string,
+			unknown
+		>;
+
+		await expect(new ConfigurationService([source(parsed)]).get("auth")).rejects.toThrow(
+			"auth.list[0].__proto__",
+		);
+		expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+	});
+
+	it.each(["__proto__", "constructor", "prototype"])(
+		"refuses %s from a real YAML file",
+		(key) => {
+			const text = `auth:\n  ${key}:\n    polluted: 1\n`;
+
+			expect(() => resolveYamlConfig([{ name: "config.yaml", text }])).toThrow(`auth.${key}`);
+			expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+		},
+	);
+});
+
+describe("config()", () => {
+	it("stops the build when a source fails, with no section read yet", async () => {
+		class Broken extends ConfigurationDataSource {
+			public name = "broken";
+			public async getData(): Promise<Record<string, unknown>> {
+				throw new ConfigurationError("cannot read");
+			}
+		}
+
+		await expect(
+			Builder.create(new ServiceContainerBuilder()).use(config(Broken)).build(),
+		).rejects.toThrow("cannot read");
 	});
 });

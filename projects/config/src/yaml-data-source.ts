@@ -3,7 +3,7 @@ import { parse } from "yaml";
 import { ConfigurationDataSource } from "./configuration-data-source.js";
 import { DEFAULT_CONFIG_DIR } from "./const.js";
 import { ConfigurationError } from "./errors.js";
-import { isNamedList, isTree, mergeTrees, type Tree } from "./tree-merge.js";
+import { assertSafeKeys, isNamedList, isTree, mergeTrees, type Tree } from "./tree-merge.js";
 
 const CONFIG_FILE_NAME = "config";
 /** Unset NODE_ENV must not silently load config.dev.yaml (TypeORM synchronize, etc.). */
@@ -107,6 +107,7 @@ function parseSource({ name, text }: ConfigSource): Tree | undefined {
 			`Config file ${name} must contain a mapping at the top level`,
 		);
 	}
+	assertSafeKeys(parsed, name);
 	assertUniqueNames(parsed, name, "");
 	return parsed;
 }

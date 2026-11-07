@@ -19,6 +19,10 @@ export function config(
 				containerBuilder.registerSingleton(ConfigurationDataSourceKey, dataSource);
 			}
 		});
+		// Loads every source, so a bad one stops the build, not the first read of its section.
+		builder.registerPreBuildStep(async (configuration) => {
+			await configuration.get("");
+		});
 	};
 }
 

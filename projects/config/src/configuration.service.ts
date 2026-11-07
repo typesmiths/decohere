@@ -2,15 +2,23 @@ import { inject, injectable } from "@decohere/crucible/decorators";
 import { cache, memoize } from "@decohere/core/caching";
 import type { IConfigurationService } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
-import { lowerCamelCase } from "@decohere/core/system";
+import { isDevelopmentEnv, lowerCamelCase } from "@decohere/core/system";
 import { Ajv, type ErrorObject } from "ajv";
 import type { ConfigurationDataSource } from "./configuration-data-source.js";
 import { ConfigurationDataSourceKey } from "./const.js";
 import { ConfigurationError } from "./errors.js";
-import { isTree, mergeTrees, type Tree } from "./tree-merge.js";
+import { assertSafeKeys, isTree, mergeTrees, type Tree, withoutNulls } from "./tree-merge.js";
 
 /** Environment values are always text, so a schema's types coerce them. */
 const ajv = new Ajv({ allErrors: true, coerceTypes: true, strict: false });
+
+/** `devOnly: true` in a schema: this key may only have a value when NODE_ENV says development. */
+ajv.addKeyword({
+	keyword: "devOnly",
+	schemaType: "boolean",
+	error: { message: 'is only allowed when NODE_ENV is "development" or "dev"' },
+	validate: (flagged: boolean) => !flagged || isDevelopmentEnv(),
+});
 
 type WithSchema = { schema?: object };
 
@@ -25,6 +33,7 @@ function describeIssue(
 ) {
 	const path = instancePath.split("/").filter(Boolean);
 	if (keyword === "required") path.push(String(params.missingProperty));
+	if (keyword === "additionalProperties") path.push(String(params.additionalProperty));
 	return `  - ${[section, ...path].join(".")}: ${message ?? keyword}`;
 }
 
@@ -55,7 +64,10 @@ export class ConfigurationService implements IConfigurationService {
 		}
 
 		const records = await Promise.all(this.dataSources.map(async (d) => await d.getData()));
-		this.data = records.reduce<Tree>(mergeTrees, {});
+		records.forEach((record, index) => {
+			assertSafeKeys(record, this.dataSources[index]?.name ?? String(index));
+		});
+		this.data = withoutNulls(records.reduce<Tree>(mergeTrees, {}));
 		this.isInitialized = true;
 	}
 
@@ -63,6 +75,8 @@ export class ConfigurationService implements IConfigurationService {
 	 * A section by its name, or as an instance of its class. The class's field values are the
 	 * defaults, and a `static schema` (JSON Schema) on it is checked, with text coerced to the types
 	 * it asks for. The section comes from the class's name: `PaymentsConfig` reads `payments`.
+	 * A key set to null counts as unset. In a schema, `devOnly: true` refuses a key's value when
+	 * NODE_ENV doesn't say development.
 	 *
 	 * @throws {ConfigurationError} if the section breaks the schema, naming each bad path.
 	 */
@@ -90,7 +104,7 @@ export class ConfigurationService implements IConfigurationService {
 		}
 		const configObject = new type();
 		const defaults = Object.fromEntries(Object.entries(configObject));
-		const merged = structuredClone(mergeTrees(defaults, data));
+		const merged = structuredClone(withoutNulls(mergeTrees(defaults, data)));
 		const { schema } = type as WithSchema;
 		if (schema) assertValid(section, schema, merged);
 		Object.assign(configObject, merged);

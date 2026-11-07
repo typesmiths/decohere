@@ -1,6 +1,6 @@
 import path from "node:path";
 import picomatch from "picomatch";
-import { isDevelopmentNodeEnv } from "../auth/auth.types.js";
+import { isDevelopmentEnv } from "@decohere/core/system";
 
 /**
  * Serving a module's built UI from its API (the `statics` setting). Everything here is
@@ -149,8 +149,7 @@ async function resolve(
 		const root = path.resolve(cwd, mount.directory);
 		if (!(await env.directoryExists(root))) {
 			const policy =
-				mount.options.onMissingDirectory ??
-				(isDevelopmentNodeEnv(env.nodeEnv) ? "warn" : "fail");
+				mount.options.onMissingDirectory ?? (isDevelopmentEnv(env.nodeEnv) ? "warn" : "fail");
 			const message =
 				`statics "${mount.prefix}" at "${mount.directory}": ${root} does not exist. ` +
 				"Build the UI first, or run the app from the folder that holds it.";

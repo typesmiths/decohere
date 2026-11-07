@@ -79,3 +79,25 @@ Invalid config in section "payments":
 ```
 
 Without `configSection`, the check runs on the first `get(PaymentsConfig)`.
+
+## Guards
+
+**A later layer keeps what it doesn't mention.** That is what lets `API__PORT` change one key, but it also means a setting can survive when you meant to replace it: with `auth: { provider: dev, devUser: admin }` then `auth: { provider: oidc }`, `devUser` is still `admin`. An empty section (`auth: {}`) clears nothing. To clear something, set it to null.
+
+**Null means unset,** at any depth, inside a named list entry too: the class's default applies, or `required` fails. `auth: null` clears the whole section.
+
+**Dev values don't belong in the base file or class defaults.** Put them in `config.dev.yaml`, and mark the key in the schema:
+
+```ts
+properties: { devUser: { type: "string", devOnly: true } }
+```
+
+A `devOnly` key with a value stops the app unless `NODE_ENV` is `development` or `dev`. Unset, staging or a typo all count as not development.
+
+**Undeclared keys.** With `additionalProperties: false`, an unknown key stops the app, including a stray `API__X` variable. Framework sections such as `api` use it. Consider it for yours, since any `SECTION__KEY` variable becomes config once `EnvDataSource` is listed.
+
+**Clashing variables stop the app:** `API__A` with `API__A__B`, or two names that mean the same key, such as `API__A_1` and `API__A1`.
+
+**`__proto__`, `constructor` and `prototype`** are refused as keys, from any source.
+
+**What these can't catch:** an ordinary value such as `host: localhost` in the base file, because nothing says it's wrong; use `${VAR}` with no default for values that differ by environment, so a missing one stops the app. A section read by name, or with no schema, skips the schema checks.
