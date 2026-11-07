@@ -330,4 +330,101 @@ describe("PackageDeployable", () => {
 			expect(response.message).toContain("ui.output");
 		});
 	});
+
+	describe("config files", () => {
+		const packaged = () =>
+			fs.existsSync("/ws/projects/api/.package/config")
+				? (fs.readdirSync("/ws/projects/api/.package/config") as string[]).sort()
+				: [];
+		const allConfig = {
+			"/ws/config/config.dev.yaml": "a: 1",
+			"/ws/config/config.production.yaml": "a: 1",
+			"/ws/config/config.staging.yaml": "a: 1",
+			"/ws/config/config.api.yaml": "a: 1",
+			"/ws/config/config.api.production.yaml": "a: 1",
+			"/ws/config/config.api.dev.yaml": "a: 1",
+			"/ws/config/config.billing.yaml": "a: 1",
+			"/ws/config/config.billing.production.yaml": "a: 1",
+		};
+
+		it("copies only what this app reads in production, by default", async () => {
+			seed(allConfig);
+
+			const response = await action().run({ project: "@app/api" });
+
+			expect(response.succeeded).toBe(true);
+			expect(packaged()).toEqual([
+				"config.api.production.yaml",
+				"config.api.yaml",
+				"config.production.yaml",
+				"config.yaml",
+			]);
+		});
+
+		it("takes the environments and apps it's given", async () => {
+			seed(allConfig);
+
+			await action().run({
+				project: "@app/api",
+				env: ["staging", "dev"],
+				app: ["billing"],
+			});
+
+			expect(packaged()).toEqual([
+				"config.billing.yaml",
+				"config.dev.yaml",
+				"config.staging.yaml",
+				"config.yaml",
+			]);
+		});
+
+		it("is fine when an env's file doesn't exist", async () => {
+			seed();
+
+			const response = await action().run({ project: "@app/api", env: ["staging"] });
+
+			expect(response.succeeded).toBe(true);
+			expect(packaged()).toEqual(["config.yaml"]);
+		});
+
+		it("keeps folders, which the loader doesn't layer", async () => {
+			seed({ "/ws/config/automation/rules.yaml": "a: 1" });
+
+			await action().run({ project: "@app/api" });
+
+			expect(
+				fs.readFileSync("/ws/projects/api/.package/config/automation/rules.yaml", "utf8"),
+			).toBe("a: 1");
+		});
+
+		it.each(["settings.json", "config.yml", "config.a.b.c.yaml", "secrets.yaml"])(
+			"stops on %s, which fits no pattern, naming it",
+			async (name) => {
+				seed({ [`/ws/config/${name}`]: "a: 1" });
+
+				const response = await action().run({ project: "@app/api" });
+
+				expect(response.succeeded).toBe(false);
+				expect(response.message).toContain(name);
+			},
+		);
+
+		it("refuses an app named like an environment", async () => {
+			seed();
+
+			const response = await action().run({ project: "@app/api", app: ["production"] });
+
+			expect(response.succeeded).toBe(false);
+			expect(response.message).toContain("both an app and an environment");
+		});
+
+		it("refuses a name that can't be part of a file name", async () => {
+			seed();
+
+			const response = await action().run({ project: "@app/api", env: ["../secrets"] });
+
+			expect(response.succeeded).toBe(false);
+			expect(response.message).toContain("can't name a config file");
+		});
+	});
 });

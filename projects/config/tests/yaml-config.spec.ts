@@ -1,5 +1,5 @@
 import { vol } from "memfs";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigurationError } from "../src/errors.js";
 import { resolveYamlConfig, YamlDataSource } from "../src/yaml-data-source.js";
 
@@ -262,5 +262,85 @@ describe("YamlDataSource reads config.yaml then config.<env>.yaml", () => {
 		vol.fromJSON({ "/app/config/config.yaml": "name: api\n" });
 
 		expect(await new YamlDataSource().getData()).toEqual({ name: "api" });
+	});
+});
+
+describe("YamlDataSource: config.{optional app}.{optional env}.yaml", () => {
+	beforeEach(() => {
+		vol.reset();
+		vol.fromJSON({
+			"/c/config.yaml": "from: base\nbase: 1",
+			"/c/config.billing.yaml": "from: app\napp: 1",
+			"/c/config.production.yaml": "from: env\nenv: 1",
+			"/c/config.billing.production.yaml": "from: both\nboth: 1",
+			"/c/config.other.yaml": "other: 1",
+			"/c/config.dev.yaml": "dev: 1",
+		});
+		vi.stubEnv("CONFIG_DIR", "/c");
+		vi.stubEnv("NODE_ENV", "production");
+	});
+	afterEach(() => vi.unstubAllEnvs());
+
+	it("reads base, app, env, then both, later winning", async () => {
+		expect(await new YamlDataSource({ app: "billing" }).getData()).toEqual({
+			from: "both",
+			base: 1,
+			app: 1,
+			env: 1,
+			both: 1,
+		});
+	});
+
+	it("reads only base and env with no app", async () => {
+		expect(await new YamlDataSource().getData()).toEqual({ from: "env", base: 1, env: 1 });
+	});
+
+	it("stops when the app named in code has no config file, naming it", async () => {
+		await expect(new YamlDataSource({ app: "biling" }).getData()).rejects.toThrow(
+			/"biling" has no config file.*config\.biling\.yaml.*config\.biling\.production\.yaml/,
+		);
+	});
+
+	it("is satisfied by the app's env file alone", async () => {
+		vol.reset();
+		vol.fromJSON({ "/c/config.billing.production.yaml": "both: 1" });
+
+		expect(await new YamlDataSource({ app: "billing" }).getData()).toEqual({ both: 1 });
+	});
+
+	it("is satisfied by an app file that's only comments", async () => {
+		vol.reset();
+		vol.fromJSON({ "/c/config.billing.yaml": "# nothing yet\n" });
+
+		expect(await new YamlDataSource({ app: "billing" }).getData()).toEqual({});
+	});
+
+	it("takes no app from the environment", async () => {
+		vi.stubEnv("CONFIG_APP", "billing");
+
+		expect(await new YamlDataSource().getData()).toEqual({ from: "env", base: 1, env: 1 });
+	});
+
+	it("reads config.dev.yaml as the environment when NODE_ENV is dev, with an app set too", async () => {
+		vi.stubEnv("NODE_ENV", "dev");
+
+		expect(await new YamlDataSource({ app: "billing" }).getData()).toEqual({
+			from: "app",
+			base: 1,
+			app: 1,
+			dev: 1,
+		});
+	});
+
+	it("refuses an app named the same as the environment", async () => {
+		await expect(new YamlDataSource({ app: "production" }).getData()).rejects.toThrow(
+			/both an app and an environment/,
+		);
+	});
+
+	it.each(["../secrets", "a.b", "a/b", ""])("refuses the app name %j", async (app) => {
+		await expect(new YamlDataSource({ app }).getData()).rejects.toThrow(
+			/can't name a config file/,
+		);
 	});
 });

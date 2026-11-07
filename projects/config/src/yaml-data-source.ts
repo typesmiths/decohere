@@ -1,3 +1,4 @@
+import { configFileNames, DEFAULT_CONFIG_ENV } from "@decohere/core/configuration";
 import { io } from "@decohere/core/io";
 import { parse } from "yaml";
 import { ConfigurationDataSource } from "./configuration-data-source.js";
@@ -5,16 +6,11 @@ import { DEFAULT_CONFIG_DIR } from "./const.js";
 import { ConfigurationError } from "./errors.js";
 import { assertSafeKeys, isNamedList, isTree, mergeTrees, type Tree } from "./tree-merge.js";
 
-const CONFIG_FILE_NAME = "config";
-/** Unset NODE_ENV must not silently load config.dev.yaml (TypeORM synchronize, etc.). */
-const DEFAULT_ENV = "production";
-const FILE_EXT = "yaml";
-
-/** Resolve which env-specific config file to merge (e.g. config.dev.yaml). */
+/** Resolve which env-specific config file to merge. Unset must not silently load config.dev.yaml. */
 export function resolveConfigEnv(nodeEnv?: string): string {
 	const env = nodeEnv ?? process.env.NODE_ENV;
 	if (env == null || env.trim() === "") {
-		return DEFAULT_ENV;
+		return DEFAULT_CONFIG_ENV;
 	}
 	return env;
 }
@@ -142,19 +138,40 @@ export function resolveYamlConfig(sources: ConfigSource[]): Tree {
 	return resolved;
 }
 
+export type YamlDataSourceOptions = {
+	/** Reads this app's files too: `config.<app>.yaml` and `config.<app>.<env>.yaml`. */
+	app?: string;
+};
+
 export class YamlDataSource extends ConfigurationDataSource {
 	public name: string = YamlDataSource.name;
+
+	public constructor(private readonly options: YamlDataSourceOptions = {}) {
+		super();
+	}
+
 	public async getData(): Promise<Record<string, unknown>> {
 		const configDir = process.env.CONFIG_DIR ?? DEFAULT_CONFIG_DIR;
+		const { app } = this.options;
+		const apps = app == null ? [] : [app];
 		const env = resolveConfigEnv();
-		const candidates = [
-			`${configDir}/${CONFIG_FILE_NAME}.${FILE_EXT}`,
-			`${configDir}/${CONFIG_FILE_NAME}.${env}.${FILE_EXT}`,
-		];
 		const sources: ConfigSource[] = [];
-		for (const filePath of candidates) {
+		for (const fileName of configFileNames(apps, [env])) {
+			const filePath = `${configDir}/${fileName}`;
 			if (await io.fileExists(filePath)) {
 				sources.push({ name: filePath, text: await io.readFile(filePath) });
+			}
+		}
+		// A name in code that matches no file is a typo, or a file left out of the package.
+		if (app != null) {
+			const own = [
+				`${configDir}/config.${app}.yaml`,
+				`${configDir}/config.${app}.${env}.yaml`,
+			];
+			if (!sources.some(({ name }) => own.includes(name))) {
+				throw new ConfigurationError(
+					`The app "${app}" has no config file: neither ${own.join(" nor ")} exists. Add one, or fix the name.`,
+				);
 			}
 		}
 		return resolveYamlConfig(sources);

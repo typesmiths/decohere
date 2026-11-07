@@ -49,7 +49,10 @@ export class MainSourceFile implements KeyedModel {
 	private _dataSourceName: string | undefined;
 	private _typeOrmSeed: string | undefined;
 
-	public constructor(private readonly appName: string) {
+	public constructor(
+		private readonly appName: string,
+		private readonly apiName = "api",
+	) {
 		this.addImport("health", "@decohere/http").addImport("http", "@decohere/http");
 	}
 
@@ -151,7 +154,7 @@ export class MainSourceFile implements KeyedModel {
 
 		const builderCalls: string[] = [
 			`\t.use(http(FastifyProvider, { controllers: [HelloController], openApi: { info: { title: "${this.appName}", version: "1.0.0" } } }))`,
-			`\t.use(config(YamlDataSource, EnvDataSource))`,
+			`\t.use(config(new YamlDataSource({ app: "${this.apiName}" }), EnvDataSource))`,
 			`\t.use(health())`,
 			...this._builderCalls.map((c) => `\t${c}`),
 			`\t.withServices((cb) => { ${serviceRegs} })`,

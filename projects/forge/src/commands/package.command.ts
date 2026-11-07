@@ -1,6 +1,10 @@
 import { DecohereCommand } from "@decohere/devkit/cli";
 import { PackageDeployable } from "../actions/package.action.js";
 
+function collect(value: string, previous: string[]): string[] {
+	return [...previous, value];
+}
+
 export class PackageCommand extends DecohereCommand {
 	public override get actions() {
 		return [PackageDeployable];
@@ -14,6 +18,18 @@ export class PackageCommand extends DecohereCommand {
 		this.argument(
 			"[project]",
 			"Package name of the deployable; omit to package every project with a Dockerfile",
+		);
+		this.option(
+			"--env <name>",
+			"Environment whose config files to include; repeat for more. Default production",
+			collect,
+			[],
+		);
+		this.option(
+			"--app <name>",
+			"App whose config files to include; repeat for more. Default the project's folder name",
+			collect,
+			[],
 		);
 	}
 

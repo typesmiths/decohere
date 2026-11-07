@@ -302,8 +302,16 @@ function addApiProject(
 ): void {
 	const apiProject = new ProjectScaffold(webapiProjectDir(apiName));
 	apiProject.addModel(new ApiPackageJson(workspaceName, apiName));
-	apiProject.addModel(new MainSourceFile(`${workspaceName}.${apiName}`));
+	apiProject.addModel(new MainSourceFile(`${workspaceName}.${apiName}`, apiName));
 	apiProject.addModel(new ControllerSourceFile());
+	// main.ts names this app, and an app named in code must have a config file.
+	monoRepo.addModel(
+		new ConfigYaml(
+			`config.${apiName}.yaml`,
+			`config/config.${apiName}.yaml`,
+			`# Settings only the ${apiName} API reads, over config.yaml.\n`,
+		),
+	);
 	apiProject.addFile(new SampleConfigModel());
 	apiProject.addFile(new SampleServiceModel());
 	monoRepo.addProject(apiProject);

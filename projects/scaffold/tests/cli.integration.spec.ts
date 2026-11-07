@@ -910,7 +910,7 @@ describe("decohere add auth0", () => {
 		const source = readFileSync(main, "utf8");
 		expect(source).toContain('import { auth } from "@decohere/http";');
 		expect(source).toMatch(
-			/\.use\(config\(YamlDataSource, EnvDataSource\)\)\n\s*\.use\(auth\(\)\)/,
+			/\.use\(config\(new YamlDataSource\(\{ app: "api" \}\), EnvDataSource\)\)\n\s*\.use\(auth\(\)\)/,
 		);
 		expect(readFileSync("/my-app/config/config.yaml", "utf8")).toContain(
 			"discoveryUrl: ${AUTH0_ISSUER_BASE_URL}",

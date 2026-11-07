@@ -5,6 +5,12 @@ import { type Project, Workspace } from "@decohere/workspace";
 import type { Action, ResultStatus } from "@decohere/devkit/cli";
 import { ActionResponse } from "@decohere/devkit/cli";
 import { Npm } from "@decohere/devkit/interop";
+import {
+	configFileNames,
+	DEFAULT_CONFIG_ENV,
+	isConfigFileName,
+	isConfigNamePart,
+} from "@decohere/core/configuration";
 import { io } from "@decohere/core/io";
 import { scribe } from "@decohere/scribe";
 import { ForgeError, formatUnknownError } from "../errors.js";
@@ -18,6 +24,10 @@ import { Release } from "../workspace.config.js";
 export type PackageOptions = {
 	/** Package name of one deployable. Omit to package every project that has a Dockerfile. */
 	project?: string;
+	/** Environments whose config files to include. Default `production`. */
+	env?: string[];
+	/** Apps whose config files to include. Default the project's folder name, when it's a valid name. */
+	app?: string[];
 };
 
 export type PackageResponse = ResultStatus & {
@@ -57,7 +67,7 @@ export class PackageDeployable implements Action<PackageOptions> {
 		const releaseProjects = await this.releaseProjects(projects);
 		const responses: PackageResponse[] = [];
 		for (const project of selected) {
-			responses.push(await this.packageProject(project, releaseProjects, projects));
+			responses.push(await this.packageProject(project, releaseProjects, projects, options));
 		}
 
 		return responses.some((response) => !response.succeeded)
@@ -117,6 +127,7 @@ export class PackageDeployable implements Action<PackageOptions> {
 		project: Project,
 		releaseProjects: ReadonlyMap<string, ReleaseProject>,
 		projects: readonly Project[],
+		options: PackageOptions,
 	): Promise<PackageResponse> {
 		const outDir = path.join(path.resolve(project.projectRoot), PACKAGE_DIR);
 		const base = {
@@ -150,6 +161,7 @@ export class PackageDeployable implements Action<PackageOptions> {
 			);
 
 			await this.write(entry, libraries, dependencies, outDir, ui);
+			await this.copyConfig(project, outDir, options);
 
 			const workspacePackages = [...reached.workspace].sort();
 			this.#logger.info(`Packaged ${project.name} to ${outDir}`, {
@@ -195,11 +207,6 @@ export class PackageDeployable implements Action<PackageOptions> {
 		}
 
 		await this.copyTree(path.join(entry.releaseDir, "es6"), path.join(outDir, "es6"));
-		const config = path.join(path.resolve(this.workspace.rootDir), "config");
-		if (await io.directoryExists(config)) {
-			await this.copyTree(config, path.join(outDir, "config"));
-		}
-
 		if (ui != null) {
 			await this.copyTree(ui.from, path.join(outDir, ui.to));
 		}
@@ -216,6 +223,51 @@ export class PackageDeployable implements Action<PackageOptions> {
 		}
 
 		await this.assertNoSymlinks(outDir);
+	}
+
+	/**
+	 * Copies the config files this package's apps and environments read, and every folder, which
+	 * the loader doesn't layer. Other config files are for someone else, a developer's
+	 * `config.dev.yaml` above all, so they stay out. A file that fits no pattern stops the package.
+	 */
+	private async copyConfig(
+		project: Project,
+		outDir: string,
+		options: PackageOptions,
+	): Promise<void> {
+		const config = path.join(path.resolve(this.workspace.rootDir), "config");
+		if (!(await io.directoryExists(config))) return;
+
+		const entries = await fs.readdir(config, { withFileTypes: true });
+		const files = entries.filter((entry) => !entry.isDirectory()).map((entry) => entry.name);
+		const unknown = files.filter((name) => !name.startsWith(".") && !isConfigFileName(name));
+		if (unknown.length > 0) {
+			throw new ForgeError(
+				`config/ holds files that aren't named config.{optional app}.{optional env}.yaml, so ${project.name} can't tell whether it needs them: ${unknown.join(", ")}. Rename them, or move them into a folder.`,
+			);
+		}
+
+		const folderName = path.basename(path.resolve(project.projectRoot));
+		const apps = options.app?.length
+			? options.app
+			: isConfigNamePart(folderName)
+				? [folderName]
+				: [];
+		const envs = options.env?.length ? options.env : [DEFAULT_CONFIG_ENV];
+		const wanted = new Set(configFileNames(apps, envs));
+		const target = path.join(outDir, "config");
+		await fs.mkdir(target, { recursive: true });
+		for (const entry of entries) {
+			if (entry.isDirectory() || wanted.has(entry.name)) {
+				await this.copyTree(path.join(config, entry.name), path.join(target, entry.name));
+			}
+		}
+		const leftOut = files.filter((name) => !name.startsWith(".") && !wanted.has(name));
+		if (leftOut.length > 0) {
+			this.#logger.info(
+				`${project.name}: config left out for app ${apps.join(", ") || "(none)"}, env ${envs.join(", ")}: ${leftOut.join(", ")}`,
+			);
+		}
 	}
 
 	/** Copies file contents, never links: a symlink in the output would break outside the image. */
