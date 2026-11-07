@@ -30,7 +30,7 @@ class OidcConfigService implements IConfigurationService {
 		return [];
 	}
 	public async get<T extends object>(type: Constructable<T> | string): Promise<T> {
-		if (type === AuthConfig) {
+		if (Object.is(type, AuthConfig)) {
 			const config = new AuthConfig();
 			config.discoveryUrl = oidc.issuer;
 			config.audience = "https://api.test";

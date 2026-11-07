@@ -1,10 +1,5 @@
+import { isDevelopmentEnv } from "@decohere/core/system";
 import { type ConnectionInfo, DataConfigurationError } from "@decohere/data";
-
-/** True when NODE_ENV says development. Only then may a data source declare `auth: trust`. */
-export function isDevelopmentEnv(nodeEnv: string | undefined = process.env.NODE_ENV): boolean {
-	const env = nodeEnv?.toLowerCase() ?? "";
-	return env === "development" || env === "dev";
-}
 
 function isTrusted(info: ConnectionInfo): boolean {
 	return info.auth === "trust";

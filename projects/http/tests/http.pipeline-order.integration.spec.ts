@@ -25,7 +25,7 @@ class SecretConfigService implements IConfigurationService {
 		return [];
 	}
 	public async get<T extends object>(type: Constructable<T> | string): Promise<T> {
-		if (type === AuthConfig) {
+		if (Object.is(type, AuthConfig)) {
 			const config = new AuthConfig();
 			config.secret = "test-secret-at-least-32-bytes-long!!";
 			config.audience = "test-audience";

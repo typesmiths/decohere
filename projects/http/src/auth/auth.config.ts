@@ -8,6 +8,11 @@ import type { Principal } from "./auth.types.js";
  * Development → use `devStatic` (only works when NODE_ENV=development).
  */
 export class AuthConfig {
+	public static schema = {
+		type: "object",
+		properties: { devStatic: { devOnly: true } },
+	};
+
 	/** OIDC discovery URL — the issuer base URL, e.g. https://accounts.google.com.
 	 *  The framework appends `/.well-known/openid-configuration` automatically.
 	 *  Use this instead of `jwksUrl` for any standard OIDC-compliant IdP.

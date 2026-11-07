@@ -1,3 +1,4 @@
+import { isDevelopmentEnv } from "@decohere/core/system";
 export type Principal = {
 	sub: string;
 	roles?: string[];
@@ -90,18 +91,12 @@ export function isSecretConfig(config: TokenServiceConfig): config is SecretConf
 	return "secret" in config;
 }
 
-/** `devStatic` is only valid for local development NODE_ENV values. */
-export function isDevelopmentNodeEnv(nodeEnv = process.env.NODE_ENV): boolean {
-	const env = nodeEnv?.toLowerCase();
-	return env === "development" || env === "dev";
-}
-
 /**
  * Refuse `devStatic` outside development — otherwise any Bearer string is
  * accepted as the configured principal (auth bypass in production).
  */
 export function assertDevStaticAllowed(nodeEnv = process.env.NODE_ENV): void {
-	if (!isDevelopmentNodeEnv(nodeEnv)) {
+	if (!isDevelopmentEnv(nodeEnv)) {
 		throw new Error(
 			`AuthConfig.devStatic is only allowed when NODE_ENV is "development" or "dev" (got ${JSON.stringify(nodeEnv ?? "")}).`,
 		);
