@@ -11,6 +11,7 @@
 
 - **Layers:** the class's field values, then each source in the order given to `config(...)`. Objects and named lists merge; any other list, and a scalar, replaces. It is the merge the YAML files already used.
 - **File names say who a file is for:** `config.{optional app}.{optional env}.yaml`, read as `config.yaml`, `config.<app>.yaml`, `config.<env>.yaml`, `config.<app>.<env>.yaml`, each if it exists, later ones winning. The app is a const in the app's code, `new YamlDataSource({ app: "billing" })`, and `forge package --app` names what to copy. Names are built, never parsed, so `dev` alone can't be misread as an app, and an app named like its environment is refused.
+- **An app named in code must have a file of its own**, `config.<app>.yaml` or `config.<app>.<env>.yaml`, or boot stops and names it. Generated APIs get a `config.<api>.yaml`.
 - **`forge package` copies only what the package reads**, for `--env` (default `production`) and `--app` (default the project's folder name). A top-level file that fits no pattern stops it. Folders copy as they are.
 - **The environment is a source**, `EnvDataSource`, listed explicitly, so an app shows what it reads. `SECTION__KEY_NAME` means `section.keyName`. Only upper-case names with `__` count.
 - **A schema is a `static schema` on the class**, in JSON Schema, checked with AJV. Types coerce, because environment values are text.
@@ -37,7 +38,7 @@ Rejected:
 - A leftover `auth.devStatic` now stops the app outside development, even with a real login strategy configured.
 - A section is checked only when something asks for it, so a section with no `configSection` can fail after boot.
 - `config` depends on `ajv`.
-- An image that runs in several environments or roles must list them when packaging. A file left out isn't an error at run time, so `forge package` logs what it leaves out.
+- An image that runs in several environments must list them when packaging. An environment file left out isn't an error at run time, so `forge package` logs what it leaves out.
 
 ## History
 

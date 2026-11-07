@@ -295,6 +295,26 @@ describe("YamlDataSource: config.{optional app}.{optional env}.yaml", () => {
 		expect(await new YamlDataSource().getData()).toEqual({ from: "env", base: 1, env: 1 });
 	});
 
+	it("stops when the app named in code has no config file, naming it", async () => {
+		await expect(new YamlDataSource({ app: "biling" }).getData()).rejects.toThrow(
+			/"biling" has no config file.*config\.biling\.yaml.*config\.biling\.production\.yaml/,
+		);
+	});
+
+	it("is satisfied by the app's env file alone", async () => {
+		vol.reset();
+		vol.fromJSON({ "/c/config.billing.production.yaml": "both: 1" });
+
+		expect(await new YamlDataSource({ app: "billing" }).getData()).toEqual({ both: 1 });
+	});
+
+	it("is satisfied by an app file that's only comments", async () => {
+		vol.reset();
+		vol.fromJSON({ "/c/config.billing.yaml": "# nothing yet\n" });
+
+		expect(await new YamlDataSource({ app: "billing" }).getData()).toEqual({});
+	});
+
 	it("takes no app from the environment", async () => {
 		vi.stubEnv("CONFIG_APP", "billing");
 

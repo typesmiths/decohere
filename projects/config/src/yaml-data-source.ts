@@ -154,11 +154,24 @@ export class YamlDataSource extends ConfigurationDataSource {
 		const configDir = process.env.CONFIG_DIR ?? DEFAULT_CONFIG_DIR;
 		const { app } = this.options;
 		const apps = app == null ? [] : [app];
+		const env = resolveConfigEnv();
 		const sources: ConfigSource[] = [];
-		for (const fileName of configFileNames(apps, [resolveConfigEnv()])) {
+		for (const fileName of configFileNames(apps, [env])) {
 			const filePath = `${configDir}/${fileName}`;
 			if (await io.fileExists(filePath)) {
 				sources.push({ name: filePath, text: await io.readFile(filePath) });
+			}
+		}
+		// A name in code that matches no file is a typo, or a file left out of the package.
+		if (app != null) {
+			const own = [
+				`${configDir}/config.${app}.yaml`,
+				`${configDir}/config.${app}.${env}.yaml`,
+			];
+			if (!sources.some(({ name }) => own.includes(name))) {
+				throw new ConfigurationError(
+					`The app "${app}" has no config file: neither ${own.join(" nor ")} exists. Add one, or fix the name.`,
+				);
 			}
 		}
 		return resolveYamlConfig(sources);

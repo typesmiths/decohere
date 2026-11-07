@@ -18,6 +18,8 @@ The app is a const in your code:
 builder.use(config(new YamlDataSource({ app: "billing" }), EnvDataSource));
 ```
 
+An app named in code must have a file of its own, `config.<app>.yaml` or `config.<app>.<env>.yaml`, even if it's only a comment. Otherwise the app stops at boot and names it, so a typo, or a file left out of a package, can't run on the shared settings alone.
+
 Names are built from the app and `NODE_ENV`, never parsed, so `config.dev.yaml` can't be misread. An app can't have the same name as its environment.
 
 [`forge package`](../forge/README.md#forge-package-one-folder-a-plain-node-can-run) copies only the files a package's apps and environments read, so `config.dev.yaml` stays out of a production image.
