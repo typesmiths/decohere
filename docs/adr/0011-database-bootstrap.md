@@ -24,6 +24,7 @@
 
 - An app with one schema per module only maps modules to schemas; the bootstrap is the framework's.
 - A config that relied on development to excuse a missing password fails at startup until it sets `auth: trust` or a password.
+- `synchronize` is refused outside development, like `auth: trust`, because it can drop columns and data on boot. Anything but `false` or absent counts as on, since TypeORM treats the text "false" as true.
 - The migrate role gets no explicit `GRANT ALL ON DATABASE`: it owns the database.
 - If the database is owned by a role the admin cannot become, bootstrap stops with an error saying so.
 - Scaffolded projects use this: their local Postgres has no passwords, `config.dev.yaml` declares `auth: trust`, and `postgres` is the bootstrap admin.
@@ -34,3 +35,4 @@
 - 2026-10-15: Decided. Replaces the NODE_ENV-based passwordless rule.
 - 2026-11-06: Scaffolded projects use `auth: trust` locally, with no database passwords. A password set to `null` by a config file means no password.
 - 2026-11-06: `withTypeOrm` became the `typeOrm()` plugin ([ADR 0014](0014-package-names.md)).
+- 2026-11-07: `synchronize` is refused outside development.
