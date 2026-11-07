@@ -1,3 +1,4 @@
+import { configFileNames, DEFAULT_CONFIG_ENV } from "@decohere/core/configuration";
 import { io } from "@decohere/core/io";
 import { parse } from "yaml";
 import { ConfigurationDataSource } from "./configuration-data-source.js";
@@ -5,16 +6,11 @@ import { DEFAULT_CONFIG_DIR } from "./const.js";
 import { ConfigurationError } from "./errors.js";
 import { assertSafeKeys, isNamedList, isTree, mergeTrees, type Tree } from "./tree-merge.js";
 
-const CONFIG_FILE_NAME = "config";
-/** Unset NODE_ENV must not silently load config.dev.yaml (TypeORM synchronize, etc.). */
-const DEFAULT_ENV = "production";
-const FILE_EXT = "yaml";
-
-/** Resolve which env-specific config file to merge (e.g. config.dev.yaml). */
+/** Resolve which env-specific config file to merge. Unset must not silently load config.dev.yaml. */
 export function resolveConfigEnv(nodeEnv?: string): string {
 	const env = nodeEnv ?? process.env.NODE_ENV;
 	if (env == null || env.trim() === "") {
-		return DEFAULT_ENV;
+		return DEFAULT_CONFIG_ENV;
 	}
 	return env;
 }
@@ -146,13 +142,11 @@ export class YamlDataSource extends ConfigurationDataSource {
 	public name: string = YamlDataSource.name;
 	public async getData(): Promise<Record<string, unknown>> {
 		const configDir = process.env.CONFIG_DIR ?? DEFAULT_CONFIG_DIR;
-		const env = resolveConfigEnv();
-		const candidates = [
-			`${configDir}/${CONFIG_FILE_NAME}.${FILE_EXT}`,
-			`${configDir}/${CONFIG_FILE_NAME}.${env}.${FILE_EXT}`,
-		];
+		const app = process.env.CONFIG_APP;
+		const apps = app == null || app.trim() === "" ? [] : [app];
 		const sources: ConfigSource[] = [];
-		for (const filePath of candidates) {
+		for (const fileName of configFileNames(apps, [resolveConfigEnv()])) {
+			const filePath = `${configDir}/${fileName}`;
 			if (await io.fileExists(filePath)) {
 				sources.push({ name: filePath, text: await io.readFile(filePath) });
 			}

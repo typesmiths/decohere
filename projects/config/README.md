@@ -4,10 +4,17 @@ Application configuration for Decohere: data sources that feed the configuration
 
 ## YAML files
 
-`YamlDataSource` reads two files from `CONFIG_DIR` (default `config`):
+Config files are named `config.{optional app}.{optional env}.yaml`. `YamlDataSource` reads these from `CONFIG_DIR` (default `config`), each if it exists, later ones winning:
 
 1. `config.yaml`: production, and the base for every environment.
+1. `config.<CONFIG_APP>.yaml`, if `CONFIG_APP` is set: one app's settings, in a project with several.
 2. `config.<NODE_ENV>.yaml`, if it exists, such as `config.dev.yaml`. An unset `NODE_ENV` means `production`, so a missing variable never loads development settings.
+
+3. `config.<CONFIG_APP>.<NODE_ENV>.yaml`: that app in that environment.
+
+Names are built from `CONFIG_APP` and `NODE_ENV`, never parsed, so `config.dev.yaml` can't be misread. An app can't have the same name as its environment.
+
+[`forge package`](../forge/README.md#forge-package-one-folder-a-plain-node-can-run) copies only the files a package's apps and environments read, so `config.dev.yaml` stays out of a production image.
 
 ### How the files merge
 

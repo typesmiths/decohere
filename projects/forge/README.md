@@ -84,7 +84,10 @@ Save `src/index.ts` → Flux reboots `shop.api`. No pre-build of `shop.domain`, 
 forge build --configuration release
 forge package @app/shop.api      # one deployable
 forge package                    # every project that has a Dockerfile
+forge package @app/shop.api --env staging --env production --app worker
 ```
+
+It copies only the config files this package reads, named `config.{optional app}.{optional env}.yaml`, each if it exists: `config.yaml`, then each `--app`'s, each `--env`'s, and each pair's. `--env` defaults to `production`, so `config.dev.yaml` stays out of the image. `--app` defaults to the project's folder name, which generated Dockerfiles also set as `CONFIG_APP`. If one image runs in several environments or as several roles, list them all: a missing file isn't an error, at build or at run time. It logs what it leaves out, and folders inside `config/` always copy. A file at the top of `config/` that fits no pattern stops the package, naming the file.
 
 Only a **deployable** can be packaged: a project with a Dockerfile (`docker.dockerfile` in `.decohere.js`, default `Dockerfile` — the same rule `forge docker` uses). A library is refused with a message; libraries are packaged into the deployables that import them, which is also how `"private": true` libraries reach production.
 
