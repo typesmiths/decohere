@@ -138,12 +138,22 @@ export function resolveYamlConfig(sources: ConfigSource[]): Tree {
 	return resolved;
 }
 
+export type YamlDataSourceOptions = {
+	/** Reads this app's files too: `config.<app>.yaml` and `config.<app>.<env>.yaml`. */
+	app?: string;
+};
+
 export class YamlDataSource extends ConfigurationDataSource {
 	public name: string = YamlDataSource.name;
+
+	public constructor(private readonly options: YamlDataSourceOptions = {}) {
+		super();
+	}
+
 	public async getData(): Promise<Record<string, unknown>> {
 		const configDir = process.env.CONFIG_DIR ?? DEFAULT_CONFIG_DIR;
-		const app = process.env.CONFIG_APP;
-		const apps = app == null || app.trim() === "" ? [] : [app];
+		const { app } = this.options;
+		const apps = app == null ? [] : [app];
 		const sources: ConfigSource[] = [];
 		for (const fileName of configFileNames(apps, [resolveConfigEnv()])) {
 			const filePath = `${configDir}/${fileName}`;

@@ -266,7 +266,8 @@ describe("YamlDataSource reads config.yaml then config.<env>.yaml", () => {
 });
 
 describe("YamlDataSource: config.{optional app}.{optional env}.yaml", () => {
-	const write = () =>
+	beforeEach(() => {
+		vol.reset();
 		vol.fromJSON({
 			"/c/config.yaml": "from: base\nbase: 1",
 			"/c/config.billing.yaml": "from: app\napp: 1",
@@ -275,20 +276,13 @@ describe("YamlDataSource: config.{optional app}.{optional env}.yaml", () => {
 			"/c/config.other.yaml": "other: 1",
 			"/c/config.dev.yaml": "dev: 1",
 		});
-
-	beforeEach(() => {
-		vol.reset();
-		write();
 		vi.stubEnv("CONFIG_DIR", "/c");
 		vi.stubEnv("NODE_ENV", "production");
-		vi.stubEnv("CONFIG_APP", "");
 	});
 	afterEach(() => vi.unstubAllEnvs());
 
 	it("reads base, app, env, then both, later winning", async () => {
-		vi.stubEnv("CONFIG_APP", "billing");
-
-		expect(await new YamlDataSource().getData()).toEqual({
+		expect(await new YamlDataSource({ app: "billing" }).getData()).toEqual({
 			from: "both",
 			base: 1,
 			app: 1,
@@ -301,11 +295,16 @@ describe("YamlDataSource: config.{optional app}.{optional env}.yaml", () => {
 		expect(await new YamlDataSource().getData()).toEqual({ from: "env", base: 1, env: 1 });
 	});
 
-	it("reads config.dev.yaml as the environment when NODE_ENV is dev, with an app set too", async () => {
-		vi.stubEnv("NODE_ENV", "dev");
+	it("takes no app from the environment", async () => {
 		vi.stubEnv("CONFIG_APP", "billing");
 
-		expect(await new YamlDataSource().getData()).toEqual({
+		expect(await new YamlDataSource().getData()).toEqual({ from: "env", base: 1, env: 1 });
+	});
+
+	it("reads config.dev.yaml as the environment when NODE_ENV is dev, with an app set too", async () => {
+		vi.stubEnv("NODE_ENV", "dev");
+
+		expect(await new YamlDataSource({ app: "billing" }).getData()).toEqual({
 			from: "app",
 			base: 1,
 			app: 1,
@@ -314,16 +313,14 @@ describe("YamlDataSource: config.{optional app}.{optional env}.yaml", () => {
 	});
 
 	it("refuses an app named the same as the environment", async () => {
-		vi.stubEnv("CONFIG_APP", "production");
-
-		await expect(new YamlDataSource().getData()).rejects.toThrow(
+		await expect(new YamlDataSource({ app: "production" }).getData()).rejects.toThrow(
 			/both an app and an environment/,
 		);
 	});
 
-	it.each(["../secrets", "a.b", "a/b"])("refuses CONFIG_APP %s", async (app) => {
-		vi.stubEnv("CONFIG_APP", app);
-
-		await expect(new YamlDataSource().getData()).rejects.toThrow(/can't name a config file/);
+	it.each(["../secrets", "a.b", "a/b", ""])("refuses the app name %j", async (app) => {
+		await expect(new YamlDataSource({ app }).getData()).rejects.toThrow(
+			/can't name a config file/,
+		);
 	});
 });

@@ -6,11 +6,12 @@ import type { ConfigurationDataSource } from "./configuration-data-source.js";
 import { ConfigurationDataSourceKey } from "./const.js";
 
 /**
- * Read configuration from the given sources, in order: a later source overrides an earlier one,
- * key by key. For example `config(YamlDataSource, EnvDataSource)`.
+ * Read configuration from the given sources, classes or instances, in order: a later source
+ * overrides an earlier one, key by key. For example
+ * `config(new YamlDataSource({ app: "billing" }), EnvDataSource)`.
  */
 export function config(
-	...dataSources: Constructable<ConfigurationDataSource>[]
+	...dataSources: (Constructable<ConfigurationDataSource> | ConfigurationDataSource)[]
 ): BuilderPlugin {
 	return (builder) => {
 		builder.withServices((containerBuilder) => {

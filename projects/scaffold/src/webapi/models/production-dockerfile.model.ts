@@ -50,7 +50,6 @@ export function renderProductionDockerfile(apiName: string): string {
 FROM node:24-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
-ENV CONFIG_APP=${apiName}
 
 COPY .package/ ./
 

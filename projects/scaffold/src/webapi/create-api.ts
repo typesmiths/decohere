@@ -302,7 +302,7 @@ function addApiProject(
 ): void {
 	const apiProject = new ProjectScaffold(webapiProjectDir(apiName));
 	apiProject.addModel(new ApiPackageJson(workspaceName, apiName));
-	apiProject.addModel(new MainSourceFile(`${workspaceName}.${apiName}`));
+	apiProject.addModel(new MainSourceFile(`${workspaceName}.${apiName}`, apiName));
 	apiProject.addModel(new ControllerSourceFile());
 	apiProject.addFile(new SampleConfigModel());
 	apiProject.addFile(new SampleServiceModel());

@@ -457,3 +457,30 @@ describe("config()", () => {
 		).rejects.toThrow("cannot read");
 	});
 });
+
+describe("config() sources", () => {
+	it("takes classes and instances together, in order", async () => {
+		class Base extends ConfigurationDataSource {
+			public name = "base";
+			public async getData() {
+				return { api: { port: 1 } };
+			}
+		}
+		const seen: unknown[] = [];
+		class Reader implements HostedService {
+			public constructor(@inject(ApiConfiguration) private readonly api: ApiConfiguration) {}
+			public start() {
+				seen.push(this.api.port);
+			}
+		}
+		const app = await Builder.create(new ServiceContainerBuilder())
+			.use(config(Base, source({ api: { port: 2 } })))
+			.use(configSection(ApiConfiguration))
+			.withHostedService(Reader)
+			.build();
+		await app.start({ port: 0, shutdownSignals: false });
+		await app.dispose();
+
+		expect(seen).toEqual([2]);
+	});
+});
