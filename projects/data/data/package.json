@@ -31,8 +31,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@decohere/crucible": "0.0.1-dev.5",
-    "@decohere/core": "0.0.1-dev.5"
+    "@decohere/crucible": "0.0.1-dev.5"
   },
   "devDependencies": {}
 }

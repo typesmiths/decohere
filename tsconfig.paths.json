@@ -65,6 +65,12 @@
       "@decohere/data": [
         "./projects/data/data/src/index.ts"
       ],
+      "@decohere/data-mikro-orm": [
+        "./projects/data/data-mikro-orm/src/index.ts"
+      ],
+      "@decohere/data-mikro-orm/*": [
+        "./projects/data/data-mikro-orm/src/*"
+      ],
       "@decohere/data-typeorm": [
         "./projects/data/data-typeorm/src/index.ts"
       ],

@@ -33,6 +33,7 @@ Test what the program does for its users (files written, HTTP responses, exit co
 | forge CLI | `projects/cli/tests/forge.integration.spec.ts` | action edges the CLI cannot see |
 | flux CLI | `projects/cli/tests/flux.integration.spec.ts` | HotReloadServer edges in `projects/flux/tests/hmr.server.spec.ts` |
 | HTTP | `projects/http/tests/*.integration.spec.ts` | crypto, SSRF and `*.pentest.spec.ts` edges |
+| data's unit of work, on every provider | `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, against Postgres, MikroORM's writes snapshotted as the reference | the query types in `projects/data/data/tests/query.types.spec.ts`; bootstrap and roles in `projects/data/data-typeorm/tests/` |
 | scribe facade | `projects/scribe/scribe/tests/scribe.integration.spec.ts` | env helpers, console edge cases |
 | scribe + pino | `projects/scribe/scribe-pino/tests/scribe-pino.integration.spec.ts` | `pinoRecipe.transport` plan shapes, transport guard |
 | scribe + JSON console | `projects/scribe/scribe-console/tests/json-console.adapter.integration.spec.ts` | none |

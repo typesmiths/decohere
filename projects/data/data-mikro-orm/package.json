@@ -1,0 +1,38 @@
+{
+  "name": "@decohere/data-mikro-orm",
+  "version": "0.0.1-dev.5",
+  "description": "MikroORM provider for @decohere/data: its own unit of work under data's contracts",
+  "keywords": [
+    "typescript",
+    "mikro-orm",
+    "postgres",
+    "data-access",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/data/data-mikro-orm#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/data/data-mikro-orm"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/data": "0.0.1-dev.5",
+    "@mikro-orm/core": "^7.2.8"
+  },
+  "devDependencies": {}
+}

@@ -1,28 +1,30 @@
-import type { Constructable } from "@decohere/core/reflection";
-import type { Entity } from "./data.types.js";
-import type { IDataProvider } from "./data-provider.js";
+import type { EntityClass, EntityKey, Include, Query } from "./query.types.js";
+import type { IUnitOfWork } from "./unit-of-work.js";
 
-export interface IRepository<T> {
-	find(key: string): Promise<T>;
-}
+/** A repository for one aggregate, over the request's unit of work. Subclasses add the queries the domain needs. */
+export abstract class Repository<T extends object> {
+	protected constructor(
+		protected readonly unitOfWork: IUnitOfWork,
+		protected readonly type: EntityClass<T>,
+	) {}
 
-export abstract class Repository<T extends Entity> implements IRepository<T> {
-	protected abstract readonly provider: IDataProvider;
-	protected abstract readonly type: Constructable<T>;
-
-	public find(key: string | number): Promise<T> {
-		return this.provider.findById(this.type, key);
+	public findById(key: EntityKey<T>, include?: readonly Include<T>[]): Promise<T | null> {
+		return this.unitOfWork.findById(this.type, key, include);
 	}
 
-	public save(entity: T): Promise<T> {
-		return this.provider.save(entity);
+	public find(query?: Query<T>): Promise<T[]> {
+		return this.unitOfWork.find(this.type, query);
 	}
 
-	public async delete(entity: T) {
-		await this.provider.delete(entity);
+	public findOne(query?: Query<T>): Promise<T | null> {
+		return this.unitOfWork.findOne(this.type, query);
 	}
 
-	public async all(): Promise<T[]> {
-		return this.provider.all(this.type);
+	public add(entity: T) {
+		this.unitOfWork.add(entity);
+	}
+
+	public remove(entity: T) {
+		this.unitOfWork.remove(entity);
 	}
 }

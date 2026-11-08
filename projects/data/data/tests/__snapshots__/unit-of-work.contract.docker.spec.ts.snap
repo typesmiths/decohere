@@ -1,0 +1,139 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`unit of work contract > a child keyed by its parent and a column of its own is added, changed and removed 1`] = `
+[
+  "begin",
+  "insert approval ×1",
+  "update approval (note) ×1",
+  "delete approval ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > a child moved to another parent is updated, not deleted 1`] = `
+[
+  "begin",
+  "update line (order_id) ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > a child removed from its collection is deleted, and one added is inserted 1`] = `
+[
+  "begin",
+  "insert line ×1",
+  "delete part ×1",
+  "delete line ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > a commit failing part-way rolls everything back, and the unit of work refuses more 1`] = `
+[
+  "begin",
+  "insert orders ×2",
+  "rollback",
+]
+`;
+
+exports[`unit of work contract > a key the database generates is set on the entity after commit 1`] = `
+[
+  "begin",
+  "insert tag ×2",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > a re-query returns the instance already loaded, with its unsaved changes 1`] = `[]`;
+
+exports[`unit of work contract > a row loaded twice is one instance, read once 1`] = `[]`;
+
+exports[`unit of work contract > children two deep load, change and insert 1`] = `
+[
+  "begin",
+  "insert part ×1",
+  "update part (name) ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > concurrent requests each get their own unit of work; the one that fails leaves nothing 1`] = `
+[
+  "begin",
+  "update orders (note, version) ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > disposing without a commit keeps nothing 1`] = `
+[
+  "begin",
+  "rollback",
+]
+`;
+
+exports[`unit of work contract > events an aggregate raises are written to the outbox in the same commit 1`] = `
+[
+  "begin",
+  "insert outbox ×1",
+  "update orders (placed_at, status, version) ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > one field changed on a loaded aggregate is written on commit, with no save call 1`] = `
+[
+  "begin",
+  "update orders (note, version) ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > queries filter, order, limit and lock in Decohere's terms 1`] = `
+[
+  "begin",
+  "select for update",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > removing an aggregate deletes the children it loaded first; the database cascades the rest 1`] = `
+[
+  "begin",
+  "delete part ×2",
+  "delete line ×2",
+  "delete orders ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > rows that reference each other are inserted, then the cycle is closed with an update 1`] = `
+[
+  "begin",
+  "insert team ×1",
+  "insert member ×1",
+  "update team (lead_id) ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > several new aggregates and their children go in one commit, parents first 1`] = `
+[
+  "begin",
+  "insert orders ×2",
+  "insert line ×3",
+  "insert part ×3",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > two units changing one row: the second commit loses 1`] = `
+[
+  "begin",
+  "update orders (note, version) ×1",
+  "commit",
+  "begin",
+  "update orders (note, version) ×1",
+  "rollback",
+]
+`;
