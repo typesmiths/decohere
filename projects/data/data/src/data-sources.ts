@@ -1,6 +1,9 @@
+import type { IContainer } from "@decohere/core/composition";
 import type { ConnectionInfo } from "./connection-info.js";
+import type { MigrationTarget } from "./migrations/migration-target.js";
 import {
 	assertDataSourceAuth,
+	assertMigrateOnStartAllowed,
 	assertSynchronizeAllowed,
 	shouldBootstrapDatabase,
 } from "./data-source-policy.js";
@@ -56,8 +59,8 @@ function resolve<M extends DataSourceModule>(
 
 /**
  * Creates what data sources need on their server before a provider connects: a database, roles,
- * a schema. Each database has its own package that supplies one (`postgres.bootstrap` from
- * `@decohere/data-postgres`), passed to the provider as `bootstrap`.
+ * a schema. Each database's package supplies one, as part of the {@link DatabaseSupport} passed to
+ * the provider as `database` (`postgres` from `@decohere/data-postgres`).
  */
 export type DataSourceBootstrap = (
 	dataSources: readonly ConnectionInfo[],
@@ -82,6 +85,7 @@ async function prepare(sources: readonly ConnectionInfo[], options: PrepareOptio
 	for (const info of sources) {
 		assertDataSourceAuth(info, nodeEnv);
 		assertSynchronizeAllowed(info, nodeEnv);
+		assertMigrateOnStartAllowed(info, nodeEnv);
 	}
 	if (options.bootstrap) {
 		await options.bootstrap(sources, { applicationName: options.applicationName, nodeEnv });
@@ -91,8 +95,46 @@ async function prepare(sources: readonly ConnectionInfo[], options: PrepareOptio
 	if (asking.length === 0) return;
 	const names = asking.map((info) => `"${info.name}"`).join(", ");
 	throw new DataConfigurationError(
-		`Data source ${names} asks to be set up at startup (bootstrap), but the provider was given no bootstrap. Install the package for its database and pass it: bootstrap: postgres.bootstrap, from @decohere/data-postgres. Or set bootstrap: false.`,
+		`Data source ${names} asks to be set up at startup (bootstrap), but the provider was given no bootstrap. Install the package for its database and pass it to the provider: database: postgres, from @decohere/data-postgres. Or set bootstrap: false.`,
 	);
 }
 
-export const dataSources = { prepare, resolve };
+/** One opened data source, as {@link start} sees it: the provider supplies how to synchronize and seed. */
+export type StartingDataSource = {
+	connection: ConnectionInfo;
+	/** Present when the provider was given a `database` with a migrator. */
+	migrations?: MigrationTarget;
+	synchronize(): Promise<void>;
+	seed(): Promise<void>;
+};
+
+/**
+ * What every provider does for a data source when the app starts (a start step, so an app built by
+ * a tool or a test changes nothing): apply pending migrations when `migrateOnStart` is on, bring the
+ * tables to the mappings when `synchronize` is on, then seed when `seed` is on.
+ */
+async function start(
+	source: StartingDataSource,
+	container: IContainer,
+	log?: (line: string) => void,
+) {
+	const { connection } = source;
+	// As the policy counts it: anything but false or absent is on.
+	const migrateOnStart: unknown = connection.migrateOnStart;
+	if (migrateOnStart != null && migrateOnStart !== false) {
+		const target = source.migrations;
+		if (target == null) {
+			throw new DataConfigurationError(
+				`Data source "${connection.name}" sets migrateOnStart, but the provider has no migrator. Pass it the database's package: database: postgres, from @decohere/data-postgres.`,
+			);
+		}
+		await target.migrator.migrate(target.source, {
+			container,
+			log,
+		});
+	}
+	if (connection.synchronize) await source.synchronize();
+	if (connection.seed) await source.seed();
+}
+
+export const dataSources = { prepare, resolve, start };

@@ -57,6 +57,30 @@ export function assertSynchronizeAllowed(
 }
 
 /**
+ * Refuse `migrateOnStart` outside development, where a release step migrates as the migrate role
+ * and the app's servers hold no migrate password, and together with `synchronize`, which would
+ * change the same tables behind the migrations' backs.
+ */
+export function assertMigrateOnStartAllowed(
+	info: ConnectionInfo,
+	nodeEnv: string | undefined = process.env.NODE_ENV,
+): void {
+	const migrateOnStart: unknown = info.migrateOnStart;
+	if (migrateOnStart == null || migrateOnStart === false) return;
+	if (!isDevelopmentEnv(nodeEnv)) {
+		throw new DataConfigurationError(
+			`Data source "${info.name}" sets migrateOnStart, which is allowed only in development (NODE_ENV is ${JSON.stringify(nodeEnv ?? "")}). Run db migrate as a release step instead.`,
+		);
+	}
+	const synchronize: unknown = info.synchronize;
+	if (synchronize != null && synchronize !== false) {
+		throw new DataConfigurationError(
+			`Data source "${info.name}" sets both migrateOnStart and synchronize. Pick one: migrations own the schema, or synchronize does.`,
+		);
+	}
+}
+
+/**
  * Decide whether to bootstrap a data source (create its database, roles and schema).
  *
  * - `bootstrap: false` → never

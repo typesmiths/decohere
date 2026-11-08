@@ -8,7 +8,7 @@ export type ConnectionOptions = ConnectionInfo & {
 	applicationName?: string;
 };
 
-/** Fields used only for bootstrap / privilege provisioning — not TypeORM connection options. */
+/** Fields that are Decohere's, not TypeORM connection options. */
 function omitProvisionFields(options: ConnectionOptions) {
 	const {
 		adminUser: _adminUser,
@@ -18,6 +18,9 @@ function omitProvisionFields(options: ConnectionOptions) {
 		bootstrap: _bootstrap,
 		auth: _auth,
 		seed: _seed,
+		// Decohere runs these when the app starts, not TypeORM when it connects.
+		synchronize: _synchronize,
+		migrateOnStart: _migrateOnStart,
 		dialect: _dialect,
 		name: _name,
 		...rest

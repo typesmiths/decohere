@@ -1,5 +1,6 @@
 import { scribe } from "@decohere/scribe";
 import {
+	type IContainer,
 	inject,
 	type LifetimeScope,
 	LifetimeScopeToken,
@@ -9,7 +10,12 @@ import {
 	ConfigurationServiceToken,
 	type IConfigurationService,
 } from "../configuration/index.js";
-import { AppServerToken, HostedServiceHostToken } from "./const.js";
+import {
+	AppServerToken,
+	HostedServiceHostToken,
+	type StartSteps,
+	StartStepsToken,
+} from "./const.js";
 import type { HostedServiceHost } from "./hosted-service-host.js";
 
 const DEFAULT_PORT = 3000;
@@ -64,7 +70,16 @@ export class App {
 		private configurationService?: IConfigurationService,
 		@inject(AppServerToken) @optional() private server?: AppServer,
 		@inject(HostedServiceHostToken) @optional() private hostedServices?: HostedServiceHost,
+		@inject(StartStepsToken) @optional() private startSteps?: StartSteps,
 	) {}
+
+	/**
+	 * The app's root container, for a tool or a test that builds the app to use its services
+	 * without starting it: `decohere`'s db commands resolve its data sources' migrations here.
+	 */
+	public get services(): IContainer {
+		return this.container;
+	}
 
 	public get addresses(): readonly string[] {
 		return this._addresses;
@@ -72,6 +87,10 @@ export class App {
 
 	public async start(options?: StartOptions): Promise<AppServerStartResponse | undefined> {
 		this.logger.info("Starting app");
+		for (const step of this.startSteps?.steps ?? []) {
+			await step(this.container);
+			if (this.disposing != null) return undefined;
+		}
 		// Before the server, so a request never reaches a service that has not started.
 		await this.hostedServices?.start(this.container);
 		// The app was stopped while a hosted service was still starting.

@@ -1,5 +1,5 @@
 import type { Constructable } from "@decohere/core/reflection";
-import type { DataSourceBootstrap, OutboxMapper } from "@decohere/data";
+import type { DatabaseSupport, Migration, OutboxMapper } from "@decohere/data";
 import type { DataSource } from "typeorm";
 
 export type ModuleConfig = {
@@ -7,9 +7,15 @@ export type ModuleConfig = {
 	name?: string | symbol;
 	repositories?: Constructable[];
 	entities: Constructable[];
-	/** Creates the database, roles and schema when the config asks: `postgres.bootstrap` from `@decohere/data-postgres`. */
-	bootstrap?: DataSourceBootstrap;
+	/**
+	 * The database's package: `postgres` from `@decohere/data-postgres`. It creates the database,
+	 * roles and schema when the config asks, and runs migrations.
+	 */
+	database?: DatabaseSupport;
+	/** The data source's migrations: `migrations` from its migrations folder's `index.ts`. */
+	migrations?: readonly Migration[];
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
 	outbox?: OutboxMapper;
+	/** Runs when the app starts, after migrations, when the data source's `seed` is on. */
 	seed?: (dataSource: DataSource) => Promise<void>;
 };
