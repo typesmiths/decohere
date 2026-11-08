@@ -9,19 +9,27 @@ builder.use(
 	mikroOrm({
 		entities: [OrderSchema, LineSchema],
 		repositories: [OrderRepository],
-		bootstrap: postgres.bootstrap, // from @decohere/data-postgres
+		database: postgres, // from @decohere/data-postgres
+		migrations, // from ./migrations/index.js
 		outbox: toOutboxMessage,
 	}),
 );
 ```
 
-`mikroOrm()` reads the `database` config section, like `typeOrm()`. For each data source it:
+`mikroOrm()` reads the `database` config section, like `typeOrm()`. When the app is built, for each data source it:
 
-- checks each data source's `auth` and `synchronize`, and creates its database, least-privilege roles and schema when the config asks, with the `bootstrap` you pass (`postgres.bootstrap` from `@decohere/data-postgres`);
+- checks the data source's `auth`, `synchronize` and `migrateOnStart`, and creates its database, least-privilege roles and schema when the config asks, with the `database` you pass;
 - opens one MikroORM instance as the app role, named for the app in `application_name`;
+- registers a unit of work per request (`@injectUnitOfWork()`), the instance itself (`@injectMikroOrm()`) and a readiness check;
+- registers the data source's migrations and schema diff for the db commands, when given a `database`.
+
+When the app starts, before hosted services and the server, it:
+
+- applies pending migrations when `migrateOnStart` is on (development only);
 - creates missing tables when `synchronize` is on (development only), never dropping any;
-- runs `seed(orm)` when `seed` is on;
-- registers a unit of work per request (`@injectUnitOfWork()`), the instance itself (`@injectMikroOrm()`) and a readiness check.
+- runs `seed(orm)` when `seed` is on.
+
+`db generate` takes MikroORM's schema diff, connected as the migrate role. MikroORM proposes dropping every table it sees and doesn't map, so the role's reach to its own schema is what keeps another app's tables out of the diff. The history table is skipped by name, and `create schema` and `drop schema` are left out: schemas are the bootstrap's. `synchronize` leaves out `create schema` for the same reason: the app role may not run it even when the schema exists.
 
 The container closes the instance when the app stops, after hosted services. Postgres only. Outside a plugin, `new MikroOrmUnitOfWork(orm.em, { outbox })` gives the same unit of work.
 

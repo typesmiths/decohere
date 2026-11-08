@@ -148,3 +148,15 @@ await app.start({
 await app.start({ port: 3000, shutdownSignals: false });
 process.on("SIGTERM", () => app.dispose());
 ```
+
+## Change a database schema
+
+Generate a migration from a mapping change, and apply it.
+
+```bash
+pnpm db generate add-expiry   # a migration from the mappings' differences, for you to review
+pnpm db migrate               # or restart the app with migrateOnStart in development
+pnpm db status
+```
+
+Set up, data migrations, deploys and changing a schema without downtime: [Migrations](migrations.md).

@@ -61,11 +61,58 @@ export class OrderRepository extends Repository<Order> {
 
 ## Setting up the database
 
-Before it connects, a provider runs `dataSources.prepare`. It checks each data source's `auth` and `synchronize` for the environment ([ADR 0011](../../../docs/adr/0011-database-bootstrap.md)), then runs the `bootstrap` the provider was given, which creates the database, roles and schema. The bootstrap comes from the package for the database: `postgres.bootstrap` from [`@decohere/data-postgres`](../data-postgres/README.md). A data source that asks to be set up (`bootstrap: true`, or an admin user in development) when there's no bootstrap stops startup with an error that says what to install.
+A provider is given the package for its database as `database`: `postgres` from [`@decohere/data-postgres`](../data-postgres/README.md), which supplies a bootstrap and a migrator.
+
+When the app is **built**, before it connects, a provider runs `dataSources.prepare`. It checks each data source's `auth`, `synchronize` and `migrateOnStart` for the environment ([ADR 0011](../../../docs/adr/0011-database-bootstrap.md)), then runs the bootstrap, which creates the database, roles and schema. A data source that asks to be set up (`bootstrap: true`, or an admin user in development) when the provider has no `database` stops startup with an error that says what to install.
+
+When the app **starts**, before hosted services and the server, each data source applies pending migrations if `migrateOnStart` is on, brings its tables to the mappings if `synchronize` is on, and then seeds if `seed` is on. An app that is only built, by a tool or a test, changes nothing in the database. `migrateOnStart` and `synchronize` are for development, and can't both be on.
+
+## Migrations
+
+A migration is a TypeScript file in the data source's migrations folder, listed in that folder's generated `index.ts` and passed to the provider (`mikroOrm({ …, database: postgres, migrations })`). Nothing is globbed at run time, so `flux` runs them from source and `forge package` ships them.
+
+```ts
+// src/migrations/20261110-093000-backfill-expiry.ts
+export default defineMigration({
+	id: "20261110-093000-backfill-expiry",
+	async up({ sql, container, batch }) {
+		const policy = container.resolve(ExpiryPolicy);
+		await batch(`select id, placed_at from orders where expires_at is null order by id limit $1`, 500, async (rows) => {
+			for (const r of rows) await sql(`update orders set expires_at = $1 where id = $2`, [policy.expiresAt(r.placed_at), r.id]);
+		});
+	},
+	async down({ sql }) {
+		await sql(`update orders set expires_at = null`);
+	},
+});
+```
+
+Each migration runs in its own transaction, as the data source's migrate role, in its schema. The history is one `decohere_migrations` table in that schema, whichever provider maps the entities. A lock keeps two runs from applying the same migration.
+
+The commands run from the app's own `db.ts`, which builds the app without starting it:
+
+```ts
+// src/db.ts
+import { db } from "@decohere/data";
+import { createApp } from "./app.js";
+
+await using app = await createApp();
+await db.run(app, process.argv.slice(2), { directory: new URL("./migrations/", import.meta.url) });
+```
+
+| Command | Does |
+| --- | --- |
+| `migrate [--to <id>] [--dry-run]` | Applies pending migrations in id order |
+| `status` | Lists migrations: applied, pending, or in the history but not the code |
+| `revert` | Undoes the last applied migration |
+| `new <name> [--data]` | Writes an empty migration; with `--data`, one that changes rows and fails until written |
+| `generate <name>` | Writes a schema migration from the provider's diff of the mappings against the tables |
+
+`generate` connects as the migrate role, which sees only its own schema, so the diff can't touch another app's tables. It refuses while migrations are pending, since the diff would repeat them. With several data sources, name one with `--data-source`. How to run them in development and in a deploy, and how to change a schema without downtime: [Migrations](../../../docs/recipes/migrations.md).
 
 ## For provider authors
 
-A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, and runs `dataSources.prepare` with the `bootstrap` its caller passed. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
+A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.prepare` with the bootstrap from the `database` its caller passed, and registers `dataSources.start` as a start step. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
 
 MikroORM's unit of work is the reference. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome.
 
