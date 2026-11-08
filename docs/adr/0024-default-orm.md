@@ -1,7 +1,7 @@
 # 0024. Data keeps its own contracts, with MikroORM and TypeORM providers under them
 
 - **Status:** Accepted
-- **Date:** 2026-11-07
+- **Date:** 2026-11-07 · updated 2026-11-08
 
 ## Context
 
@@ -54,10 +54,10 @@ A migration history can change provider: the prototype applied a migration gener
 
 
 1. **`@decohere/data` owns the contracts; ORMs are providers.** `data-typeorm` stays, and a `data-mikro-orm` provider is added beside it.
-2. **The unit of work promises change tracking**, not explicit saves: an identity map, changes to anything loaded written on `commit`, one transaction, rollback on dispose, a version column checked on update, and an outbox for events the aggregates raise.
-3. **MikroORM's unit of work is the reference; Decohere's tracker matches it.** The MikroORM provider uses MikroORM's own unit of work. The TypeORM provider uses a tracker that lives once in `data` (`TrackingUnitOfWork`), modelled on MikroORM's and written from scratch, so no MikroORM code or licence notice comes with it. A provider under the tracker supplies metadata, transaction control and five row operations (select, select children, insert, update, delete).
+2. **The unit of work promises change tracking**, not explicit saves: an identity map, changes to anything loaded written on `commit` and nothing before it, one transaction, rollback on dispose, a version column checked on update, and an outbox for events the aggregates raise. Removing an aggregate deletes the children it loaded; children it didn't load are the database's to cascade, as with MikroORM, so a remove never loads more rows.
+3. **MikroORM's unit of work is the reference; Decohere's tracker matches it.** The MikroORM provider uses MikroORM's own unit of work. The TypeORM provider uses a tracker that lives once in `data` (`TrackingUnitOfWork`), modelled on MikroORM's and written from scratch, so no MikroORM code or licence notice comes with it. A provider under the tracker supplies the mapping, transaction control and four operations on plain rows (select, insert, update, delete). The tracker builds the objects itself, so no ORM loads relations or keys under it.
 
-   **One contract suite holds the two together.** It runs every case against both providers, checking behaviour (instances, rows, errors) and the SQL sent (statements, their order, the columns written). MikroORM is the oracle: on every MikroORM upgrade the suite runs first, and any change in what MikroORM does is a change the tracker must follow, or a deliberate difference written into the suite. Before 0.1.0 the suite covers at least the scenarios above, plus children nested two deep, a child moved between parents, foreign-key cycles, and deletes that cascade.
+   **One contract suite holds the two together.** It runs every case against both providers, checking behaviour (instances, rows, errors) and the writes sent: statements, their order, tables, rows, the columns each update sets, and reads that lock. Plain reads aren't compared, because MikroORM may join children into one SELECT and reads a new version back after a commit, where the tracker already knows it. MikroORM is the oracle: its writes are snapshotted, so a MikroORM upgrade that changes them fails the suite until the tracker follows, or until the difference is written into the suite with its reason. The suite covers the scenarios above, plus children nested two deep, a child moved between parents, a key made of a reference and a column, foreign-key cycles, keys the database generates, and deletes.
 4. **Queries go through a Decohere `Query<T>`**: `where` with `in`, `gt`, `gte`, `lt`, `lte`, `ne` and null, plus `orderBy`, `limit`, `include` for children, and `lock`. Each provider translates it in about ten lines. `firstOrDefault(FindOneOptions)` goes. Keys may be composite, so `Entity`'s single `id` goes too.
 5. **Children are a `Children<T>`** (`add`, `remove`, iteration, `length`). MikroORM's `Collection` meets it, and the TypeORM provider loads arrays into a `ChildList`. Records keep their persistence apart from the domain: each provider maps the same classes in its own mapping file, and the domain imports neither ORM.
 6. **One Decohere migration format and runner**, in `data`, on a plain Postgres connection: `defineMigration({ id, up, down })`, one history table, an advisory lock, a transaction per migration, the app's container and a batch helper. Providers supply only the schema diff (TypeORM's schema builder, MikroORM's schema generator). `decohere db generate` connects as the data source's migrate role, and leaves Decohere's history table alone.
@@ -72,11 +72,13 @@ Rejected:
 ## Consequences
 
 - Keeping the providers in step is a test, not a review: the contract suite runs in CI for both, and a MikroORM upgrade lands only with the suite passing on both or a recorded difference.
-- The size of what Decohere builds, without blanks or comments: contracts 36 lines, the tracker 200, the TypeORM row store 102, the MikroORM provider 59, the migration runner 84 and the diff and file writer 44. Each still needs tests at production quality.
+- The size of what Decohere builds, formatted, without blanks or comments: contracts about 125 lines, the tracker 541 and its row-store interface 45, the TypeORM row store 268, the MikroORM unit of work 137. The spike's tracker was 200 compact lines; the built one adds cycles, inserts in waves for generated keys, moved children, references held by key, and collections that fail when not loaded. The migration runner (84) and the diff and file writer (44) are still the spike's.
 - A repository written against the contract runs on both providers: the proposal repository is 59 lines, with no ORM import. Mappings are per provider (27 lines each for the proposal aggregate), so changing provider means rewriting the mappings and one rename migration, not the repositories or the history.
 - The lowest common denominator shows: `Query<T>` covers filters, order, limit, children and locks, not joins across aggregates or aggregates in SQL. Those go through each provider's escape hatch (MikroORM's `em.getKysely()`, TypeORM's query builder), behind the repository.
-- MikroORM changes the classes it maps at run time (`toJSON`, field accessors, `__helper`), and a loaded child carries its parent. HTTP responses should map to DTOs, not serialise records.
-- TypeORM 0.3 ignores `primary: true` on a many-to-one in an `EntitySchema`, silently making the wrong primary key. The TypeORM mapping declares the key column as well, and the row store fills it from the reference.
+- MikroORM changes the classes it maps at run time (`toJSON`, field accessors, `__helper`), and a loaded child carries its parent. HTTP responses should map to DTOs, not serialise records. Those accessors stay on the class, so one class can't be mapped by two providers in one process: the contract suite builds its model once per provider.
+- MikroORM leaves a version column to the database's default on insert, so version columns need one.
+- TypeORM 0.3 ignored `primary: true` on a many-to-one in an `EntitySchema`, silently making the wrong primary key. TypeORM 1.x makes the right one, and the row store writes plain rows, so no extra key column is needed.
+- Child collections in a TypeORM mapping are one-to-many with `persistence: false`. TypeORM refuses a class that starts one as a `ChildList` otherwise, and the tracker writes them.
 - Migrations name their schema in the SQL, so one file set serves one schema.
 - Existing apps move their repositories onto the unit of work and their migrations into the Decohere format, one repository at a time. Follow-up issues cover each piece once this record is accepted.
 
@@ -84,3 +86,4 @@ Rejected:
 
 - 2026-11-07: Proposed after a spike on TypeORM 1.1.2, MikroORM 7.2.8 and Drizzle 1.0.0-rc.5. Revised the same day after porting a real repository and comparing the unit of work and migrations on TypeORM 0.3.31 and MikroORM 7.2.8: both providers stay under data's contracts, instead of TypeORM being removed.
 - 2026-11-07: Accepted. MikroORM's unit of work is the reference the TypeORM provider's tracker follows, held together by one contract suite.
+- 2026-11-08: Built the contracts, the tracker, the TypeORM 1.x provider and the MikroORM unit of work. Following MikroORM, a remove deletes only the children it loaded. The tracker takes plain rows, so it needs four row operations, not five. The suite compares writes and locking reads, not plain reads, and the sizes are the built code's.

@@ -15,8 +15,9 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 | `@decohere/scribe-console` | `projects/scribe/scribe-console` | JSON console writer (Workers, browsers, Deno, Bun, Node) |
 | [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: Fastify, routing, auth, OpenAPI, the app builder |
 | [`@decohere/config`](../../projects/config/README.md) | `projects/config` | Configuration from YAML and environment sources |
-| `@decohere/data` | `projects/data/data` | Repository and unit-of-work contracts |
-| `@decohere/data-typeorm` | `projects/data/data-typeorm` | TypeORM adapter |
+| [`@decohere/data`](../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)) |
+| [`@decohere/data-mikro-orm`](../../projects/data/data-mikro-orm/README.md) | `projects/data/data-mikro-orm` | MikroORM provider, over MikroORM's own unit of work |
+| [`@decohere/data-typeorm`](../../projects/data/data-typeorm/README.md) | `projects/data/data-typeorm` | TypeORM provider, on data's change tracker; Postgres bootstrap |
 | [`@decohere/devkit`](../../projects/devkit/README.md) | `projects/devkit` | Base for the CLIs: commands, `git`/`npm`/`docker` wrappers, file search and watch. Never in a production app |
 | [`@decohere/workspace`](../../projects/workspace/README.md) | `projects/workspace` | Workspace model: package discovery and aliases |
 | [`@decohere/forge`](../../projects/forge/README.md) | `projects/forge` | Build (SWC), typecheck, test, version, publish, Docker; Vitest plugin at `@decohere/forge/vitest`; `@decohere/forge/transpile` compiles a file without loading forge's commands (what flux uses) |
@@ -49,7 +50,7 @@ How we test without those: [testing](../testing/).
 
 ## 2. Vendors stay at the composition edge
 
-Application and domain code depend on Decohere contracts; vendor code lives in an adapter chosen at the app's composition root. Fastify, Pino, TypeORM/Postgres and Auth0 are today's defaults, not requirements. Switching one should be a provider and config change, not a rewrite. Examples: Scribe's facade and its writers, `data` and `data-typeorm`, `config`'s replaceable sources.
+Application and domain code depend on Decohere contracts; vendor code lives in an adapter chosen at the app's composition root. Fastify, Pino, TypeORM/Postgres and Auth0 are today's defaults, not requirements. Switching one should be a provider and config change, not a rewrite. Examples: Scribe's facade and its writers, `data` and its providers (`data-mikro-orm`, `data-typeorm`), `config`'s replaceable sources.
 
 ## 3. One owner per fact
 
@@ -62,6 +63,6 @@ A fact has one owner, and consumers ask it. Flux and Forge both call `workspace.
 - **Dispose and reload:** Flux calls `Symbol.asyncDispose` on the entry's default export, so `export default app` is enough at the composition root. `App.dispose` stops hosted services (`withHostedService`, [ADR 0010](../adr/0010-hosted-services.md)), then disposes the container, then Scribe. Long-lived services implement `Symbol.asyncDispose`.
 - **Logging:** libraries log through Scribe, never a concrete logger.
 - **Configuration:** `@decohere/config` sources behind tokens.
-- **Data:** `@decohere/data` repositories and a request-scoped unit of work; TypeORM `DataSource`s are singletons, injected with `@injectDataSource`.
+- **Data:** `@decohere/data` repositories over a request-scoped unit of work that tracks changes and writes them on `commit()`; queries in Decohere's `Query<T>`, never an ORM's options. TypeORM `DataSource`s are singletons, injected with `@injectDataSource`.
 - **Build and test:** Forge builds packages; tests compile through `@decohere/forge/vitest` (`forgeBuild`).
 - **Scaffolded apps:** `projects/<api>/`, with `main.ts` as the composition root.

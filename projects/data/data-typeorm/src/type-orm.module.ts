@@ -3,6 +3,7 @@ import {
 	type DatabaseConfig,
 	DataConfigurationError,
 	DEFAULT_DATA_SOURCE,
+	TrackingUnitOfWork,
 	type Dialect,
 	type Provider,
 } from "@decohere/data";
@@ -15,7 +16,7 @@ import { DataSourceFactory } from "./data-source.factory.js";
 import type { ModuleConfig } from "./database-options.js";
 import { typeOrmDataSourceToken } from "./inject-data-source.js";
 import { TypeOrmScribeLogger } from "./typeorm-scribe.logger.js";
-import { TypeOrmUnitOfWork } from "./unit-of-work.js";
+import { TypeOrmRowStore } from "./type-orm.row-store.js";
 
 export type TypeOrmModuleOptions = {
 	applicationName: string;
@@ -110,7 +111,7 @@ export class TypeOrmModule {
 		builder: ContainerBuilder,
 		logger: Logger,
 	) {
-		const { entities, repositories } = moduleConfig;
+		const { entities, repositories, outbox } = moduleConfig;
 		const dataSource = DataSourceFactory.create(
 			{
 				entities,
@@ -121,7 +122,8 @@ export class TypeOrmModule {
 		);
 
 		await dataSource.initialize();
-		const unitOfWork = () => new TypeOrmUnitOfWork(dataSource);
+		const unitOfWork = () =>
+			new TrackingUnitOfWork(new TypeOrmRowStore(dataSource), { outbox });
 		builder.registerRequestScoped(name, unitOfWork);
 		builder.registerSingleton(typeOrmDataSourceToken(name), dataSource);
 		builder.registerSingleton(

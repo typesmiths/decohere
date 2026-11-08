@@ -1,5 +1,10 @@
 import "reflect-metadata";
-import { type ConnectionInfo, DatabaseConfig, DEFAULT_DATA_SOURCE } from "@decohere/data";
+import {
+	type ConnectionInfo,
+	DatabaseConfig,
+	DEFAULT_DATA_SOURCE,
+	TrackingUnitOfWork,
+} from "@decohere/data";
 import { ServiceContainerBuilder, ResolveError } from "@decohere/crucible";
 import { injectable } from "@decohere/crucible/decorators";
 import type { DataSource } from "typeorm";
@@ -11,7 +16,6 @@ import {
 	typeOrmDataSourceToken,
 } from "../src/inject-data-source.js";
 import { TypeOrmModule } from "../src/type-orm.module.js";
-import { TypeOrmUnitOfWork } from "../src/unit-of-work.js";
 
 class PositionEntity {}
 
@@ -117,7 +121,7 @@ describe("TypeOrmModule DataSource singleton", () => {
 		expect(() => container.resolve(TypeOrmDataSourceToken)).toThrow(ResolveError);
 
 		using scope = container.beginScope("req");
-		expect(scope.resolve("api")).toBeInstanceOf(TypeOrmUnitOfWork);
+		expect(scope.resolve("api")).toBeInstanceOf(TrackingUnitOfWork);
 		expect(() => scope.resolve(DEFAULT_DATA_SOURCE)).toThrow(ResolveError);
 	});
 });

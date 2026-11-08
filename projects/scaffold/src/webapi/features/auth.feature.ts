@@ -30,10 +30,9 @@ export type AuthOptions = {
 const ADMIN_ROLE = "admin";
 
 const USER_ENTITY_TS = `import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
-import type { Entity as IEntity } from "@decohere/data";
 
 @Entity()
-export class UserEntity implements IEntity {
+export class UserEntity {
 \t@PrimaryGeneratedColumn()
 \tpublic id!: number;
 
@@ -53,23 +52,23 @@ export class UserEntity implements IEntity {
 `;
 
 const USER_REPOSITORY_TS = `import { injectable } from "@decohere/crucible/decorators";
-import { injectUnitOfWork } from "@decohere/data";
-import { TypeOrmRepository, TypeOrmUnitOfWork } from "@decohere/data-typeorm";
+import { injectUnitOfWork, type IUnitOfWork, Repository } from "@decohere/data";
 import { UserEntity } from "../entities/user.entity.js";
 
 @injectable()
-export class UserEntityRepository extends TypeOrmRepository<UserEntity> {
-\tpublic constructor(@injectUnitOfWork() unitOfWork: TypeOrmUnitOfWork) {
+export class UserEntityRepository extends Repository<UserEntity> {
+\tpublic constructor(@injectUnitOfWork() unitOfWork: IUnitOfWork) {
 \t\tsuper(unitOfWork, UserEntity);
 \t}
 
 \tpublic findBySub(sub: string): Promise<UserEntity | null> {
-\t\treturn this.firstOrDefault({ where: { sub } });
+\t\treturn this.findOne({ where: { sub } });
 \t}
 }
 `;
 
 const USER_SERVICE_TS = `import { injectable } from "@decohere/crucible/decorators";
+import { injectUnitOfWork, type IUnitOfWork } from "@decohere/data";
 import type { Principal } from "@decohere/http";
 import { UserEntity } from "../entities/user.entity.js";
 import { UserEntityRepository } from "../repositories/user.repository.js";
@@ -81,7 +80,10 @@ function claimString(principal: Principal | undefined, key: string): string | un
 
 @injectable()
 export class UserService {
-\tpublic constructor(private readonly users: UserEntityRepository) {}
+\tpublic constructor(
+\t\tprivate readonly users: UserEntityRepository,
+\t\t@injectUnitOfWork() private readonly unitOfWork: IUnitOfWork,
+\t) {}
 
 \t/**
 \t * Upsert a local profile keyed by JWT \`sub\`.
@@ -102,16 +104,13 @@ export class UserService {
 
 \t\tconst existing = await this.users.findBySub(sub);
 \t\tif (existing) {
-\t\t\tlet dirty = false;
-\t\t\tif (!existing.email && email) {
-\t\t\t\texisting.email = email;
-\t\t\t\tdirty = true;
-\t\t\t}
+\t\t\tif (!existing.email && email) existing.email = email;
 \t\t\tif (existing.displayName === existing.sub && displayFromToken) {
 \t\t\t\texisting.displayName = displayFromToken;
-\t\t\t\tdirty = true;
 \t\t\t}
-\t\t\treturn dirty ? this.users.save(existing) : existing;
+\t\t\t// Writes only what changed, if anything did.
+\t\t\tawait this.unitOfWork.commit();
+\t\t\treturn existing;
 \t\t}
 
 \t\tconst created = new UserEntity();
@@ -121,7 +120,9 @@ export class UserService {
 \t\tcreated.roles = Array.isArray(principal.roles)
 \t\t\t? principal.roles.filter((r): r is string => typeof r === "string")
 \t\t\t: [];
-\t\treturn this.users.save(created);
+\t\tthis.users.add(created);
+\t\tawait this.unitOfWork.commit();
+\t\treturn created;
 \t}
 }
 `;

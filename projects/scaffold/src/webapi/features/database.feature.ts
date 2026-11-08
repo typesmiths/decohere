@@ -81,10 +81,9 @@ function renderDatabaseSection(
 }
 
 const SAMPLE_ENTITY_TS = `import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
-import type { Entity as IEntity } from "@decohere/data";
 
 @Entity()
-export class SampleEntity implements IEntity {
+export class SampleEntity {
 \t@PrimaryGeneratedColumn()
 \tpublic id!: number;
 
@@ -94,13 +93,12 @@ export class SampleEntity implements IEntity {
 `;
 
 const SAMPLE_REPOSITORY_TS = `import { injectable } from "@decohere/crucible/decorators";
-import { injectUnitOfWork } from "@decohere/data";
-import { TypeOrmRepository, TypeOrmUnitOfWork } from "@decohere/data-typeorm";
+import { injectUnitOfWork, type IUnitOfWork, Repository } from "@decohere/data";
 import { SampleEntity } from "../entities/sample.entity.js";
 
 @injectable()
-export class SampleEntityRepository extends TypeOrmRepository<SampleEntity> {
-\tpublic constructor(@injectUnitOfWork() unitOfWork: TypeOrmUnitOfWork) {
+export class SampleEntityRepository extends Repository<SampleEntity> {
+\tpublic constructor(@injectUnitOfWork() unitOfWork: IUnitOfWork) {
 \t\tsuper(unitOfWork, SampleEntity);
 \t}
 }
@@ -292,7 +290,7 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 	const pkg = workspace
 		.getModel<PackageJson>(WELL_KNOWN_FILES.PACKAGE_JSON)
 		?.addDependency("@decohere/data", CREATE_VERSION)
-		.addDependency("typeorm", "^0.3.28")
+		.addDependency("typeorm", "^1.1.2")
 		.addDependency("@decohere/data-typeorm", CREATE_VERSION)
 		.addDependency("tsx", "^4.20.5")
 		.addScript("db:up", DB_UP_SCRIPT)

@@ -31,13 +31,13 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "@decohere/data": "0.0.1-dev.5",
-    "@decohere/crucible": "0.0.1-dev.5",
     "@decohere/core": "0.0.1-dev.5",
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/data": "0.0.1-dev.5",
     "@decohere/scribe": "0.0.1-dev.5",
-    "pg": "^8.16.3",
+    "pg": "^8.23.1",
     "pino-pretty": "^13.2.0",
-    "typeorm": "^0.3.31"
+    "typeorm": "^1.1.2"
   },
   "devDependencies": {}
 }

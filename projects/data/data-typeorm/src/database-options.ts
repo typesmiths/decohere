@@ -1,4 +1,5 @@
 import type { Constructable } from "@decohere/core/reflection";
+import type { OutboxMapper } from "@decohere/data";
 import type { DataSource } from "typeorm";
 
 export type ModuleConfig = {
@@ -6,5 +7,7 @@ export type ModuleConfig = {
 	name?: string | symbol;
 	repositories?: Constructable[];
 	entities: Constructable[];
+	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
+	outbox?: OutboxMapper;
 	seed?: (dataSource: DataSource) => Promise<void>;
 };
