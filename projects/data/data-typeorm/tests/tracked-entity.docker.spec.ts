@@ -8,7 +8,7 @@ import { TypeOrmRowStore } from "../src/type-orm.row-store.js";
 import {
 	type PostgresContainer,
 	startPostgres,
-} from "../../data/tests/postgres/postgres-container.js";
+} from "../../data-postgres/tests/postgres-container.js";
 
 @Entity()
 class UserEntity {

@@ -5,12 +5,19 @@ The MikroORM provider for [`@decohere/data`](../data/README.md): data's `IUnitOf
 ```ts
 import { mikroOrm } from "@decohere/data-mikro-orm";
 
-builder.use(mikroOrm({ entities: [OrderSchema, LineSchema], repositories: [OrderRepository], outbox: toOutboxMessage }));
+builder.use(
+	mikroOrm({
+		entities: [OrderSchema, LineSchema],
+		repositories: [OrderRepository],
+		bootstrap: postgres.bootstrap, // from @decohere/data-postgres
+		outbox: toOutboxMessage,
+	}),
+);
 ```
 
 `mikroOrm()` reads the `database` config section, like `typeOrm()`. For each data source it:
 
-- bootstraps the database, least-privilege roles and schema when the config asks (`@decohere/data/postgres`);
+- checks each data source's `auth` and `synchronize`, and creates its database, least-privilege roles and schema when the config asks, with the `bootstrap` you pass (`postgres.bootstrap` from `@decohere/data-postgres`);
 - opens one MikroORM instance as the app role, named for the app in `application_name`;
 - creates missing tables when `synchronize` is on (development only), never dropping any;
 - runs `seed(orm)` when `seed` is on;

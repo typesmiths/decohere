@@ -22,9 +22,9 @@ import {
 	assertBootstrapCredentials,
 	assertDataSourceAuth,
 	shouldBootstrapDatabase,
-} from "../../src/postgres/bootstrap-policy.js";
-import { createUserQuery } from "../../src/postgres/user-scripts.js";
-import { PostgresServerManager } from "../../src/postgres/server-manager.js";
+} from "@decohere/data";
+import { createUserQuery } from "../src/user-scripts.js";
+import { PostgresServerManager } from "../src/server-manager.js";
 
 // A local dev Postgres that trusts every connection has no passwords at all, and says so
 // with auth: trust.

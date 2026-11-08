@@ -71,6 +71,12 @@
       "@decohere/data-mikro-orm/*": [
         "./projects/data/data-mikro-orm/src/*"
       ],
+      "@decohere/data-postgres": [
+        "./projects/data/data-postgres/src/index.ts"
+      ],
+      "@decohere/data-postgres/*": [
+        "./projects/data/data-postgres/src/*"
+      ],
       "@decohere/data-typeorm": [
         "./projects/data/data-typeorm/src/index.ts"
       ],
@@ -79,9 +85,6 @@
       ],
       "@decohere/data/*": [
         "./projects/data/data/src/*"
-      ],
-      "@decohere/data/postgres": [
-        "./projects/data/data/src/postgres/index.ts"
       ],
       "@decohere/devkit/*": [
         "./projects/devkit/src/*"

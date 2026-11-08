@@ -15,7 +15,8 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 | `@decohere/scribe-console` | `projects/scribe/scribe-console` | JSON console writer (Workers, browsers, Deno, Bun, Node) |
 | [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: Fastify, routing, auth, OpenAPI, the app builder |
 | [`@decohere/config`](../../projects/config/README.md) | `projects/config` | Configuration from YAML and environment sources |
-| [`@decohere/data`](../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)); Postgres bootstrap at `@decohere/data/postgres` |
+| [`@decohere/data`](../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)) |
+| [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `bootstrap` |
 | [`@decohere/data-mikro-orm`](../../projects/data/data-mikro-orm/README.md) | `projects/data/data-mikro-orm` | MikroORM provider: the `mikroOrm()` plugin, over MikroORM's own unit of work |
 | [`@decohere/data-typeorm`](../../projects/data/data-typeorm/README.md) | `projects/data/data-typeorm` | TypeORM provider: the `typeOrm()` plugin, on data's change tracker |
 | [`@decohere/devkit`](../../projects/devkit/README.md) | `projects/devkit` | Base for the CLIs: commands, `git`/`npm`/`docker` wrappers, file search and watch. Never in a production app |

@@ -1,7 +1,7 @@
 import type { ConnectionInfo } from "@decohere/data";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { bootstrapDataSources } from "../../src/postgres/bootstrap.js";
+import { bootstrapDataSources } from "../src/bootstrap.js";
 import { type PostgresContainer, startPostgres } from "./postgres-container.js";
 
 /**

@@ -16,13 +16,14 @@ import {
 	DEFAULT_DATA_SOURCE,
 	type IUnitOfWork,
 } from "@decohere/data";
+import { postgres } from "@decohere/data-postgres";
 import { defineEntity, p } from "@mikro-orm/core";
 import type { MikroORM } from "@mikro-orm/postgresql";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import {
 	type PostgresContainer,
 	startPostgres,
-} from "../../data/tests/postgres/postgres-container.js";
+} from "../../data-postgres/tests/postgres-container.js";
 import { mikroOrm, MikroOrmToken } from "../src/index.js";
 
 class Note {
@@ -57,28 +58,28 @@ function containerOf() {
 }
 
 describe("mikroOrm() in an app", () => {
-	let postgres: PostgresContainer;
+	let server: PostgresContainer;
 
 	beforeAll(async () => {
 		// Bootstrap and synchronize are for development only, and refuse to run elsewhere.
 		vi.stubEnv("NODE_ENV", "development");
-		postgres = await startPostgres();
-		await postgres.superuser.query(
+		server = await startPostgres();
+		await server.superuser.query(
 			"CREATE ROLE decohere_bootstrap LOGIN PASSWORD 'bootstrap-pw' CREATEDB CREATEROLE NOSUPERUSER NOBYPASSRLS",
 		);
 	});
 
 	afterAll(async () => {
 		vi.unstubAllEnvs();
-		await postgres?.stop();
+		await server?.stop();
 	});
 
 	it("bootstraps, creates tables, seeds, and gives each request its own unit of work", async () => {
 		const connection: ConnectionInfo = {
 			name: "notes",
 			provider: "postgres",
-			host: postgres.host,
-			port: postgres.port,
+			host: server.host,
+			port: server.port,
 			database: "notes_dev",
 			username: "notes_app",
 			password: "app-pw",
@@ -101,6 +102,7 @@ describe("mikroOrm() in an app", () => {
 			.use(
 				mikroOrm({
 					entities: [NoteSchema],
+					bootstrap: postgres.bootstrap,
 					seed: async (orm) => {
 						const em = orm.em.fork();
 						await em.persist(new Note("seeded")).flush();

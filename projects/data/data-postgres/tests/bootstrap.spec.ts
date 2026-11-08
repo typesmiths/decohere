@@ -21,7 +21,7 @@ const { PoolMock, queryMock } = vi.hoisted(() => {
 
 vi.mock("pg", () => ({ Pool: PoolMock }));
 
-import { bootstrapDataSources } from "../../src/postgres/bootstrap.js";
+import { bootstrapDataSources } from "../src/bootstrap.js";
 
 /** Edges the real-Postgres suite (bootstrap-schemas.docker.spec.ts) does not see. */
 

@@ -123,6 +123,8 @@ export class MainSourceFile implements KeyedModel {
 
 		if (this._entities.length > 0) {
 			imports.push('import { typeOrm } from "@decohere/data-typeorm";');
+			// Creates the database, roles and schema in development, which dev config asks for.
+			imports.push('import { postgres } from "@decohere/data-postgres";');
 		}
 
 		for (const e of this._entities) {
@@ -168,7 +170,7 @@ export class MainSourceFile implements KeyedModel {
 				? `, seed: async (dataSource) => { ${this._typeOrmSeed} }`
 				: "";
 			builderCalls.push(
-				`\t.use(typeOrm({ ${named}entities: [${entities}], repositories: [${repos}]${seed} }))`,
+				`\t.use(typeOrm({ ${named}entities: [${entities}], repositories: [${repos}], bootstrap: postgres.bootstrap${seed} }))`,
 			);
 		}
 

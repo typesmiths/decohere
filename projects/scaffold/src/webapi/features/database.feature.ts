@@ -292,6 +292,7 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 		?.addDependency("@decohere/data", CREATE_VERSION)
 		.addDependency("typeorm", "^1.1.2")
 		.addDependency("@decohere/data-typeorm", CREATE_VERSION)
+		.addDependency("@decohere/data-postgres", CREATE_VERSION)
 		.addDependency("tsx", "^4.20.5")
 		.addScript("db:up", DB_UP_SCRIPT)
 		.addScript("db:down", "docker compose -f .devcontainer/docker-compose.yml down")
@@ -379,7 +380,8 @@ function wireApiDatabase(project: ProjectScaffold): void {
 	project
 		.getModel<ApiPackageJson>(WELL_KNOWN_FILES.API_PACKAGE_JSON)
 		?.addDependency("@decohere/data", CREATE_VERSION)
-		.addDependency("@decohere/data-typeorm", CREATE_VERSION);
+		.addDependency("@decohere/data-typeorm", CREATE_VERSION)
+		.addDependency("@decohere/data-postgres", CREATE_VERSION);
 	project.addFile({
 		files: () => [
 			{

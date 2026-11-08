@@ -10,7 +10,6 @@ import { type IReadinessCheck, ReadinessCheckToken } from "@decohere/core/hostin
 import type { ContainerBuilder } from "@decohere/crucible";
 import { memoize } from "@decohere/core/caching";
 import type { DataSource, Logger } from "typeorm";
-import { bootstrapDataSources } from "@decohere/data/postgres";
 import { DataSourceFactory } from "./data-source.factory.js";
 import type { ModuleConfig } from "./database-options.js";
 import { typeOrmDataSourceToken } from "./inject-data-source.js";
@@ -38,9 +37,9 @@ export class TypeOrmModule {
 				moduleConfig: module,
 			}));
 		// Once, before any DataSource opens: modules sharing a database must not race to create it.
-		await bootstrapDataSources(
+		await dataSources.prepare(
 			modules.map((m) => m.connectionInfo),
-			{ applicationName },
+			{ applicationName, bootstrap: moduleConfigurations.find((m) => m.bootstrap)?.bootstrap },
 		);
 
 		return await Promise.all(

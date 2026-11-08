@@ -1,4 +1,9 @@
 import type { ConnectionInfo } from "./connection-info.js";
+import {
+	assertDataSourceAuth,
+	assertSynchronizeAllowed,
+	shouldBootstrapDatabase,
+} from "./data-source-policy.js";
 import type { DatabaseConfig } from "./database.config.js";
 import { DataConfigurationError } from "./error.js";
 import { DEFAULT_DATA_SOURCE } from "./inject-unit-of-work.js";
@@ -49,4 +54,45 @@ function resolve<M extends DataSourceModule>(
 	});
 }
 
-export const dataSources = { resolve };
+/**
+ * Creates what data sources need on their server before a provider connects: a database, roles,
+ * a schema. Each database has its own package that supplies one (`postgres.bootstrap` from
+ * `@decohere/data-postgres`), passed to the provider as `bootstrap`.
+ */
+export type DataSourceBootstrap = (
+	dataSources: readonly ConnectionInfo[],
+	options: { applicationName: string; nodeEnv?: string },
+) => Promise<void>;
+
+export type PrepareOptions = {
+	applicationName: string;
+	bootstrap?: DataSourceBootstrap;
+	/** Defaults to `process.env.NODE_ENV`. */
+	nodeEnv?: string;
+};
+
+/**
+ * What every provider runs before it connects. It checks each data source's `auth` and
+ * `synchronize` for the environment, then runs the bootstrap it was given. A data source that
+ * asks to be set up (`bootstrap: true`, or an admin user in development) with no bootstrap given
+ * is an error, rather than a login failure later.
+ */
+async function prepare(sources: readonly ConnectionInfo[], options: PrepareOptions) {
+	const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV;
+	for (const info of sources) {
+		assertDataSourceAuth(info, nodeEnv);
+		assertSynchronizeAllowed(info, nodeEnv);
+	}
+	if (options.bootstrap) {
+		await options.bootstrap(sources, { applicationName: options.applicationName, nodeEnv });
+		return;
+	}
+	const asking = sources.filter((info) => shouldBootstrapDatabase(info, nodeEnv));
+	if (asking.length === 0) return;
+	const names = asking.map((info) => `"${info.name}"`).join(", ");
+	throw new DataConfigurationError(
+		`Data source ${names} asks to be set up at startup (bootstrap), but the provider was given no bootstrap. Install the package for its database and pass it: bootstrap: postgres.bootstrap, from @decohere/data-postgres. Or set bootstrap: false.`,
+	);
+}
+
+export const dataSources = { prepare, resolve };

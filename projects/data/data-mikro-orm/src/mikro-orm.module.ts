@@ -6,10 +6,10 @@ import {
 	type ConnectionInfo,
 	DatabaseConfig,
 	DataConfigurationError,
+	type DataSourceBootstrap,
 	dataSources,
 	type OutboxMapper,
 } from "@decohere/data";
-import { bootstrapDataSources } from "@decohere/data/postgres";
 import { scribe } from "@decohere/scribe";
 import { type Options, MikroORM } from "@mikro-orm/postgresql";
 import { mikroOrmToken } from "./inject-mikro-orm.js";
@@ -21,6 +21,8 @@ export type MikroOrmModuleConfig = {
 	/** The mappings: `defineEntity({ class, … })` results or `EntitySchema`s. */
 	entities: NonNullable<Options["entities"]>;
 	repositories?: Constructable[];
+	/** Creates the database, roles and schema when the config asks: `postgres.bootstrap` from `@decohere/data-postgres`. */
+	bootstrap?: DataSourceBootstrap;
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
 	outbox?: OutboxMapper;
 	/** Runs after connecting when the data source's `seed` is on. */
@@ -41,9 +43,9 @@ export class MikroOrmModule {
 			options;
 		const resolved = dataSources.resolve(databaseConfig, moduleConfigurations);
 		// Once, before any instance connects: data sources sharing a database must not race to create it.
-		await bootstrapDataSources(
+		await dataSources.prepare(
 			resolved.map((r) => r.connectionInfo),
-			{ applicationName },
+			{ applicationName, bootstrap: moduleConfigurations.find((m) => m.bootstrap)?.bootstrap },
 		);
 		return Promise.all(
 			resolved.map(async ({ name, connectionInfo, module }) => {
