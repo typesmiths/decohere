@@ -1,7 +1,7 @@
 {
   "name": "@decohere/data",
   "version": "0.0.1-dev.5",
-  "description": "Data access for Decohere apps: repositories, request-scoped units of work and database bootstrap",
+  "description": "Data access for Decohere apps: repository, query and unit-of-work contracts, the change tracker, and Postgres bootstrap",
   "keywords": [
     "typescript",
     "data-access",
@@ -25,13 +25,21 @@
     ".": {
       "types": "./types/src/index.d.ts",
       "import": "./es6/src/index.js"
+    },
+    "./postgres": {
+      "types": "./types/src/postgres/index.d.ts",
+      "import": "./es6/src/postgres/index.js"
     }
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@decohere/core": "0.0.1-dev.5",
     "@decohere/crucible": "0.0.1-dev.5"
   },
-  "devDependencies": {}
+  "devDependencies": {},
+  "peerDependencies": {
+    "pg": "^8.23.1"
+  }
 }

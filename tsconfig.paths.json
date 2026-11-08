@@ -80,6 +80,9 @@
       "@decohere/data/*": [
         "./projects/data/data/src/*"
       ],
+      "@decohere/data/postgres": [
+        "./projects/data/data/src/postgres/index.ts"
+      ],
       "@decohere/devkit/*": [
         "./projects/devkit/src/*"
       ],

@@ -31,8 +31,12 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@decohere/core": "0.0.1-dev.5",
+    "@decohere/crucible": "0.0.1-dev.5",
     "@decohere/data": "0.0.1-dev.5",
-    "@mikro-orm/core": "^7.2.8"
+    "@decohere/scribe": "0.0.1-dev.5",
+    "@mikro-orm/core": "^7.2.8",
+    "@mikro-orm/postgresql": "^7.2.8"
   },
   "devDependencies": {}
 }

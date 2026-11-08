@@ -1,11 +1,11 @@
 # 0011. Database bootstrap: trust is declared, schemas are bootstrapped, each database once
 
 - **Status:** Proposed
-- **Date:** 2026-10-15 · updated 2026-11-06
+- **Date:** 2026-10-15 · updated 2026-11-08
 
 ## Context
 
-`@decohere/data-typeorm` can bootstrap a data source at startup: create its database, an app role and an optional migrate role, and grant them least privilege. It fell short in four ways:
+A data provider can bootstrap a data source at startup (the code is `@decohere/data/postgres`, shared by every provider): create its database, an app role and an optional migrate role, and grant them least privilege. It fell short in four ways:
 
 - Every grant went to `public`, ignoring the data source's `schema`, so an app with one schema per module in one database needed its own bootstrap.
 - After the first run the migrate role owns the database, and the admin may no longer grant on it. Postgres checks that even for a grant that changes nothing, so a second run could fail.
@@ -36,3 +36,4 @@
 - 2026-11-06: Scaffolded projects use `auth: trust` locally, with no database passwords. A password set to `null` by a config file means no password.
 - 2026-11-06: `withTypeOrm` became the `typeOrm()` plugin ([ADR 0014](0014-package-names.md)).
 - 2026-11-07: `synchronize` is refused outside development.
+- 2026-11-08: The bootstrap moved from `data-typeorm` to `@decohere/data/postgres`, so the MikroORM provider uses it too. `pg` is a peer dependency of `data` and `data-typeorm`.

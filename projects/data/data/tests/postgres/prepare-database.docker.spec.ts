@@ -1,7 +1,7 @@
 import type { ConnectionInfo } from "@decohere/data";
 import { Pool } from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { PostgresServerManager } from "../src/server-manager.js";
+import { PostgresServerManager } from "../../src/postgres/server-manager.js";
 import { type PostgresContainer, startPostgres } from "./postgres-container.js";
 
 /**

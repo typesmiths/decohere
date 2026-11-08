@@ -1,4 +1,4 @@
-import { type ConnectionInfo, DataConfigurationError } from "@decohere/data";
+import { type ConnectionInfo, DataConfigurationError } from "../index.js";
 import {
 	assertBootstrapCredentials,
 	assertDataSourceAuth,

@@ -1,5 +1,5 @@
 import { isDevelopmentEnv } from "@decohere/core/system";
-import { type ConnectionInfo, DataConfigurationError } from "@decohere/data";
+import { type ConnectionInfo, DataConfigurationError } from "../index.js";
 
 function isTrusted(info: ConnectionInfo): boolean {
 	return info.auth === "trust";

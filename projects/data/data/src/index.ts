@@ -11,3 +11,4 @@ export * from "./unit-of-work.js";
 export * from "./comparison.js";
 export * from "./tracking/row-store.js";
 export * from "./tracking/tracking-unit-of-work.js";
+export * from "./data-sources.js";

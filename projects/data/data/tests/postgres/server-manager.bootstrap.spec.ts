@@ -15,7 +15,7 @@ const { PoolMock, connectMock } = vi.hoisted(() => {
 
 vi.mock("pg", () => ({ Pool: PoolMock }));
 
-import { PostgresServerManager } from "../src/server-manager.js";
+import { PostgresServerManager } from "../../src/postgres/server-manager.js";
 
 function adminInfo(overrides: Partial<ConnectionInfo> = {}): ConnectionInfo {
 	return {

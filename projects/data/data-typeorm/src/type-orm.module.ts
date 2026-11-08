@@ -1,8 +1,7 @@
 import {
 	type ConnectionInfo,
 	type DatabaseConfig,
-	DataConfigurationError,
-	DEFAULT_DATA_SOURCE,
+	dataSources,
 	TrackingUnitOfWork,
 	type Dialect,
 	type Provider,
@@ -11,7 +10,7 @@ import { type IReadinessCheck, ReadinessCheckToken } from "@decohere/core/hostin
 import type { ContainerBuilder } from "@decohere/crucible";
 import { memoize } from "@decohere/core/caching";
 import type { DataSource, Logger } from "typeorm";
-import { bootstrapDataSources } from "./bootstrap.js";
+import { bootstrapDataSources } from "@decohere/data/postgres";
 import { DataSourceFactory } from "./data-source.factory.js";
 import type { ModuleConfig } from "./database-options.js";
 import { typeOrmDataSourceToken } from "./inject-data-source.js";
@@ -31,11 +30,13 @@ export class TypeOrmModule {
 		const { moduleConfigurations, databaseConfig, containerBuilder, applicationName } =
 			options;
 
-		if (databaseConfig.dataSources.length === 0) {
-			throw new DataConfigurationError("No datasources detected in config");
-		}
-
-		const modules = this.resolveDataSources(databaseConfig, moduleConfigurations);
+		const modules = dataSources
+			.resolve(databaseConfig, moduleConfigurations)
+			.map(({ name, connectionInfo, module }) => ({
+				name,
+				connectionInfo,
+				moduleConfig: module,
+			}));
 		// Once, before any DataSource opens: modules sharing a database must not race to create it.
 		await bootstrapDataSources(
 			modules.map((m) => m.connectionInfo),
@@ -48,38 +49,6 @@ export class TypeOrmModule {
 				return name;
 			}),
 		);
-	}
-
-	private resolveDataSources(
-		databaseConfig: DatabaseConfig,
-		moduleConfigurations: ModuleConfig[],
-	): { name: string | symbol; connectionInfo: ConnectionInfo; moduleConfig: ModuleConfig }[] {
-		if (databaseConfig.dataSources.length === 1 && moduleConfigurations.length === 1) {
-			const moduleConfig = moduleConfigurations.at(0);
-			return [
-				{
-					name: moduleConfig.name ?? DEFAULT_DATA_SOURCE,
-					connectionInfo: databaseConfig.dataSources.at(0),
-					moduleConfig,
-				},
-			];
-		}
-
-		return moduleConfigurations.map((moduleConfig) => {
-			const { name } = moduleConfig;
-			if (name == null) {
-				throw new DataConfigurationError(
-					`Name is required if there is more than one datasource`,
-				);
-			}
-
-			const connectionInfo = databaseConfig.dataSources.find((ds) => ds.name === name);
-			if (connectionInfo == null) {
-				throw new DataConfigurationError(`Cannot find connection info for ${name.toString()}`);
-			}
-
-			return { name, connectionInfo, moduleConfig };
-		});
 	}
 
 	private async init(
