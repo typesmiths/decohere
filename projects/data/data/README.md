@@ -96,8 +96,12 @@ The commands run from the app's own `db.ts`, which builds the app without starti
 import { db } from "@decohere/data";
 import { createApp } from "./app.js";
 
-await using app = await createApp();
-await db.run(app, process.argv.slice(2), { directory: new URL("./migrations/", import.meta.url) });
+const app = await createApp();
+try {
+	await db.run(app, process.argv.slice(2), { directory: new URL("./migrations/", import.meta.url) });
+} finally {
+	await app.dispose();
+}
 ```
 
 | Command | Does |

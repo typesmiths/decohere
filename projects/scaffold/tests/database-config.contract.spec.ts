@@ -119,7 +119,8 @@ describe("scaffolded database config ↔ @decohere/config contract", () => {
 			name: "api",
 			auth: "trust",
 			password: null,
-			synchronize: true,
+			synchronize: false,
+			migrateOnStart: true,
 			seed: true,
 			bootstrap: true,
 			adminUser: "postgres",
@@ -143,7 +144,7 @@ describe("scaffolded database config ↔ @decohere/config contract", () => {
 		expect(dev.map((source) => source.name)).toEqual(["api", "billing"]);
 		for (const [index, source] of dev.entries()) {
 			expect(connection(source)).toEqual(connection(production[index]!));
-			expect(source).toMatchObject({ synchronize: true, bootstrap: true });
+			expect(source).toMatchObject({ migrateOnStart: true, bootstrap: true });
 		}
 		expect(dev[0]?.database).not.toEqual(dev[1]?.database);
 	});
@@ -158,7 +159,7 @@ describe("scaffolded database config ↔ @decohere/config contract", () => {
 		expect(dev.map((source) => source.name)).toEqual(["api", "billing"]);
 		for (const [index, source] of dev.entries()) {
 			expect(connection(source)).toEqual(connection(production[index]!));
-			expect(source).toMatchObject({ synchronize: true, bootstrap: true });
+			expect(source).toMatchObject({ migrateOnStart: true, bootstrap: true });
 		}
 	});
 });

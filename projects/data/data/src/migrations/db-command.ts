@@ -74,8 +74,12 @@ function nameArgument(positionals: string[], command: string): string {
  * The db commands, for an app's `db.ts`:
  *
  * ```ts
- * await using app = await createApp();
- * await db.run(app, process.argv.slice(2), { directory: new URL("./migrations/", import.meta.url) });
+ * const app = await createApp();
+ * try {
+ * 	await db.run(app, process.argv.slice(2), { directory: new URL("./migrations/", import.meta.url) });
+ * } finally {
+ * 	await app.dispose();
+ * }
  * ```
  *
  * Builds nothing and starts nothing itself: the app is built, not started, so no migration runs on

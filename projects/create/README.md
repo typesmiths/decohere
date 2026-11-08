@@ -35,7 +35,7 @@ decohere create webapi -d my-app
 To skip prompts, pass every answer up front (`-y` means “install deps, don’t ask”):
 
 ```bash
-npm create @decohere@dev -- webapi -d my-app --database postgres/typeorm --auth none -y
+npm create @decohere@dev -- webapi -d my-app --database postgres/mikro-orm --auth none -y
 ```
 
 Target directory is `webapi`'s optional argument or `-d` (default `.`). `npm create` treats `-d` as its own loglevel flag and forwards `my-app` as a positional — that form is supported. Extra create flags still need `--` after `npm create`.
@@ -190,14 +190,17 @@ Commit `pnpm-lock.yaml` after the first install.
 | Value | Effect |
 |---|---|
 | `none` | No database |
-| `postgres/typeorm` | One Compose Postgres **instance**; each API owns a named database + `{PREFIX}_DB_*` env |
+| `postgres/mikro-orm` | One Compose Postgres **instance**; each API owns a named database + `{PREFIX}_DB_*` env, mapped with MikroORM |
+| `postgres/typeorm` | The same, mapped with TypeORM |
 
 ```bash
-npx @decohere/create webapi -d my-app --database postgres/typeorm
-npx @decohere/create webapi -d my-app --name api --name billing --database postgres/typeorm
+npx @decohere/create webapi -d my-app --database postgres/mikro-orm
+npx @decohere/create webapi -d my-app --name api --name billing --database postgres/mikro-orm
 ```
 
-`config.yaml` lists one datasource per API (`name: billing` → `typeOrm({ name: "billing" })`). Locally they share host `postgres` port `5432`. Point `BILLING_DB_HOST` / `BILLING_DB_PORT` at another server to split later. `webapi add billing --database postgres/typeorm` appends a datasource; TypeORM bootstrap `CREATE DATABASE`s it on first run.
+`config.yaml` lists one datasource per API (`name: billing` → `mikroOrm({ name: "billing" })`). Locally they share host `postgres` port `5432`. Point `BILLING_DB_HOST` / `BILLING_DB_PORT` at another server to split later. `webapi add billing --database postgres/mikro-orm` appends a datasource; the bootstrap `CREATE DATABASE`s it on first run.
+
+Each API builds in `src/app.ts` (`createApp()`) and starts in `src/main.ts`. Its migrations are in `src/migrations/`, starting with one per table the scaffold maps, and development applies them on start. `pnpm db <command>` (`pnpm db:<api>` for another API) runs `src/db.ts`: `generate <name>` writes a migration from your mapping changes, and `migrate`, `status`, `revert` and `new` do what they say. See [Migrations](../../docs/recipes/migrations.md).
 
 #### Health probes
 
@@ -208,7 +211,7 @@ Scaffolded APIs call `.use(health())` so these routes are available **without au
 | `GET /health` | Liveness — process is up | Always `200` `{ "status": "ok" }` |
 | `GET /ready` | Readiness — dependencies OK | `200` when checks pass; `503` when a check fails |
 
-With `--database postgres/typeorm`, readiness runs `SELECT 1` against each TypeORM datasource. Use `/ready` for load balancers and orchestrators.
+With a database, readiness checks each data source's connection. Use `/ready` for load balancers and orchestrators.
 
 #### Auth (`--auth`)
 
@@ -241,7 +244,7 @@ While the API is running, `http://localhost:3000/openapi.json` describes every r
 | `auth0 login` | `decohere auth0` | Device/URL login; keeps tokens in `~/.config/auth0` |
 | `auth0 configure` | `decohere auth0` | Update the Auth0 API, login app and token app for an existing workspace |
 | `auth0 token` | `decohere auth0` | Print an access token for calling the API in development |
-| `--database <provider>` | `webapi` / `add` | `none` \| `postgres/typeorm` |
+| `--database <provider>` | `webapi` / `add` | `none` \| `postgres/mikro-orm` \| `postgres/typeorm` |
 | `--auth <provider>` | `webapi` / `add` | `none` \| `auth0` |
 | `-y, --yes` | `webapi` / `add` | Install dependencies without prompting |
 | `--install <mode>` | `webapi` / `add` | `ask` (default) \| `yes` \| `no` |

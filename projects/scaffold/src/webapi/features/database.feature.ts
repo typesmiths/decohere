@@ -14,8 +14,11 @@ import type { ProjectScaffold, WorkspaceScaffold } from "../../models/project.mo
 import type { Feature } from "../../services/scaffold.service.js";
 import { CREATE_VERSION } from "../../version.js";
 import { apiEnvPrefix, apiNameFromProjectDir } from "../api-name.js";
+import { type DatabaseProvider, type Orm, ormOf } from "../database-provider.js";
 import type { ApiPackageJson } from "../models/api-package-json.model.js";
 import type { MainSourceFile } from "../models/main-source-file.model.js";
+import { MigrationsModel } from "../models/migrations.model.js";
+import { sampleTable } from "./orm-templates.js";
 
 /** Bind path relative to `.devcontainer/docker-compose.yml` (dies with the working tree). */
 const POSTGRES_DATA_BIND = "./postgres-data:/var/lib/postgresql/data";
@@ -28,7 +31,7 @@ const DB_UP_SCRIPT =
 const DB_RESET_SCRIPT = `docker compose -f .devcontainer/docker-compose.yml down && rm -rf .devcontainer/postgres-data && ${DB_UP_SCRIPT}`;
 
 export type DatabaseOptions = {
-	databaseProvider?: "none" | "postgres/typeorm";
+	databaseProvider?: DatabaseProvider;
 	/** When true, merge into an existing workspace (\`webapi add\`). */
 	add?: boolean;
 };
@@ -58,14 +61,15 @@ function renderBaseDataSource(apiName: string): string {
 
 // Dev overlay: @decohere/config merges it into config.yaml by data source name, so it only states
 // what development changes. The local server trusts every connection, so there are no passwords;
-// `password: null` replaces the production placeholder so it's never looked up.
+// `password: null` replaces the production placeholder so it's never looked up. Migrations apply
+// on start, so `db generate` always diffs against an up-to-date database.
 function renderDevDataSource(apiName: string): string {
 	const p = apiEnvPrefix(apiName);
 	return [
 		`    - name: ${apiName}`,
 		`      auth: trust`,
 		`      password: null`,
-		`      synchronize: true`,
+		`      migrateOnStart: true`,
 		`      seed: true`,
 		`      bootstrap: true`,
 		`      adminUser: ${POSTGRES_SUPERUSER}`,
@@ -80,18 +84,6 @@ function renderDatabaseSection(
 	return `database:\n  dataSources:\n${apiNames.map(items).join("\n")}\n`;
 }
 
-const SAMPLE_ENTITY_TS = `import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
-
-@Entity()
-export class SampleEntity {
-\t@PrimaryGeneratedColumn()
-\tpublic id!: number;
-
-\t@Column()
-\tpublic name!: string;
-}
-`;
-
 const SAMPLE_REPOSITORY_TS = `import { injectable } from "@decohere/crucible/decorators";
 import { injectUnitOfWork, type IUnitOfWork, Repository } from "@decohere/data";
 import { SampleEntity } from "../entities/sample.entity.js";
@@ -104,49 +96,25 @@ export class SampleEntityRepository extends Repository<SampleEntity> {
 }
 `;
 
-/** TypeORM CLI DataSource — connects as the migrate role; never enables synchronize. */
-function renderTypeOrmDataSource(apiName: string): string {
-	const p = apiEnvPrefix(apiName);
-	return `import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { DataSource } from "typeorm";
-
-const root = dirname(fileURLToPath(import.meta.url));
-const required = (key: string): string => {
-\tconst value = process.env[key];
-\tif (value == null || value === "") {
-\t\tthrow new Error(\`Missing env \${key} (load .env via --env-file or export it)\`);
-\t}
-\treturn value;
+/** The ORM packages the provider package is built on: the app installs the same range. */
+const ORM_DEPENDENCIES: Record<Orm, Record<string, string>> = {
+	"mikro-orm": { "@mikro-orm/core": "^7.2.8", "@mikro-orm/postgresql": "^7.2.8" },
+	typeorm: { typeorm: "^1.1.2" },
 };
 
-/**
- * CLI-only DataSource for \`pnpm db:migrate\` / \`pnpm db:migrate:generate\`.
- * Uses the migrate role (DDL). Runtime API pods use the app role with synchronize: false.
- */
-export default new DataSource({
-\ttype: "postgres",
-\thost: required("${p}_DB_HOST"),
-\tport: Number(required("${p}_DB_PORT")),
-\tdatabase: required("${p}_DB_NAME"),
-\tusername: required("${p}_DB_MIGRATE_USER"),
-\t// Unset locally, where the server trusts every connection. Set it in CI and deployments.
-\tpassword: process.env.${p}_DB_MIGRATE_PASSWORD,
-\tsynchronize: false,
-\tentities: [join(root, "entities", "*.{ts,js}")],
-\tmigrations: [join(root, "migrations", "*.{ts,js}")],
-});
-`;
-}
+const PROVIDER_PACKAGE: Record<Orm, string> = {
+	"mikro-orm": "@decohere/data-mikro-orm",
+	typeorm: "@decohere/data-typeorm",
+};
 
-const DATABASE_DOCS_MD = `# Database (Postgres / TypeORM)
+const DATABASE_DOCS_MD = `# Database (Postgres)
 
 ## Roles
 
 | Role | Env | Purpose |
 |---|---|---|
 | App | \`{PREFIX}_DB_USER\` | Runtime API (DML only in production) |
-| Migrate | \`{PREFIX}_DB_MIGRATE_USER\` | Schema changes / TypeORM migrations (CI/deploy) |
+| Migrate | \`{PREFIX}_DB_MIGRATE_USER\` | Schema changes: \`pnpm db\` commands, and migrations on start in development |
 | Bootstrap | \`postgres\` | Create DB + roles when \`bootstrap: true\` (dev) |
 
 \`{PREFIX}\` is the API slug in SCREAMING_SNAKE (\`api\` → \`API\`, \`billing\` → \`BILLING\`).
@@ -157,26 +125,25 @@ The local Postgres trusts every connection, so nothing here needs a password. \`
 
 Production still needs real passwords: \`{PREFIX}_DB_PASSWORD\` for the app, and \`{PREFIX}_DB_MIGRATE_PASSWORD\` for migrations.
 
-## Development (fast iteration)
+## Changing the schema
 
-\`config/config.dev.yaml\` sets \`synchronize: true\` and \`seed: true\` so the API can create tables on startup. You can keep using sync while prototyping.
-
-Alternatively, turn sync off in the overlay and use migrations the same way as production:
+Migrations live in \`projects/<api>/src/migrations/\`, listed in its \`index.ts\`. In development (\`config/config.dev.yaml\`, \`migrateOnStart: true\`) the API applies pending ones when it starts.
 
 \`\`\`bash
-pnpm db:up
-pnpm db:migrate
-pnpm db:migrate:generate -- ./projects/api/src/migrations/AddSomething
+pnpm db generate add-expiry           # write a migration from your mapping changes; read it, then restart
+pnpm db new backfill-expiry --data    # a migration that changes rows, written by hand
+pnpm db status
+pnpm db revert
 \`\`\`
 
-Do **not** mix sync and migrations for the same schema change (pick one path per change).
+\`pnpm db:<api> …\` does the same for another API in this workspace. How it works, deploys, and changing a schema without downtime: https://github.com/typesmiths/decohere/blob/main/docs/recipes/migrations.md
 
 ## Production (migrations only)
 
 \`config/config.yaml\` keeps \`synchronize: false\` / \`seed: false\` / \`bootstrap: false\`. Deploy steps:
 
 1. Ensure the app database and roles already exist (provisioner / ops — not the API pod).
-2. Run migrations with the migrate role: \`pnpm db:migrate\` (or \`pnpm db:migrate:<api>\` for multi-API).
+2. Run migrations as a release step, with the migrate role: \`node es6/src/db.js migrate\` in the packaged API, with \`{PREFIX}_DB_MIGRATE_USER\` and \`{PREFIX}_DB_MIGRATE_PASSWORD\` set.
 3. Start the API with the app role only — no migrate/admin secrets on the pod.
 
 ## Scripts
@@ -184,11 +151,8 @@ Do **not** mix sync and migrations for the same schema change (pick one path per
 | Script | What it does |
 |---|---|
 | \`db:up\` / \`db:down\` / \`db:reset\` | Local Compose Postgres |
-| \`db:migrate\` | Run pending migrations (\`projects/api\` by default) |
-| \`db:migrate:generate\` | Generate a migration from entity drift (pass path after \`--\`) |
-| \`db:migrate:<api>\` | Same for a named API under \`projects/<api>\` |
-
-CLI entry: \`projects/<api>/src/typeorm.data-source.ts\` (migrate credentials, \`synchronize: false\`).
+| \`db <command>\` | Migrations for \`projects/api\`: \`migrate\`, \`status\`, \`revert\`, \`new\`, \`generate\` |
+| \`db:<api> <command>\` | The same for a named API under \`projects/<api>\` |
 
 ## Browse the database
 
@@ -210,18 +174,9 @@ Adminer is **not** scaffolded. If you want a browser UI in Compose, add this und
 Then: \`docker compose -f .devcontainer/docker-compose.yml --profile tools up -d adminer\`
 `;
 
-function typeormCli(args: string): string {
-	return `node --import tsx --env-file=.env ./node_modules/typeorm/cli.js ${args}`;
-}
-
-function migrateRunScript(apiName: string): string {
-	return typeormCli(`migration:run -d ./projects/${apiName}/src/typeorm.data-source.ts`);
-}
-
-function migrateGenerateScript(apiName: string): string {
-	return typeormCli(
-		`migration:generate --esm -d ./projects/${apiName}/src/typeorm.data-source.ts`,
-	);
+/** The API's db commands, run from source with the workspace's .env, like \`pnpm dev\`. */
+function dbScript(apiName: string): string {
+	return `flux run --env-file-if-exists .env projects/${apiName}/src/db.ts --`;
 }
 
 async function getOptions(
@@ -230,13 +185,18 @@ async function getOptions(
 ): Promise<Partial<DatabaseOptions>> {
 	if (cliOptions.databaseProvider != null) return {};
 
-	const choices = [{ label: "none" as const }, { label: "postgres/typeorm" as const }];
+	const choices = [
+		{ label: "none" as const },
+		{ label: "postgres/mikro-orm" as const },
+		{ label: "postgres/typeorm" as const },
+	];
 	const selected = await pick("\n  Database: ", choices, (c) => c.label);
 	return { databaseProvider: selected?.label ?? "none" };
 }
 
 function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void {
-	if (options.databaseProvider !== "postgres/typeorm") return;
+	const orm = ormOf(options.databaseProvider);
+	if (orm == null) return;
 
 	const name = workspace.name;
 	const ident = toSqlIdentFragment(name);
@@ -290,27 +250,20 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 	const pkg = workspace
 		.getModel<PackageJson>(WELL_KNOWN_FILES.PACKAGE_JSON)
 		?.addDependency("@decohere/data", CREATE_VERSION)
-		.addDependency("typeorm", "^1.1.2")
-		.addDependency("@decohere/data-typeorm", CREATE_VERSION)
+		.addDependency(PROVIDER_PACKAGE[orm], CREATE_VERSION)
 		.addDependency("@decohere/data-postgres", CREATE_VERSION)
-		.addDependency("tsx", "^4.20.5")
 		.addScript("db:up", DB_UP_SCRIPT)
 		.addScript("db:down", "docker compose -f .devcontainer/docker-compose.yml down")
 		.addScript("db:reset", DB_RESET_SCRIPT);
 
 	const primaryApi = apiNames[0];
 	if (pkg != null) {
-		for (const apiName of apiNames) {
-			pkg
-				.addScript(`db:migrate:${apiName}`, migrateRunScript(apiName))
-				.addScript(`db:migrate:generate:${apiName}`, migrateGenerateScript(apiName));
+		for (const [name, range] of Object.entries(ORM_DEPENDENCIES[orm])) {
+			pkg.addDependency(name, range);
 		}
-		// Default aliases target the first API of a new workspace only — never overwrite on `webapi add`.
-		if (!options.add && primaryApi != null) {
-			pkg
-				.addScript("db:migrate", migrateRunScript(primaryApi))
-				.addScript("db:migrate:generate", migrateGenerateScript(primaryApi));
-		}
+		for (const apiName of apiNames) pkg.addScript(`db:${apiName}`, dbScript(apiName));
+		// The default alias targets the first API of a new workspace only — never overwrite on `webapi add`.
+		if (!options.add && primaryApi != null) pkg.addScript("db", dbScript(primaryApi));
 	}
 
 	workspace.addFile({
@@ -325,7 +278,7 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 	writeDatabaseConfig(workspace, apiNames);
 
 	for (const project of apiProjects) {
-		wireApiDatabase(project);
+		wireApiDatabase(project, orm);
 	}
 
 	for (const apiName of apiNames) {
@@ -367,38 +320,36 @@ function writeApiDatabaseEnv(
 		.addEntry(`${prefix}_DB_MIGRATE_USER`, `${ident}_${sqlApi}_migrate`);
 }
 
-function wireApiDatabase(project: ProjectScaffold): void {
+function wireApiDatabase(project: ProjectScaffold, orm: Orm): void {
 	const apiName = apiNameFromProjectDir(project.dir);
+	const sample = sampleTable(orm);
 	project
 		.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
-		?.setDataSourceName(apiName)
-		.addEntity({ className: "SampleEntity", importPath: "./entities/sample.entity.js" })
+		?.setOrm(orm)
+		.setDataSourceName(apiName)
+		.addEntity(sample.entity)
 		.addRepository({
 			className: "SampleEntityRepository",
 			importPath: "./repositories/sample.repository.js",
 		});
-	project
-		.getModel<ApiPackageJson>(WELL_KNOWN_FILES.API_PACKAGE_JSON)
+	const migrations =
+		project.getModel<MigrationsModel>(WELL_KNOWN_FILES.MIGRATIONS) ??
+		project.addModel(new MigrationsModel());
+	migrations.add(sample.migration.name, sample.migration.up, sample.migration.down);
+	const api = project.getModel<ApiPackageJson>(WELL_KNOWN_FILES.API_PACKAGE_JSON);
+	api
 		?.addDependency("@decohere/data", CREATE_VERSION)
-		.addDependency("@decohere/data-typeorm", CREATE_VERSION)
+		.addDependency(PROVIDER_PACKAGE[orm], CREATE_VERSION)
 		.addDependency("@decohere/data-postgres", CREATE_VERSION);
+	for (const [name, range] of Object.entries(ORM_DEPENDENCIES[orm])) {
+		api?.addDependency(name, range);
+	}
 	project.addFile({
 		files: () => [
-			{
-				filePath: "src/entities/sample.entity.ts",
-				content: SAMPLE_ENTITY_TS,
-			},
+			...sample.files,
 			{
 				filePath: "src/repositories/sample.repository.ts",
 				content: SAMPLE_REPOSITORY_TS,
-			},
-			{
-				filePath: "src/typeorm.data-source.ts",
-				content: renderTypeOrmDataSource(apiName),
-			},
-			{
-				filePath: "src/migrations/.gitkeep",
-				content: "",
 			},
 		],
 	});

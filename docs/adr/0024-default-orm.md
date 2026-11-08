@@ -95,3 +95,4 @@ Rejected:
 - 2026-11-07: Accepted. MikroORM's unit of work is the reference the TypeORM provider's tracker follows, held together by one contract suite.
 - 2026-11-08: Built the contracts, the tracker, the TypeORM 1.x provider and the MikroORM unit of work. Following MikroORM, a remove deletes only the children it loaded. The tracker takes plain rows, so it needs four row operations, not five. The suite compares writes and locking reads, not plain reads, and the sizes are the built code's.
 - 2026-11-08: Built the migrations. The runner went to `data-postgres` rather than `data`, providers take `database: postgres` in place of `bootstrap`, and the commands run from the app's `db.ts` rather than the Decohere CLI.
+- 2026-11-08: The scaffold generates MikroORM apps by default (`--database postgres/mikro-orm`; `postgres/typeorm` stays), each with `app.ts`, `main.ts` and `db.ts`, its first migrations, and `pnpm db` scripts in place of TypeORM's CLI.

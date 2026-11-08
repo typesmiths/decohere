@@ -309,7 +309,7 @@ describe.skipIf(!registry || !version)(
 					devcontainer("exec", "--workspace-folder", dir, "bash", "-c", script);
 
 				beforeAll(async () => {
-					await generate("shop", "postgres/typeorm");
+					await generate("shop", "postgres/mikro-orm");
 					writeFileSync(join(dir, ".npmrc"), `registry=${containerRegistry}\n`);
 					expectOk(await run("git", ["init", "-q"], dir));
 				}, FIVE_MINUTES);
@@ -353,6 +353,12 @@ exit 1`),
 					);
 				});
 
+				it("applied its first migration on start, and runs the db commands from source", async () => {
+					const status = await inside("pnpm db status");
+					expectOk(status);
+					expect(status.output).toMatch(/applied\s+\d{8}-\d{6}-create-sample-entity/);
+				});
+
 				it("leaves Postgres's files owned by you, so you can delete them", async () => {
 					const owner = await run(
 						"stat",
@@ -366,7 +372,7 @@ exit 1`),
 				it("runs add right there, without starting another container", async () => {
 					expectOk(
 						await inside(`if command -v docker; then echo "docker should not be here"; exit 1; fi
-pnpm decohere add api billing --database postgres/typeorm --auth none --install no
+pnpm decohere add api billing --database postgres/mikro-orm --auth none --install no
 test -f projects/billing/package.json`),
 					);
 				});

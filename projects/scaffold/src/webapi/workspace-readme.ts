@@ -1,3 +1,4 @@
+import { type DatabaseProvider, ormOf } from "./database-provider.js";
 import { WELL_KNOWN_FILES } from "../models/const.js";
 import type { EnvFile } from "../models/env-file.model.js";
 import type { PackageJson } from "../models/package-json.model.js";
@@ -6,7 +7,7 @@ import { apiNameFromProjectDir, listExistingApiNames } from "./api-name.js";
 
 export type WorkspaceReadmeOptions = {
 	add?: boolean;
-	databaseProvider?: "none" | "postgres/typeorm";
+	databaseProvider?: DatabaseProvider;
 	authProvider?: "auth0" | "none";
 };
 
@@ -77,6 +78,15 @@ export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
 			"pnpm db:down",
 			"pnpm db:reset",
 			"```",
+			"",
+			"Migrations live in each API's `src/migrations/`, and development applies them on start:",
+			"",
+			"```bash",
+			"pnpm db generate add-expiry   # a migration from your mapping changes; read it, then restart",
+			"pnpm db status",
+			"```",
+			"",
+			"More in [docs/database.md](docs/database.md).",
 			"",
 		);
 	}
@@ -172,7 +182,7 @@ export function resolveWorkspaceReadmeInput(
 	const env = workspace.getModel<EnvFile>(WELL_KNOWN_FILES.ENV_FILE);
 
 	const hasPostgres =
-		options.databaseProvider === "postgres/typeorm" || Boolean(pkg?.hasScript("db:up"));
+		ormOf(options.databaseProvider) != null || Boolean(pkg?.hasScript("db:up"));
 	const hasAuth0 =
 		options.authProvider === "auth0" || Boolean(env?.hasEntry("AUTH0_ISSUER_BASE_URL"));
 

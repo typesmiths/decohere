@@ -341,7 +341,7 @@ describe("scaffoldApi auth0 wiring", () => {
 		expect(ability).not.toContain("AbilityBuilder");
 		expect(ability).not.toContain("createMongoAbility");
 
-		const main = read("projects/api/src/main.ts");
+		const main = read("projects/api/src/app.ts");
 		expect(main).toContain(
 			".use(auth(defineAbilitiesFor, { principalMapper: mapPrincipal }))",
 		);
