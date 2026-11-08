@@ -18,7 +18,7 @@ import {
 	revokeRoleMembershipQuery,
 	roleExistsQuery,
 	type SqlQuery,
-} from "./scripts/user.js";
+} from "./user-scripts.js";
 
 export type ProvisionRolesOptions = {
 	database: string;

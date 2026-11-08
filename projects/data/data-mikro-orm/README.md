@@ -3,10 +3,27 @@
 The MikroORM provider for [`@decohere/data`](../data/README.md): data's `IUnitOfWork` over MikroORM's own unit of work. MikroORM tracks the changes, keeps the identity map and orders the writes. This package adds Decohere's `Query<T>`, the outbox, and one rule: nothing is written before `commit()`. Each unit of work forks the entity manager with `flushMode: "commit"`, so a query never flushes pending changes.
 
 ```ts
-import { MikroOrmUnitOfWork } from "@decohere/data-mikro-orm";
+import { mikroOrm } from "@decohere/data-mikro-orm";
 
-const uow = new MikroOrmUnitOfWork(orm.em, { outbox: (event) => new OutboxMessage(event.type, event.payload) });
+builder.use(
+	mikroOrm({
+		entities: [OrderSchema, LineSchema],
+		repositories: [OrderRepository],
+		bootstrap: postgres.bootstrap, // from @decohere/data-postgres
+		outbox: toOutboxMessage,
+	}),
+);
 ```
+
+`mikroOrm()` reads the `database` config section, like `typeOrm()`. For each data source it:
+
+- checks each data source's `auth` and `synchronize`, and creates its database, least-privilege roles and schema when the config asks, with the `bootstrap` you pass (`postgres.bootstrap` from `@decohere/data-postgres`);
+- opens one MikroORM instance as the app role, named for the app in `application_name`;
+- creates missing tables when `synchronize` is on (development only), never dropping any;
+- runs `seed(orm)` when `seed` is on;
+- registers a unit of work per request (`@injectUnitOfWork()`), the instance itself (`@injectMikroOrm()`) and a readiness check.
+
+The container closes the instance when the app stops, after hosted services. Postgres only. Outside a plugin, `new MikroOrmUnitOfWork(orm.em, { outbox })` gives the same unit of work.
 
 Map domain classes with `defineEntity({ class, … })` in infrastructure files, so the domain imports nothing from MikroORM. Map each child collection as a one-to-many with `orphanRemoval()`, so a child dropped from its aggregate is deleted.
 

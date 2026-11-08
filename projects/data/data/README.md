@@ -59,9 +59,13 @@ export class OrderRepository extends Repository<Order> {
 
 `Repository<T>` gives `findById`, `find`, `findOne`, `add` and `remove`. The service that finishes the work commits the unit of work.
 
+## Setting up the database
+
+Before it connects, a provider runs `dataSources.prepare`. It checks each data source's `auth` and `synchronize` for the environment ([ADR 0011](../../../docs/adr/0011-database-bootstrap.md)), then runs the `bootstrap` the provider was given, which creates the database, roles and schema. The bootstrap comes from the package for the database: `postgres.bootstrap` from [`@decohere/data-postgres`](../data-postgres/README.md). A data source that asks to be set up (`bootstrap: true`, or an admin user in development) when there's no bootstrap stops startup with an error that says what to install.
+
 ## For provider authors
 
-A provider either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
+A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, and runs `dataSources.prepare` with the `bootstrap` its caller passed. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
 
 MikroORM's unit of work is the reference. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome.
 

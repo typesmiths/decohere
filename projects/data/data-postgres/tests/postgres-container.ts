@@ -29,12 +29,12 @@ export async function startPostgres(
 	try {
 		execFileSync("docker", ["info"], { stdio: "ignore" });
 	} catch (err) {
-		throw new Error("Docker is required for data-typeorm *.docker.spec.ts suites", {
+		throw new Error("Docker is required for the *.docker.spec.ts suites", {
 			cause: err,
 		});
 	}
 
-	const name = `decohere-data-typeorm-it-${randomBytes(4).toString("hex")}`;
+	const name = `decohere-data-it-${randomBytes(4).toString("hex")}`;
 	const auth = options.trust
 		? ["-e", "POSTGRES_HOST_AUTH_METHOD=trust"]
 		: ["-e", `POSTGRES_PASSWORD=${SUPER_PASSWORD}`];

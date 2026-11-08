@@ -1,7 +1,7 @@
 {
   "name": "@decohere/data",
   "version": "0.0.1-dev.5",
-  "description": "Data access for Decohere apps: repositories, request-scoped units of work and database bootstrap",
+  "description": "Data access for Decohere apps: repository, query and unit-of-work contracts, and the change tracker",
   "keywords": [
     "typescript",
     "data-access",
@@ -31,6 +31,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@decohere/core": "0.0.1-dev.5",
     "@decohere/crucible": "0.0.1-dev.5"
   },
   "devDependencies": {}

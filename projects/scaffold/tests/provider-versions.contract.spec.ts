@@ -67,3 +67,23 @@ describe("a generated app's ORM ↔ its provider package", () => {
 		expect(app.dependencies.typeorm).toBe(providerManifest.dependencies.typeorm);
 	});
 });
+
+describe("a generated Postgres app ↔ @decohere/data-postgres", () => {
+	it("installs it and passes its bootstrap to the provider, since dev config asks for setup", async () => {
+		await scaffoldApi({
+			d: "/my-app",
+			names: ["api"],
+			databaseProvider: "postgres/typeorm",
+			authProvider: "none",
+			installDependencies: "no",
+		});
+
+		const app = JSON.parse(readFileSync(join("/my-app", "package.json"), "utf8")) as {
+			dependencies: Record<string, string>;
+		};
+		expect(app.dependencies).toHaveProperty("@decohere/data-postgres");
+		const main = readFileSync(join("/my-app", "projects/api/src/main.ts"), "utf8");
+		expect(main).toContain('import { postgres } from "@decohere/data-postgres";');
+		expect(main).toMatch(/typeOrm\(\{[^)]*bootstrap: postgres\.bootstrap/);
+	});
+});

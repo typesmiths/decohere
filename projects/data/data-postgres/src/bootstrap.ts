@@ -1,10 +1,11 @@
-import { type ConnectionInfo, DataConfigurationError } from "@decohere/data";
 import {
 	assertBootstrapCredentials,
 	assertDataSourceAuth,
 	assertSynchronizeAllowed,
+	type ConnectionInfo,
+	DataConfigurationError,
 	shouldBootstrapDatabase,
-} from "./bootstrap-policy.js";
+} from "@decohere/data";
 import { PostgresServerManager } from "./server-manager.js";
 
 export type BootstrapDataSourcesOptions = {
@@ -23,7 +24,8 @@ const SHARED_FIELDS = ["auth", "adminUser", "migrateUsername"] as const;
  * other: in parallel they would race to create the same database and roles. Running it again
  * changes nothing.
  *
- * For runners and scripts that open their own `DataSource`; `typeOrm()` calls it for you.
+ * Pass it to a provider as `bootstrap: postgres.bootstrap`; runners and scripts that open their own
+ * connection can call it directly.
  */
 export async function bootstrapDataSources(
 	dataSources: readonly ConnectionInfo[],

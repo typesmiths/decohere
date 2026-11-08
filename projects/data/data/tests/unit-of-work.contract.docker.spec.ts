@@ -8,7 +8,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
 	type PostgresContainer,
 	startPostgres,
-} from "../../data-typeorm/tests/postgres-container.js";
+} from "../../data-postgres/tests/postgres-container.js";
 import { DDL, type Order, SCHEMA, TABLES } from "./contract/model.js";
 import { type OpenProvider, openMikroOrm, openTypeOrm } from "./contract/providers.js";
 import { reads, shapes } from "./contract/sql-shape.js";

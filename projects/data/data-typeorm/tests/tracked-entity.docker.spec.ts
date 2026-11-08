@@ -5,7 +5,10 @@ import { TrackingUnitOfWork } from "@decohere/data";
 import { Column, DataSource, Entity, PrimaryGeneratedColumn } from "typeorm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TypeOrmRowStore } from "../src/type-orm.row-store.js";
-import { type PostgresContainer, startPostgres } from "./postgres-container.js";
+import {
+	type PostgresContainer,
+	startPostgres,
+} from "../../data-postgres/tests/postgres-container.js";
 
 @Entity()
 class UserEntity {
