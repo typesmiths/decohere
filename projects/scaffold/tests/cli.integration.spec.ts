@@ -1121,16 +1121,16 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(rootPkg.dependencies.typeorm).toBeUndefined();
 		expect(rootPkg.dependencies["@decohere/data-mikro-orm"]).toBeTruthy();
 		expect(rootPkg.dependencies["@mikro-orm/postgresql"]).toBeTruthy();
-		expect(rootPkg.scripts.db).toBe(
-			"flux run --env-file-if-exists .env projects/api/src/db.ts --",
-		);
-		expect(rootPkg.scripts["db:api"]).toBe(rootPkg.scripts.db);
+		// `pnpm decohere db` runs the migrations, so no script shares a name with db:up and the rest.
+		expect(rootPkg.scripts.db).toBeUndefined();
+		expect(rootPkg.scripts["db:api"]).toBeUndefined();
 
 		expect(existsSync("/my-app/docs/database.md")).toBe(true);
 		const dbDocs = readFileSync("/my-app/docs/database.md", "utf8");
 		expect(dbDocs).toMatch(/migrateOnStart: true/);
 		expect(dbDocs).toMatch(/migrations only/i);
-		expect(dbDocs).toContain("pnpm db generate");
+		expect(dbDocs).toContain("pnpm decohere db generate");
+		expect(dbDocs).not.toMatch(/pnpm db (generate|migrate|status|new|revert)/);
 		expect(dbDocs).toMatch(/Adminer is \*\*not\*\* scaffolded/i);
 		expect(dbDocs).toContain("image: adminer");
 
@@ -1166,9 +1166,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		const pkg = JSON.parse(readFileSync("/my-app/package.json", "utf8")) as {
 			scripts: Record<string, string>;
 		};
-		expect(pkg.scripts["db:billing"]).toBe(
-			"flux run --env-file-if-exists .env projects/billing/src/db.ts --",
-		);
+		expect(pkg.scripts["db:billing"]).toBeUndefined();
 		expect(existsSync("/my-app/projects/billing/src/db.ts")).toBe(true);
 		expect(existsSync("/my-app/projects/billing/src/migrations/index.ts")).toBe(true);
 	});
@@ -1299,11 +1297,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 			'mikroOrm({ name: "billing"',
 		);
 
-		const pkg = JSON.parse(readFileSync("/my-app/package.json", "utf8")) as {
-			scripts: Record<string, string>;
-		};
-		expect(pkg.scripts.db).toContain("projects/api/src/db.ts");
-		expect(pkg.scripts["db:billing"]).toContain("projects/billing/src/db.ts");
+		expect(existsSync("/my-app/projects/api/src/db.ts")).toBe(true);
 		expect(existsSync("/my-app/projects/billing/src/db.ts")).toBe(true);
 	});
 });

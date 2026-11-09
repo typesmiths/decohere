@@ -42,7 +42,7 @@ const PROVIDER = {
  *
  * - `src/app.ts`: `createApp()` builds the app and starts nothing, so a tool or a test can use it;
  * - `src/main.ts`: sets up logging and starts the app;
- * - `src/db.ts`, with a database: the db commands (`pnpm db migrate`).
+ * - `src/db.ts`, with a database: the db commands (`pnpm decohere db migrate`).
  *
  * Starts with the minimal HTTP + YAML config setup. Features mutate the model by calling
  * addImport / addBuilderCall / addEntity / addRepository. files() renders whatever has been
@@ -232,7 +232,8 @@ export class MainSourceFile implements KeyedModel {
 const DB_TS = `import { db } from "@decohere/data";
 import { createApp } from "./app.js";
 
-// The db commands: pnpm db migrate | status | revert | new <name> [--data] | generate <name>.
+// The db commands: pnpm decohere db migrate | status | revert | new <name> [--data] | generate <name>.
+// In a packaged app: node es6/src/db.js migrate.
 // The app is built, not started: no migration runs on start, and nothing listens.
 const app = await createApp();
 try {

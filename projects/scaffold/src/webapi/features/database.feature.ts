@@ -114,7 +114,7 @@ const DATABASE_DOCS_MD = `# Database (Postgres)
 | Role | Env | Purpose |
 |---|---|---|
 | App | \`{PREFIX}_DB_USER\` | Runtime API (DML only in production) |
-| Migrate | \`{PREFIX}_DB_MIGRATE_USER\` | Schema changes: \`pnpm db\` commands, and migrations on start in development |
+| Migrate | \`{PREFIX}_DB_MIGRATE_USER\` | Schema changes: \`pnpm decohere db\` commands, and migrations on start in development |
 | Bootstrap | \`postgres\` | Create DB + roles when \`bootstrap: true\` (dev) |
 
 \`{PREFIX}\` is the API slug in SCREAMING_SNAKE (\`api\` → \`API\`, \`billing\` → \`BILLING\`).
@@ -130,13 +130,13 @@ Production still needs real passwords: \`{PREFIX}_DB_PASSWORD\` for the app, and
 Migrations live in \`projects/<api>/src/migrations/\`, listed in its \`index.ts\`. In development (\`config/config.dev.yaml\`, \`migrateOnStart: true\`) the API applies pending ones when it starts.
 
 \`\`\`bash
-pnpm db generate add-expiry           # write a migration from your mapping changes; read it, then restart
-pnpm db new backfill-expiry --data    # a migration that changes rows, written by hand
-pnpm db status
-pnpm db revert
+pnpm decohere db generate add-expiry          # write a migration from your mapping changes; read it, then restart
+pnpm decohere db new backfill-expiry --data   # a migration that changes rows, written by hand
+pnpm decohere db status
+pnpm decohere db revert
 \`\`\`
 
-\`pnpm db:<api> …\` does the same for another API in this workspace. How it works, deploys, and changing a schema without downtime: https://github.com/typesmiths/decohere/blob/main/docs/recipes/migrations.md
+With more than one API, name it: \`pnpm decohere db status --api billing\`. How it works, deploys, and changing a schema without downtime: https://github.com/typesmiths/decohere/blob/main/docs/recipes/migrations.md
 
 ## Production (migrations only)
 
@@ -151,8 +151,6 @@ pnpm db revert
 | Script | What it does |
 |---|---|
 | \`db:up\` / \`db:down\` / \`db:reset\` | Local Compose Postgres |
-| \`db <command>\` | Migrations for \`projects/api\`: \`migrate\`, \`status\`, \`revert\`, \`new\`, \`generate\` |
-| \`db:<api> <command>\` | The same for a named API under \`projects/<api>\` |
 
 ## Browse the database
 
@@ -173,11 +171,6 @@ Adminer is **not** scaffolded. If you want a browser UI in Compose, add this und
 
 Then: \`docker compose -f .devcontainer/docker-compose.yml --profile tools up -d adminer\`
 `;
-
-/** The API's db commands, run from source with the workspace's .env, like \`pnpm dev\`. */
-function dbScript(apiName: string): string {
-	return `flux run --env-file-if-exists .env projects/${apiName}/src/db.ts --`;
-}
 
 async function getOptions(
 	_workspace: WorkspaceScaffold,
@@ -256,14 +249,10 @@ function scaffold(workspace: WorkspaceScaffold, options: DatabaseOptions): void 
 		.addScript("db:down", "docker compose -f .devcontainer/docker-compose.yml down")
 		.addScript("db:reset", DB_RESET_SCRIPT);
 
-	const primaryApi = apiNames[0];
 	if (pkg != null) {
 		for (const [name, range] of Object.entries(ORM_DEPENDENCIES[orm])) {
 			pkg.addDependency(name, range);
 		}
-		for (const apiName of apiNames) pkg.addScript(`db:${apiName}`, dbScript(apiName));
-		// The default alias targets the first API of a new workspace only — never overwrite on `webapi add`.
-		if (!options.add && primaryApi != null) pkg.addScript("db", dbScript(primaryApi));
 	}
 
 	workspace.addFile({

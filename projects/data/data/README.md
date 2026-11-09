@@ -89,7 +89,7 @@ export default defineMigration({
 
 Each migration runs in its own transaction, as the data source's migrate role, in its schema. The history is one `decohere_migrations` table in that schema, whichever provider maps the entities. A lock keeps two runs from applying the same migration.
 
-The commands run from the app's own `db.ts`, which builds the app without starting it:
+The commands run from the app's own `db.ts`, which builds the app without starting it. In a workspace, `decohere db <command> [--api <name>]` finds and runs it; in a packaged app, `node es6/src/db.js <command>`.
 
 ```ts
 // src/db.ts

@@ -354,7 +354,7 @@ exit 1`),
 				});
 
 				it("applied its first migration on start, and runs the db commands from source", async () => {
-					const status = await inside("pnpm db status");
+					const status = await inside("pnpm decohere db status");
 					expectOk(status);
 					expect(status.output).toMatch(/applied\s+\d{8}-\d{6}-create-sample-entity/);
 				});

@@ -48,9 +48,7 @@ import type { Migration } from "@decohere/data";
 export const migrations: Migration[] = [];
 ```
 
-```json
-{ "scripts": { "db": "flux run projects/api/src/db.ts --" } }
-```
+`decohere db <command>` finds the API's `src/db.ts` in the workspace and runs it from source, with the rest of the command line. With more than one API, name it with `--api <folder or package name>`. It reads no `.env` file unless you pass `--env-file` or `--env-file-if-exists`.
 
 The data source needs a migrate role in its config (`migrateUsername`, and `migratePassword` unless the server trusts every connection). Generating and running migrations both use it.
 
@@ -60,22 +58,22 @@ The data source needs a migrate role in its config (`migrateUsername`, and `migr
 2. Write the migration from the difference:
 
    ```bash
-   pnpm db generate add-expiry
+   pnpm decohere db generate add-expiry
    # Wrote …/src/migrations/20261110-093000-add-expiry.ts
    ```
 
    Read it before you apply it. The diff is the ORM's: it can propose a drop and re-create where you meant a rename. Edit the file when it does.
-3. Apply it: restart the app with `migrateOnStart: true` in the development config, or run `pnpm db migrate`.
+3. Apply it: restart the app with `migrateOnStart: true` in the development config, or run `pnpm decohere db migrate`.
 
 For a change to rows, write the migration by hand:
 
 ```bash
-pnpm db new backfill-expiry --data
+pnpm decohere db new backfill-expiry --data
 ```
 
 It fails until you write its `up`, so an empty one is never recorded as applied. Use `batch` for tables of any size, and resolve the app's services from `container`. Services write through their own connections, outside the migration's transaction, so change rows with `sql`.
 
-`pnpm db status` lists what's applied and pending, and ids in the history that the code no longer has, such as ones applied from another branch. `pnpm db revert` undoes the last one applied.
+`pnpm decohere db status` lists what's applied and pending, and ids in the history that the code no longer has, such as ones applied from another branch. `pnpm decohere db revert` undoes the last one applied.
 
 `synchronize` and `migrateOnStart` can't both be on: with `synchronize` the tables already match the mappings, so `generate` would find nothing to write.
 

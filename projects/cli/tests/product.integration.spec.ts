@@ -18,9 +18,9 @@ function names(commands: readonly { name(): string }[]): string[] {
 }
 
 describe("product CLI shape", () => {
-	it("ships forge, flux, create webapi, add api, and auth0 together", async () => {
+	it("ships forge, flux, create webapi, add api, auth0 and db together", async () => {
 		const app = await productCli.create();
-		expect(names(app.commands)).toEqual(["forge", "flux", "create", "add", "auth0"]);
+		expect(names(app.commands)).toEqual(["forge", "flux", "create", "add", "auth0", "db"]);
 
 		const forge = app.commands.find((c) => c.name() === "forge");
 		expect(names(forge?.commands ?? [])).toEqual(
@@ -63,6 +63,7 @@ describe("product CLI shape", () => {
 		[["auth0", "login", "--help"]],
 		[["auth0", "configure", "--help"]],
 		[["auth0", "token", "--help"]],
+		[["db", "--help"]],
 	] as const)("routes decohere %s", async (argv) => {
 		const app = await productCli.create();
 		await expect(app.run([...argv])).resolves.toEqual(CommandResponse.help());

@@ -154,9 +154,9 @@ process.on("SIGTERM", () => app.dispose());
 Generate a migration from a mapping change, and apply it.
 
 ```bash
-pnpm db generate add-expiry   # a migration from the mappings' differences, for you to review
-pnpm db migrate               # or restart the app with migrateOnStart in development
-pnpm db status
+pnpm decohere db generate add-expiry   # a migration from the mappings' differences, for you to review
+pnpm decohere db migrate               # or restart the app with migrateOnStart in development
+pnpm decohere db status
 ```
 
 Set up, data migrations, deploys and changing a schema without downtime: [Migrations](migrations.md).

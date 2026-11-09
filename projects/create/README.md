@@ -200,7 +200,7 @@ npx @decohere/create webapi -d my-app --name api --name billing --database postg
 
 `config.yaml` lists one datasource per API (`name: billing` → `mikroOrm({ name: "billing" })`). Locally they share host `postgres` port `5432`. Point `BILLING_DB_HOST` / `BILLING_DB_PORT` at another server to split later. `webapi add billing --database postgres/mikro-orm` appends a datasource; the bootstrap `CREATE DATABASE`s it on first run.
 
-Each API builds in `src/app.ts` (`createApp()`) and starts in `src/main.ts`. Its migrations are in `src/migrations/`, starting with one per table the scaffold maps, and development applies them on start. `pnpm db <command>` (`pnpm db:<api>` for another API) runs `src/db.ts`: `generate <name>` writes a migration from your mapping changes, and `migrate`, `status`, `revert` and `new` do what they say. See [Migrations](../../docs/recipes/migrations.md).
+Each API builds in `src/app.ts` (`createApp()`) and starts in `src/main.ts`. Its migrations are in `src/migrations/`, starting with one per table the scaffold maps, and development applies them on start. `pnpm decohere db <command>` runs `src/db.ts` (add `--api billing` when there are several APIs): `generate <name>` writes a migration from your mapping changes, and `migrate`, `status`, `revert` and `new` do what they say. See [Migrations](../../docs/recipes/migrations.md).
 
 #### Health probes
 
