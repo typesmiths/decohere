@@ -116,6 +116,9 @@
       "@decohere/forge/transpile": [
         "./projects/forge/src/transpile/index.ts"
       ],
+      "@decohere/forge/vite": [
+        "./projects/forge/src/vite/index.ts"
+      ],
       "@decohere/forge/vitest": [
         "./projects/forge/src/vitest/index.ts"
       ],

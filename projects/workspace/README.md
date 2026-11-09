@@ -57,7 +57,7 @@ For each discovered project, the workspace package maps `package.json` `name` to
 
 - **The entry:** a TypeScript `main` as written (default `src/index.ts`). A `main` or `exports["."]` that describes the published layout (`index.js`, `./es6/src/index.js`) maps back to the source under `src/`.
 - **Each subpath in `exports`:** `./auth` → `./es6/src/auth/auth.extensions.js` becomes `src/auth/auth.extensions.ts`. Entries whose source doesn't exist are left out.
-- **Any other subpath (`name/*`):** `src/<sub>.ts` (or `.tsx`, `.mts` for `.mjs`, `.cts` for `.cjs`), else `src/<sub>/index.ts`. A package with only subpaths and no root entry resolves them under `src/`.
+- **Any other subpath (`name/*`):** `src/<sub>.ts` (or `.tsx`, `.mts` for `.mjs`, `.cts` for `.cjs`), else `src/<sub>/index.ts`, else `src/<sub>` itself when it is a file (a UI package's `Button.astro` or `theme.css`). A package with only subpaths and no root entry resolves them under `src/`.
 
 Root `tsconfig.json` `paths` override the same keys. In this repo they come from `forge paths`, which writes this map to `tsconfig.paths.json` for `tsc`.
 
