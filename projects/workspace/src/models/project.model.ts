@@ -15,6 +15,7 @@ import { WorkspaceConfigurationError } from "../errors.js";
 import { HasPackageJson } from "./has-package-json.mixin.js";
 import { HasTsConfig } from "./has-tsconfig.mixin.js";
 import { type PackageExports, PackageJson } from "./package-json.model.js";
+import { projectScripts } from "./project-scripts.js";
 import type { ProjectFileEvent } from "./project-file-event.js";
 import { sourceExtensions } from "./source-extensions.js";
 import type { Configuration, WorkspaceOptions } from "./workspace-config.type.js";
@@ -55,6 +56,14 @@ export class Project extends mixwith(HasPackageJson, HasTsConfig) {
 
 	public get name() {
 		return this.#name;
+	}
+
+	/**
+	 * The command of this project's own script for a step, when it has one that doesn't call a
+	 * Decohere tool: forge and flux run it in the project's folder instead of doing the step.
+	 */
+	public ownScript(name: string): string | undefined {
+		return projectScripts.own(this.packageJson?.scripts, name);
 	}
 
 	public get isPrivate() {

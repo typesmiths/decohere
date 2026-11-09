@@ -102,6 +102,24 @@ Run `forge paths` at the workspace root to write `tsconfig.paths.json`, and agai
 
 `forgeBuild()` (`@decohere/forge/vitest`) resolves package names the same way, and compiles TypeScript with forge's SWC on top: that part is for tests, not for a site's build.
 
+## Projects with a builder of their own
+
+A site built by Astro, Vite, Angular or any other tool says so with a `build` script in its own `package.json`. `forge build` runs that script in the project's folder, through the workspace's package manager, instead of compiling the project:
+
+```
+$ pnpm forge build --configuration release
+Building @app/api
+Building @app/site.web with its own build script (pnpm run build)
+```
+
+- **The builder owns the output.** It writes where its config says (for Astro and Vite, the project's `dist/`). Forge writes nothing for the project under its own `dist/`, copies none of its files, and doesn't rebuild it in `--watch`: `flux serve` runs its `dev` script instead.
+- **A failing script fails `forge build`.** The other projects are compiled first, in the same run.
+- **The builder is found at the workspace root.** Decohere installs once, at the root, so the script runs with each `node_modules/.bin` from the project up to the root on its `PATH`.
+- **A script that calls `forge`, `flux` or `decohere` doesn't count**, so forge never calls itself: such a project is compiled as usual.
+- **The project stays in the workspace.** Other projects still import it by name, and `forge package` still finds it as a `ui`. Don't list it in `ignoreProjects`.
+
+To import workspace packages by name from the site, add [`forgeAliases()`](#sites-vite-builds-decohereforgevite) to its Vite config. The same rule (`Project.ownScript` in `@decohere/workspace`) decides what `flux serve` hands to a project's `dev` script.
+
 ## `forge package`: one folder a plain `node` can run
 
 `forge build --configuration release` keeps bare imports such as `@app/shop.domain`, so a deployable that imports a workspace library cannot run from `dist/release` on its own: there is no workspace package in production, and Node can only find those packages in `node_modules`. `forge package` makes that folder instead of symlinking `node_modules` into `dist` (what `forge link` does, for development).
@@ -163,7 +181,7 @@ export default {
 };
 ```
 
-`forge package @app/shop.api` then copies `projects/shop.web/dist/` to `projects/shop.api/.package/ui/` (real files, never links). The API calls `.statics("/ui/", "ui")` and the Dockerfile stays `COPY .package/ ./`. `forge package` does **not** build the UI: if the folder is missing it fails and tells you to build the UI first. `to` must be a new folder inside `.package/` (not `es6`, `node_modules` or `config`). Running the UI's own toolchain from `forge build` is not done yet; see [ADR 0007](../../docs/adr/0007-serving-a-built-ui-from-http.md).
+`forge package @app/shop.api` then copies `projects/shop.web/dist/` to `projects/shop.api/.package/ui/` (real files, never links). The API calls `.statics("/ui/", "ui")` and the Dockerfile stays `COPY .package/ ./`. `forge package` doesn't build the UI itself: `forge build` does, [with the UI's own build script](#projects-with-a-builder-of-their-own), so `forge build && forge package @app/shop.api` is the whole release. If the folder is missing, packaging fails and tells you to build the UI first. `to` must be a new folder inside `.package/` (not `es6`, `node_modules` or `config`). See [ADR 0007](../../docs/adr/0007-serving-a-built-ui-from-http.md).
 
 Design record: [ADR 0006](../../docs/adr/0006-forge-package-deployables.md).
 

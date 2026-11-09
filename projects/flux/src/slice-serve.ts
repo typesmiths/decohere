@@ -3,6 +3,8 @@
  * Flux apps, Nixpacks-style script deferrals, or libraries to skip.
  */
 
+import { projectScripts } from "@decohere/workspace";
+
 export type SliceProjectView = {
 	readonly name: string;
 	/** Relative project dir from workspace root (e.g. `projects/funding/api`). */
@@ -78,23 +80,12 @@ export function projectsInSlices(
 	return [...byName.values()];
 }
 
-/** Script invokes Flux (in-process serve stays on Flux, not deferred). */
-export function isFluxOwnedScript(script: string): boolean {
-	return /\bflux\b/i.test(script);
-}
-
 /**
- * First Nixpacks-style serve script that is not Flux-owned.
- * Prefers `dev`, then `serve`.
+ * The project's own serve script, `dev` before `serve`, by the rule forge uses for `build`: one
+ * that calls flux (or another Decohere tool) stays with Flux.
  */
 export function resolveDeferScript(scripts: Record<string, string>): string | undefined {
-	for (const name of DEFER_SCRIPT_CANDIDATES) {
-		const body = scripts[name];
-		if (body != null && body !== "" && !isFluxOwnedScript(body)) {
-			return name;
-		}
-	}
-	return undefined;
+	return DEFER_SCRIPT_CANDIDATES.find((name) => projectScripts.own(scripts, name) != null);
 }
 
 /** Convention: Flux Node apps use `main` ending in `main.ts` / `main.tsx`. */

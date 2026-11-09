@@ -22,7 +22,7 @@ A module deploys as one image that runs its API and serves its UI's build. The t
   `exclude` globs list further paths the mount never answers. A routing table or middleware were rejected: static stays outside the pipeline. With two mounts, the more specific prefix wins.
 - **Security.** Traversal protection, ignored dotfiles and no directory listing come from `@fastify/static`, and are tested with raw requests (`..`, encoded, double-encoded, backslash, NUL), not assumed.
 - **Missing directory.** `onMissingDirectory: "fail"` stops the app at start, naming the path; `"warn"` logs and serves nothing, so the API boots before the UI is built. The default is `"warn"` when `NODE_ENV` is `development` or `dev` (as for auth's `devStatic`), else `"fail"`, so a production image without its UI does not pass as healthy.
-- **`forge package`.** A deployable declares its UI in `.decohere.js` beside `docker`: `ui = { project: "@app/shop.web", output?: "dist", to?: "ui" }`. Packaging copies `<ui project>/<output>` to `.package/<to>/` and fails with "Build the UI first" when it is missing; it does not build the UI. The Dockerfile is unchanged, and `statics("/ui/", "ui")` finds the folder because the container runs in `.package/`.
+- **`forge package`.** A deployable declares its UI in `.decohere.js` beside `docker`: `ui = { project: "@app/shop.web", output?: "dist", to?: "ui" }`. Packaging copies `<ui project>/<output>` to `.package/<to>/` and fails with "Build the UI first" when it is missing; it does not build the UI. `forge build` does: a UI project has its own `build` script, and forge runs it instead of compiling the project, so `forge build && forge package` is the whole release. The Dockerfile is unchanged, and `statics("/ui/", "ui")` finds the folder because the container runs in `.package/`.
 - **Dependency.** `@fastify/static` (MIT, Fastify team) rather than a hand-written file server, for path safety, ranges, conditional requests and content types.
 
 ## Consequences
@@ -31,7 +31,7 @@ A module deploys as one image that runs its API and serves its UI's build. The t
 - Static requests are not access-logged by the HTTP package; a proxy or CDN logs them.
 - Files are looked up on each request (`wildcard: true`), so a rebuilt UI is served without a restart; a directory missing at start needs a restart.
 - Files are compressed on the fly ([ADR 0008](0008-response-compression-in-http.md)). Pre-compressed files, a UI-specific Content-Security-Policy and a per-mount rate limit are not done.
-- `forge package` needs the UI built first; forge does not run `vite build`.
+- `forge package` needs the UI built first, by `forge build` running the UI's own `build` script.
 - One UI per deployable can be declared for packaging (`ui` is one object), though `statics` can serve several.
 - A controller route under a non-root mount's prefix is shadowed or conflicts; keep the prefix for the UI.
 - The app is served only to requests that accept HTML. A client with no `Accept` header (bare `curl`) gets the JSON 404 for client routes; `GET /` and files do not depend on it.
@@ -42,4 +42,5 @@ A module deploys as one image that runs its API and serves its UI's build. The t
 - 2026-10-12: A root mount is allowed; the fallback decides by `Accept`, by registered routes and by `exclude`.
 - 2026-10-12: With a global prefix, the fallback's API boundary is the prefix and the OpenAPI path; without one, the first-segment rule.
 - 2026-10-14: The global prefix's own `exclude` list is gone: it had to be kept in step with the controllers. A controller opts out instead (`@Controller({ globalPrefix: false })`); the health controller does, `health({ underGlobalPrefix: true })` puts it back, and routes outside the prefix count as the API for the fallback.
+- 2026-11-09: `forge build` runs a UI project's own `build` script, so the UI no longer has to be built by hand before `forge package`.
 - 2026-11-06: `withStatic` became the `statics` setting of `http(...)`, when the builder's extensions became plugins ([ADR 0014](0014-package-names.md)).

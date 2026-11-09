@@ -1,6 +1,6 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { injectable } from "@decohere/crucible/decorators";
-import { detectPackageManager, packageManagerFromString } from "@decohere/devkit/interop";
+import { packageScriptCommand, startPackageScript } from "@decohere/devkit/interop";
 import { type Logger, scribe } from "@decohere/scribe";
 
 export type DeferredScriptStart = {
@@ -52,18 +52,15 @@ export class DeferredScriptRunner implements AsyncDisposable {
 	private readonly children: ChildProcess[] = [];
 
 	public start(options: DeferredScriptStart): ChildProcess {
-		const pm = detectPackageManager(options.workspaceRoot) ?? packageManagerFromString("pnpm");
+		const { command, args } = packageScriptCommand(options);
 		this.logger.info(
-			`deferred ${options.label} — running ${pm.name} run ${options.script} in ${options.cwd}`,
+			`deferred ${options.label} — running ${command} ${args.join(" ")} in ${options.cwd}`,
 		);
-		const child = spawn(pm.name, ["run", options.script], {
-			cwd: options.cwd,
+		const child = startPackageScript(options, {
 			// Its own process group, so stopping it reaches what the package manager started. A
 			// process in another group can't read the terminal, so it gets no stdin.
 			stdio: USE_PROCESS_GROUP ? ["ignore", "inherit", "inherit"] : "inherit",
 			detached: USE_PROCESS_GROUP,
-			env: process.env,
-			shell: false,
 		});
 		child.on("exit", (code, signal) => {
 			if (signal) return;
