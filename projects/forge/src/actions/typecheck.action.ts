@@ -6,6 +6,7 @@ import { Trace } from "@decohere/devkit/diagnostics";
 import { scribe } from "@decohere/scribe";
 import ts from "typescript";
 import { ForgeError } from "../errors.js";
+import { runOwnScripts } from "../services/own-scripts.js";
 import { TypeEmitter } from "../services/type-emitter.js";
 
 export type TypeCheckOptions = {
@@ -24,11 +25,17 @@ export class TypeCheck implements Action<TypeCheckOptions> {
 
 	public run = async (options: TypeCheckOptions): Promise<ActionResponse> => {
 		const projects = this.workspace.getProjects(options.configuration);
-		for (const project of projects) {
+		// A project with its own `check` script (`astro check`, `svelte-check`) is checked by it:
+		// only the framework's checker reads its component files and its virtual modules.
+		const checked = projects.filter((project) => project.ownScript("check") == null);
+		for (const project of checked) {
 			this.#logger.info(`Type-checking ${project.name}`);
 		}
 
-		const { diagnostics, formatted } = await this.typeEmitter.checkProject([...projects]);
+		const { diagnostics, formatted } =
+			checked.length > 0
+				? await this.typeEmitter.checkProject([...checked])
+				: { diagnostics: [], formatted: "" };
 		const errors = diagnostics.filter(
 			(diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error,
 		);
@@ -40,6 +47,16 @@ export class TypeCheck implements Action<TypeCheckOptions> {
 		if (formatted.length > 0) {
 			this.#logger.info(formatted);
 		}
+
+		await runOwnScripts(
+			projects.filter((project) => project.ownScript("check") != null),
+			{
+				script: "check",
+				verb: "Type-checking",
+				workspaceRoot: this.workspace.rootDir,
+				logger: this.#logger,
+			},
+		);
 
 		return ActionResponse.Success(TypeCheck.name);
 	};

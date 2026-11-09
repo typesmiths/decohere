@@ -1,14 +1,13 @@
-import path from "node:path";
 import { inject, injectable } from "@decohere/crucible/decorators";
 import type { Project } from "@decohere/workspace";
 import { Workspace } from "@decohere/workspace";
 import type { Action } from "@decohere/devkit/cli";
 import { ActionResponse } from "@decohere/devkit/cli";
 import { Trace } from "@decohere/devkit/diagnostics";
-import { packageScriptCommand, runPackageScript } from "@decohere/devkit/interop";
 import type { FileEx } from "@decohere/core/io";
 import { scribe } from "@decohere/scribe";
 import { ForgeError } from "../errors.js";
+import { runOwnScripts } from "../services/own-scripts.js";
 import { FileWriterService } from "../services/file-writer.service.js";
 import type { TransformResponse } from "../types/transform-response.model.js";
 import { type Transformer, TransformerKey } from "../types/transformer.type.js";
@@ -49,7 +48,17 @@ export class Build implements Action<BuildOptions> {
 			const messages = transformResults.map((responses) => responses.messages).join("\n");
 			throw new ForgeError(`Error building: ${messages}`);
 		}
-		await this.runOwnBuilds(projects.filter((project) => project.ownScript("build") != null));
+		// Projects with a builder of their own (Astro, Vite) build with their `build` script: their
+		// builder writes its output where its config says.
+		await runOwnScripts(
+			projects.filter((project) => project.ownScript("build") != null),
+			{
+				script: "build",
+				verb: "Building",
+				workspaceRoot: this.workspace.rootDir,
+				logger: this.#logger,
+			},
+		);
 
 		for (const transformer of this.transformers) {
 			if (transformer.watch && transformer.incrementalTransform$) {
@@ -78,26 +87,6 @@ export class Build implements Action<BuildOptions> {
 			this.#logger.info(`Building ${project.name}`);
 		}
 		return this.runTransformers(projects);
-	}
-
-	/**
-	 * Projects with a builder of their own (Astro, Vite) build with their `build` script, in their
-	 * folder: forge doesn't compile them, and their builder writes its output where its config says.
-	 */
-	private async runOwnBuilds(projects: readonly Project[]): Promise<void> {
-		const workspaceRoot = path.resolve(this.workspace.rootDir);
-		for (const project of projects) {
-			const script = { cwd: project.projectRoot, script: "build", workspaceRoot };
-			const { command, args } = packageScriptCommand(script);
-			const run = `${command} ${args.join(" ")}`;
-			this.#logger.info(`Building ${project.name} with its own build script (${run})`);
-			const code = await runPackageScript(script);
-			if (code !== 0) {
-				throw new ForgeError(
-					`${project.name}'s build script failed (${run} exited with ${code})`,
-				);
-			}
-		}
 	}
 
 	private async runTransformers(

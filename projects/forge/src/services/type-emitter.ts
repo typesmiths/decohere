@@ -1,4 +1,5 @@
-import type { Project, ProjectFileEvent, Workspace } from "@decohere/workspace";
+import path from "node:path";
+import type { Project, ProjectFileEvent, Tsconfig, Workspace } from "@decohere/workspace";
 import { invalidateCache } from "@decohere/core/caching";
 import { Trace } from "@decohere/devkit/diagnostics";
 import type { FileEx } from "@decohere/core/io";
@@ -35,6 +36,21 @@ export const DEFAULT_TYPE_EMITTER_OPTIONS: Readonly<ts.CompilerOptions> = {
 	types: [],
 	skipLibCheck: true,
 };
+
+/**
+ * A project with a tsconfig of its own (a site, a browser library) has chosen its settings, so
+ * what it leaves out means what it means to plain tsc: `lib` from its `target` (with the DOM),
+ * `types` as TypeScript finds them. These unset forge's faster defaults under it.
+ */
+const TSC_DEFAULTS: Readonly<ts.CompilerOptions> = { lib: undefined, types: undefined };
+
+/** The project's tsconfig is in its own folder, not the workspace's it falls back to. */
+function hasOwnTsconfig(project: Project, tsconfig: Tsconfig): boolean {
+	return (
+		tsconfig.filePath != null &&
+		path.dirname(path.resolve(tsconfig.filePath)) === path.resolve(project.projectRoot)
+	);
+}
 
 /**
  * Compiler options that TypeEmitter always enforces regardless of what the user's
@@ -151,11 +167,14 @@ export class TypeEmitter implements Transformer {
 		const projectData: TypeProgramProject[] = await Promise.all(
 			projects.map(async (proj) => {
 				const tsconfig = await proj.getTsConfig();
+				const compilerOptions = tsCompilerOptions(tsconfig);
 				return {
 					project: proj,
 					files: await proj.getAllFiles(),
 					tsconfig,
-					compilerOptions: tsCompilerOptions(tsconfig),
+					compilerOptions: hasOwnTsconfig(proj, tsconfig)
+						? { ...TSC_DEFAULTS, ...compilerOptions }
+						: compilerOptions,
 				};
 			}),
 		);
