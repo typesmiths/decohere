@@ -25,7 +25,14 @@ export class DbAction implements Action<DbOptions> {
 	public async run(options: DbOptions): Promise<ActionResponse> {
 		const picked = pickApi(this.apis(), options.api);
 		if (typeof picked === "string") return ActionResponse.Error(DbAction.name, picked);
-		await flux.run(picked.entry, { args: options.args, workspace: this.workspace });
+		try {
+			await flux.run(picked.entry, { args: options.args, workspace: this.workspace });
+		} catch (err) {
+			// db.ts disposes its app on the way out, and that stops scribe, which this CLI logs
+			// through too. So the error goes to stderr here, or nobody would see it.
+			console.error(describe(err));
+			return ActionResponse.Error(DbAction.name, `${DB_ENTRY} failed`);
+		}
 		return ActionResponse.Success(DbAction.name);
 	}
 
@@ -39,6 +46,15 @@ export class DbAction implements Action<DbOptions> {
 			}))
 			.sort((a, b) => a.folder.localeCompare(b.folder));
 	}
+}
+
+/**
+ * A db command's own refusal (`DbCommandError`: usage, pending migrations, no such data source)
+ * is written for the developer, so its message is enough. Anything else, such as a migration that
+ * failed, keeps its stack and cause.
+ */
+function describe(err: unknown): unknown {
+	return err instanceof Error && err.name === "DbCommandError" ? err.message : err;
 }
 
 /** The API to run, or why there isn't one. */

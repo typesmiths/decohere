@@ -16,7 +16,26 @@ const DB_TS = (api: string) => `const args: string[] = process.argv.slice(2);
 console.log(JSON.stringify({ api: "${api}", args, secret: process.env.DB_SPEC_VALUE ?? null }));
 `;
 
-function workspace(name: string, apis: string[]): string {
+/**
+ * A db.ts like the scaffold's: it builds the app, fails, and disposes the app on the way out.
+ * Disposing the app stops scribe, which the CLI logs through too.
+ */
+const FAILING_DB_TS = `import { Builder } from "@decohere/core/hosting";
+import { ServiceContainerBuilder } from "@decohere/crucible";
+
+const app = await Builder.create(new ServiceContainerBuilder(), { applicationName: "ws.api" }).build();
+try {
+	throw new Error("Apply the pending migrations first (db migrate)");
+} finally {
+	await app.dispose();
+}
+`;
+
+function workspace(
+	name: string,
+	apis: string[],
+	dbTs: (api: string) => string = DB_TS,
+): string {
 	const ws = join(parent, name);
 	const write = (relativePath: string, content: string) => {
 		const file = join(ws, relativePath);
@@ -36,7 +55,7 @@ function workspace(name: string, apis: string[]): string {
 			JSON.stringify({ name: `@ws/${api}`, type: "module", main: "src/main.ts" }),
 		);
 		write(`projects/${api}/src/main.ts`, "export {};\n");
-		write(`projects/${api}/src/db.ts`, DB_TS(api));
+		write(`projects/${api}/src/db.ts`, dbTs(api));
 	}
 	return ws;
 }
@@ -59,10 +78,12 @@ function decohere(cwd: string, ...argv: string[]) {
 describe("decohere db (real process)", () => {
 	let one: string;
 	let two: string;
+	let failing: string;
 
 	beforeAll(() => {
 		one = workspace("one", ["api"]);
 		two = workspace("two", ["shop", "admin"]);
+		failing = workspace("failing", ["api"], () => FAILING_DB_TS);
 	});
 
 	afterAll(() => {
@@ -120,6 +141,12 @@ describe("decohere db (real process)", () => {
 		expect(ran).toBeUndefined();
 		expect(status).toBe(1);
 		expect(stdout + stderr).toMatch(/lib/);
+	});
+
+	it("shows why db.ts failed, after the app it built has stopped", () => {
+		const { status, stdout, stderr } = decohere(failing, "db", "generate", "add-expiry");
+		expect(status).toBe(1);
+		expect(stdout + stderr).toContain("Apply the pending migrations first (db migrate)");
 	});
 
 	it("loads a .env file only when the command line names one", () => {
