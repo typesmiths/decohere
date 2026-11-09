@@ -12,6 +12,8 @@ export type TypeProgramProject = {
 	tsconfig: Tsconfig;
 	/** The compiler's parse of `tsconfig`. */
 	compilerOptions: ts.CompilerOptions;
+	/** Files the project's own tsconfig lists, checked beside its sources (`forge typecheck`). */
+	tsconfigFiles?: readonly string[];
 };
 
 type EmissionTarget = {
@@ -134,6 +136,7 @@ export class TypeEmissionProgram {
 			this.#compilerHost,
 			oldProgram,
 			this.#requiredOptions,
+			this.#group.flatMap(({ tsconfigFiles }) => tsconfigFiles ?? []),
 		);
 	}
 

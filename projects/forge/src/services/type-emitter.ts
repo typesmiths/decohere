@@ -9,7 +9,7 @@ import type ts from "typescript";
 import "../extensions/project.extensions.js";
 import { IncrementalWatch } from "../services/incremental-watch.js";
 import { OutputCache } from "../services/output-cache.js";
-import { tsCompilerOptions } from "../services/ts-compiler-options.js";
+import { tsCompilerOptions, tsconfigFileNames } from "../services/ts-compiler-options.js";
 import { TsProgramHost } from "../services/ts-program-host.js";
 import {
 	TypeEmissionProgram,
@@ -68,6 +68,8 @@ export const REQUIRED_TYPE_CHECK_OPTIONS: Readonly<ts.CompilerOptions> = {
 
 export type PrepareProgramsOptions = {
 	includeAllProjects?: boolean;
+	/** Check the files a project's own tsconfig lists too, as `tsc -p` would. */
+	includeTsconfigFiles?: boolean;
 	requiredCompilerOptions?: ts.CompilerOptions;
 };
 
@@ -132,6 +134,7 @@ export class TypeEmitter implements Transformer {
 	): Promise<{ diagnostics: ts.Diagnostic[]; formatted: string }> {
 		const programs = await this.preparePrograms(projectArrayLike, {
 			includeAllProjects: true,
+			includeTsconfigFiles: true,
 			requiredCompilerOptions: REQUIRED_TYPE_CHECK_OPTIONS,
 		});
 		const diagnostics: ts.Diagnostic[] = [];
@@ -168,13 +171,19 @@ export class TypeEmitter implements Transformer {
 			projects.map(async (proj) => {
 				const tsconfig = await proj.getTsConfig();
 				const compilerOptions = tsCompilerOptions(tsconfig);
+				// A tsconfig of the project's own is read as `tsc -p` reads it. The workspace's, which
+				// projects without one fall back to, was written for the whole repo: forge keeps its
+				// faster defaults and checks only the project's own sources.
+				const own = hasOwnTsconfig(proj, tsconfig);
 				return {
 					project: proj,
 					files: await proj.getAllFiles(),
 					tsconfig,
-					compilerOptions: hasOwnTsconfig(proj, tsconfig)
-						? { ...TSC_DEFAULTS, ...compilerOptions }
-						: compilerOptions,
+					compilerOptions: own ? { ...TSC_DEFAULTS, ...compilerOptions } : compilerOptions,
+					tsconfigFiles:
+						own && options.includeTsconfigFiles && tsconfig.filePath != null
+							? tsconfigFileNames(tsconfig.filePath)
+							: [],
 				};
 			}),
 		);

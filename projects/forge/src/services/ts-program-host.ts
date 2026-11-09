@@ -59,8 +59,9 @@ export class TsProgramHost {
 		host: ts.CompilerHost,
 		oldProgram?: ts.Program,
 		requiredOptions: ts.CompilerOptions = REQUIRED_TYPE_EMITTER_OPTIONS,
+		extraRootNames: readonly string[] = [],
 	): ts.Program {
-		const filePaths = files.map((f) => f.fullPath);
+		const filePaths = [...new Set([...files.map((f) => f.fullPath), ...extraRootNames])];
 		this.#invalidated.clear();
 		return createProgram(
 			filePaths,
