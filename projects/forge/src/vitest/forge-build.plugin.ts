@@ -1,13 +1,13 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import type { Project, Workspace } from "@decohere/workspace";
-import { sourceExtensions, WorkspaceFactory } from "@decohere/workspace";
+import { sourceExtensions } from "@decohere/workspace";
 import { FileEx } from "@decohere/core/io";
 import { ConsoleAdapter, scribe } from "@decohere/scribe";
 import type { Options } from "@swc/core";
 import { SwcTranspiler } from "../services/swc-transpiler.js";
 import { BuildTargets } from "../types/build-target.type.js";
-import { WorkspaceDefaults } from "../workspace.config.js";
+import { createWorkspace } from "../create-workspace.js";
 
 // Above fatal (60) so all standard levels are nooped when logLevel is "silent"
 const SILENT_LEVEL = 999;
@@ -48,10 +48,7 @@ export function forgeBuild(options?: ForgeBuildOptions) {
 		logger.debug(
 			`Loading Forge workspace (buildConfig: ${buildConfig}, workspaceRoot: ${workspaceRoot})`,
 		);
-		workspace = await WorkspaceFactory.create({
-			...WorkspaceDefaults,
-			rootDir: workspaceRoot,
-		});
+		workspace = await createWorkspace({ rootDir: workspaceRoot });
 	};
 
 	const baseConfigFor = (project: Project | undefined): Options => {

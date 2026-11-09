@@ -33,7 +33,12 @@ Packages do **not** have to live under `projects/` — that is only the default 
 
 ### Optional `.decohere.js`
 
-If the file is missing, the workspace package uses the defaults above. Arrays in this file **replace** defaults (they are not concatenated).
+If the file is missing, the workspace package uses the defaults above. The file overrides the defaults, including a tool's own (forge's `configurations` and `copyFiles`). Arrays in it **replace** the defaults, except `ignoreProjects` and `ignore`, which **add** to them: list only what you leave out.
+
+```js
+// Keep a Pulumi program under projects/ out of forge and flux. node_modules, __fixtures__ and dist stay ignored.
+export default { ignoreProjects: ["projects/infra/**"] };
+```
 
 ```js
 /** @type {import("@decohere/workspace").WorkspaceOptions} */
@@ -81,5 +86,7 @@ const workspace = await WorkspaceFactory.create({
 const projects = workspace.getProjects("debug");
 const aliases = workspace.getPackageAliases("debug");
 ```
+
+A tool with defaults of its own passes them as the second argument, `WorkspaceFactory.create(options, defaults)`, so `.decohere.js` can override them. Anything in `options` overrides the user's file.
 
 Pass a pre-built `workspace` into Forge/Flux in tests to skip filesystem discovery.
