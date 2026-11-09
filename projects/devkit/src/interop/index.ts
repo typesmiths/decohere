@@ -12,6 +12,8 @@ export * as npm from "./npm/npm.types.js";
 // << Pnpm >>
 export * from "./pnpm/pnpm.js";
 export * as pnpm from "./pnpm/pnpm.types.js";
+// << Package scripts >>
+export * from "./scripts/package-script.js";
 // << Shell >>
 export * from "./shell/shell.js";
 export * as shell from "./shell/shell.types.js";

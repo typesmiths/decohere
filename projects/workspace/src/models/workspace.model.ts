@@ -113,9 +113,13 @@ export class Workspace extends mixwith(HasPackageJson, HasTsConfig) {
 		});
 	}
 
-	public async watch(configuration: string) {
+	/** Watch the projects' source files; `include` limits it to some of them. */
+	public async watch(
+		configuration: string,
+		include: (project: Project) => boolean = () => true,
+	) {
 		this.stopWatching();
-		const projects = this.getProjects(configuration);
+		const projects = this.getProjects(configuration).filter(include);
 		this.#watchedProjects = projects;
 
 		for (const project of projects) {

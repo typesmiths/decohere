@@ -10,6 +10,7 @@ export type { PackageExports, RepositoryReference } from "./models/package-json.
 export { PackageJson } from "./models/package-json.model.js";
 export type { ProjectConfig, ProjectSeed } from "./models/project.model.js";
 export { Project } from "./models/project.model.js";
+export { projectScripts } from "./models/project-scripts.js";
 export { sourceExtensions } from "./models/source-extensions.js";
 export type { ProjectFileEvent } from "./models/project-file-event.js";
 export type { CompilerOptions } from "./models/tsconfig.model.js";

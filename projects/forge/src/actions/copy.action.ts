@@ -29,18 +29,22 @@ export class Copy implements Action<CopyOptions> {
 		}
 
 		await Promise.all(
-			this.workspace.getProjects(options.configuration).map(async (proj) => {
-				const cwd = proj.projectDirectory;
-				const root = proj.getOutDir();
+			// A project with its own build script owns its output: nothing of it goes in forge's.
+			this.workspace
+				.getProjects(options.configuration)
+				.filter((proj) => proj.ownScript("build") == null)
+				.map(async (proj) => {
+					const cwd = proj.projectDirectory;
+					const root = proj.getOutDir();
 
-				// Workspace + configuration copyFiles → package root (historic behaviour).
-				const rootFiles = await findFiles(proj.copyFiles, { cwd });
-				await Promise.all(rootFiles.map((file) => this.copyFileToOut(file, root)));
-				await this.copyWorkspaceLicense(proj, rootFiles, root);
+					// Workspace + configuration copyFiles → package root (historic behaviour).
+					const rootFiles = await findFiles(proj.copyFiles, { cwd });
+					await Promise.all(rootFiles.map((file) => this.copyFileToOut(file, root)));
+					await this.copyWorkspaceLicense(proj, rootFiles, root);
 
-				// Configuration-only globs → each pack target outDir (next to emitted JS).
-				await this.copyColocatedPackAssets(proj, cwd);
-			}),
+					// Configuration-only globs → each pack target outDir (next to emitted JS).
+					await this.copyColocatedPackAssets(proj, cwd);
+				}),
 		);
 
 		return ActionResponse.Success(Copy.name);
