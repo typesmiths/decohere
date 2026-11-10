@@ -7,7 +7,8 @@
  *
  * Examples are argv permutations only.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { vol } from "memfs";
 import { basename, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resetMemfs } from "@decohere/testing";
@@ -137,7 +138,7 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 		existsSync(join(root, "projects/api/src/main.ts")),
 		`${root}/projects/api/src/main.ts`,
 	).toBe(true);
-	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain("health()");
+	expect(readFileSync(join(root, "projects/api/src/app.ts"), "utf8")).toContain("health()");
 	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain(
 		"Number(process.env.PORT ?? 3000)",
 	);
@@ -885,7 +886,7 @@ describe("auth0 login and configure", () => {
 
 const POSTGRES = [
 	"--database",
-	"postgres/typeorm",
+	"postgres/mikro-orm",
 	"--auth",
 	"none",
 	"--install",
@@ -893,7 +894,7 @@ const POSTGRES = [
 ] as const;
 
 describe("decohere add auth0", () => {
-	const main = "/my-app/projects/api/src/main.ts";
+	const main = "/my-app/projects/api/src/app.ts";
 
 	async function addAuth0(): Promise<number> {
 		mockIsInstalled.mockReturnValue(true);
@@ -932,7 +933,22 @@ describe("decohere add auth0", () => {
 		expect(files.map((file) => readFileSync(file, "utf8"))).toEqual(before);
 	});
 
-	it("leaves a main.ts it can't change safely and says what to add", async () => {
+	it("patches main.ts in a project from before app.ts, where main.ts built the app", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		const older = "/my-app/projects/api/src/main.ts";
+		const built = readFileSync(main, "utf8").replace(
+			"export function createApp() {\n\treturn ",
+			"const app = await ",
+		);
+		writeFileSync(older, built);
+		vol.unlinkSync(main);
+
+		expect(await addAuth0()).toBe(0);
+
+		expect(readFileSync(older, "utf8")).toContain(".use(auth())");
+	});
+
+	it("leaves an app.ts it can't change safely and says what to add", async () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
 		const custom = "export const app = buildMyOwnApp();\n";
 		writeFileSync(main, custom);
@@ -944,7 +960,7 @@ describe("decohere add auth0", () => {
 		expect(await addAuth0()).toBe(0);
 
 		expect(readFileSync(main, "utf8")).toBe(custom);
-		expect(logs.join("\n")).toContain("projects/api/src/main.ts");
+		expect(logs.join("\n")).toContain("projects/api/src/app.ts");
 		expect(logs.join("\n")).toContain('import { auth } from "@decohere/http";');
 	});
 
@@ -1049,9 +1065,12 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(env).not.toMatch(/^DB_NAME=/m);
 		expect(env).not.toContain("PASSWORD");
 
-		const main = readFileSync("/my-app/projects/api/src/main.ts", "utf8");
-		expect(main).toContain("health()");
-		expect(main).toContain('typeOrm({ name: "api"');
+		const app = readFileSync("/my-app/projects/api/src/app.ts", "utf8");
+		expect(app).toContain("health()");
+		expect(app).toContain(
+			'mikroOrm({ name: "api", entities: [SampleEntityMapping], repositories: [SampleEntityRepository], database: postgres, migrations })',
+		);
+		expect(app).toContain('import { migrations } from "./migrations/index.js";');
 
 		const compose = readFileSync("/my-app/.devcontainer/docker-compose.yml", "utf8");
 		expect(compose).toContain("samples-my-app-postgres");
@@ -1098,28 +1117,41 @@ describe("each API owns a database on the shared Postgres instance", () => {
 
 		const depKeys = Object.keys(rootPkg.dependencies);
 		expect(depKeys).toEqual([...depKeys].sort((a, b) => a.localeCompare(b, "en")));
-		expect(rootPkg.dependencies.tsx).toBeTruthy();
-		expect(rootPkg.scripts["db:migrate"]).toContain("migration:run");
-		expect(rootPkg.scripts["db:migrate"]).toContain("typeorm.data-source.ts");
-		expect(rootPkg.scripts["db:migrate:generate"]).toContain("migration:generate");
-		expect(rootPkg.scripts["db:migrate:api"]).toContain("projects/api");
+		expect(rootPkg.dependencies.tsx).toBeUndefined();
+		expect(rootPkg.dependencies.typeorm).toBeUndefined();
+		expect(rootPkg.dependencies["@decohere/data-mikro-orm"]).toBeTruthy();
+		expect(rootPkg.dependencies["@mikro-orm/postgresql"]).toBeTruthy();
+		// `pnpm decohere db` runs the migrations, so no script shares a name with db:up and the rest.
+		expect(rootPkg.scripts.db).toBeUndefined();
+		expect(rootPkg.scripts["db:api"]).toBeUndefined();
 
 		expect(existsSync("/my-app/docs/database.md")).toBe(true);
 		const dbDocs = readFileSync("/my-app/docs/database.md", "utf8");
-		expect(dbDocs).toMatch(/synchronize: true/);
+		expect(dbDocs).toMatch(/migrateOnStart: true/);
 		expect(dbDocs).toMatch(/migrations only/i);
-		expect(dbDocs).toContain("db:migrate");
+		expect(dbDocs).toContain("pnpm decohere db generate");
+		expect(dbDocs).not.toMatch(/pnpm db (generate|migrate|status|new|revert)/);
 		expect(dbDocs).toMatch(/Adminer is \*\*not\*\* scaffolded/i);
 		expect(dbDocs).toContain("image: adminer");
 
-		expect(existsSync("/my-app/projects/api/src/typeorm.data-source.ts")).toBe(true);
-		const dataSource = readFileSync("/my-app/projects/api/src/typeorm.data-source.ts", "utf8");
-		expect(dataSource).toContain("API_DB_MIGRATE_USER");
-		expect(dataSource).toContain("synchronize: false");
-		expect(existsSync("/my-app/projects/api/src/migrations/.gitkeep")).toBe(true);
+		expect(existsSync("/my-app/projects/api/src/typeorm.data-source.ts")).toBe(false);
+		expect(readFileSync("/my-app/projects/api/src/db.ts", "utf8")).toContain(
+			"await db.run(app, process.argv.slice(2)",
+		);
+		expect(
+			readFileSync("/my-app/projects/api/src/mappings/sample.mapping.ts", "utf8"),
+		).toContain("defineEntity({");
+		const migrations = readdirSync("/my-app/projects/api/src/migrations").sort();
+		expect(migrations).toEqual([
+			expect.stringMatching(/^\d{8}-\d{6}-create-sample-entity\.ts$/),
+			"index.ts",
+		]);
+		expect(readFileSync("/my-app/projects/api/src/migrations/index.ts", "utf8")).toContain(
+			`from "./${migrations[0].replace(/\.ts$/, ".js")}";`,
+		);
 	});
 
-	it("emits per-API migrate scripts and data sources for named APIs", async () => {
+	it("emits per-API db scripts and migrations for named APIs", async () => {
 		await runCliAsNodeBin([
 			"create",
 			"webapi",
@@ -1134,12 +1166,9 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		const pkg = JSON.parse(readFileSync("/my-app/package.json", "utf8")) as {
 			scripts: Record<string, string>;
 		};
-		expect(pkg.scripts["db:migrate:billing"]).toContain("projects/billing");
-		expect(pkg.scripts["db:migrate:generate:billing"]).toContain("migration:generate");
-		expect(existsSync("/my-app/projects/billing/src/typeorm.data-source.ts")).toBe(true);
-		expect(
-			readFileSync("/my-app/projects/billing/src/typeorm.data-source.ts", "utf8"),
-		).toContain("BILLING_DB_MIGRATE_USER");
+		expect(pkg.scripts["db:billing"]).toBeUndefined();
+		expect(existsSync("/my-app/projects/billing/src/db.ts")).toBe(true);
+		expect(existsSync("/my-app/projects/billing/src/migrations/index.ts")).toBe(true);
 	});
 
 	it("gives each named API its own database on the same host", async () => {
@@ -1168,11 +1197,11 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(billingDb).toBeTruthy();
 		expect(apiDb).not.toBe(billingDb);
 
-		expect(readFileSync("/my-app/projects/api/src/main.ts", "utf8")).toContain(
-			'typeOrm({ name: "api"',
+		expect(readFileSync("/my-app/projects/api/src/app.ts", "utf8")).toContain(
+			'mikroOrm({ name: "api"',
 		);
-		expect(readFileSync("/my-app/projects/billing/src/main.ts", "utf8")).toContain(
-			'typeOrm({ name: "billing"',
+		expect(readFileSync("/my-app/projects/billing/src/app.ts", "utf8")).toContain(
+			'mikroOrm({ name: "billing"',
 		);
 
 		const compose = readFileSync("/my-app/.devcontainer/docker-compose.yml", "utf8");
@@ -1264,15 +1293,11 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		const env = readFileSync("/my-app/.env", "utf8");
 		expect(env).toContain("API_DB_HOST=postgres");
 		expect(env).toContain("BILLING_DB_HOST=postgres");
-		expect(readFileSync("/my-app/projects/billing/src/main.ts", "utf8")).toContain(
-			'typeOrm({ name: "billing"',
+		expect(readFileSync("/my-app/projects/billing/src/app.ts", "utf8")).toContain(
+			'mikroOrm({ name: "billing"',
 		);
 
-		const pkg = JSON.parse(readFileSync("/my-app/package.json", "utf8")) as {
-			scripts: Record<string, string>;
-		};
-		expect(pkg.scripts["db:migrate"]).toContain("projects/api");
-		expect(pkg.scripts["db:migrate:billing"]).toContain("projects/billing");
-		expect(existsSync("/my-app/projects/billing/src/typeorm.data-source.ts")).toBe(true);
+		expect(existsSync("/my-app/projects/api/src/db.ts")).toBe(true);
+		expect(existsSync("/my-app/projects/billing/src/db.ts")).toBe(true);
 	});
 });

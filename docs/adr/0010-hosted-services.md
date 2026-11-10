@@ -1,7 +1,7 @@
 # 0010. Background work runs as hosted services, stopped before the container
 
 - **Status:** Proposed
-- **Date:** 2026-10-14 · updated 2026-11-04
+- **Date:** 2026-10-14 · updated 2026-11-08
 
 ## Context
 
@@ -11,6 +11,7 @@ Apps need work that runs for the life of the app outside a request, such as load
 
 - **`HostedService`**: `start(signal)`, optional `stop()`, optional `check()`. Registered with `builder.withHostedService(Type)` as a singleton, injectable by its class.
 - **`start()` is awaited**, in registration order, before the HTTP server listens. It prepares what must be ready before traffic and returns; long work goes in the background. A throw fails `app.start()` after stopping the services already started. Not awaiting was rejected: a failed start would go unnoticed, and requests could reach a service that had not started.
+- **Start steps change the world; building doesn't.** `builder.registerStartStep(step)` runs `step(container)` when the app starts, in registration order, before hosted services and the server. Work that changes things outside the process goes there, such as a provider's `migrateOnStart`, `synchronize` and seed. Building an app only wires and connects it, so a tool or a test that builds it without starting it (the db commands, through `app.services`) changes nothing. A step that throws fails `app.start()` before any hosted service starts. A step is not a hosted service because it belongs to a plugin's data, not to a class the container builds, and it has nothing to stop.
 - **Warm-up is readiness**: a started service that cannot serve yet throws from `check()`, and `GET /ready` answers 503. There is no separate "starting" state.
 - **Stopping is one path** (`app.dispose()`: stop, SIGTERM/SIGINT, Flux reboot): abort the signal at once (also during a running `start()`), drain HTTP, await each `stop()` in reverse order (after a running `start()` settles; all run even if one throws), then dispose the container. Services stop while what they use is still open.
 - **The container closes DataSources**: `typeOrm()` creates a `ManagedDataSource` (with `Symbol.asyncDispose`) and resolves it right after build, so the root container owns it among its first instances and closes it last.
@@ -31,3 +32,4 @@ Apps need work that runs for the life of the app outside a request, such as load
 - 2026-11-04: `Builder`, `App` and hosted services move to `@decohere/core` rather than a new `@decohere/host` package ([ADR 0014](0014-package-names.md)).
 - 2026-11-06: They moved. A worker needs neither `http` nor Fastify.
 - 2026-11-06: `withTypeOrm` became the `typeOrm()` plugin ([ADR 0014](0014-package-names.md)).
+- 2026-11-08: Start steps added, and the data providers' `synchronize` and seed moved from build to start, with `migrateOnStart` ([ADR 0024](0024-default-orm.md)).

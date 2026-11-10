@@ -13,3 +13,8 @@ export * from "./tracking/row-store.js";
 export * from "./tracking/tracking-unit-of-work.js";
 export * from "./data-source-policy.js";
 export * from "./data-sources.js";
+export * from "./migrations/db-command.js";
+export * from "./migrations/migration.js";
+export * from "./migrations/migration-files.js";
+export * from "./migrations/migration-target.js";
+export * from "./migrations/migrator.js";

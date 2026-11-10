@@ -51,7 +51,7 @@ How we test without those: [testing](../testing/).
 
 ## 2. Vendors stay at the composition edge
 
-Application and domain code depend on Decohere contracts; vendor code lives in an adapter chosen at the app's composition root. Fastify, Pino, TypeORM/Postgres and Auth0 are today's defaults, not requirements. Switching one should be a provider and config change, not a rewrite. Examples: Scribe's facade and its writers, `data` and its providers (`data-mikro-orm`, `data-typeorm`), `config`'s replaceable sources.
+Application and domain code depend on Decohere contracts; vendor code lives in an adapter chosen at the app's composition root. Fastify, Pino, MikroORM/Postgres and Auth0 are today's defaults, not requirements. Switching one should be a provider and config change, not a rewrite. Examples: Scribe's facade and its writers, `data` and its providers (`data-mikro-orm`, `data-typeorm`), `config`'s replaceable sources.
 
 ## 3. One owner per fact
 
@@ -64,6 +64,6 @@ A fact has one owner, and consumers ask it. Flux and Forge both call `workspace.
 - **Dispose and reload:** Flux calls `Symbol.asyncDispose` on the entry's default export, so `export default app` is enough at the composition root. `App.dispose` stops hosted services (`withHostedService`, [ADR 0010](../adr/0010-hosted-services.md)), then disposes the container, then Scribe. Long-lived services implement `Symbol.asyncDispose`.
 - **Logging:** libraries log through Scribe, never a concrete logger.
 - **Configuration:** `@decohere/config` sources behind tokens.
-- **Data:** `@decohere/data` repositories over a request-scoped unit of work that tracks changes and writes them on `commit()`; queries in Decohere's `Query<T>`, never an ORM's options. TypeORM `DataSource`s are singletons, injected with `@injectDataSource`.
+- **Data:** `@decohere/data` repositories over a request-scoped unit of work that tracks changes and writes them on `commit()`; queries in Decohere's `Query<T>`, never an ORM's options. Migrations are Decohere's own, the same with either provider; building an app changes nothing in its database, and starting it migrates (in development), synchronizes and seeds.
 - **Build and test:** Forge builds packages; tests compile through `@decohere/forge/vitest` (`forgeBuild`).
 - **Scaffolded apps:** `projects/<api>/`, with `main.ts` as the composition root.

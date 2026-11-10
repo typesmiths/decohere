@@ -13,7 +13,10 @@ import {
 } from "../auth0-commands.js";
 import { AUTH_CONFIG_SECTION, AuthConfigModel } from "../models/auth-config.model.js";
 import { ControllerSourceFile } from "../models/controller-source-file.model.js";
+import { type DatabaseProvider, type Orm, ormOf } from "../database-provider.js";
 import type { MainSourceFile } from "../models/main-source-file.model.js";
+import { MigrationsModel } from "../models/migrations.model.js";
+import { adminSeed, userTable } from "./orm-templates.js";
 import * as auth0Cli from "./auth0-cli.js";
 
 export type AuthOptions = {
@@ -22,34 +25,12 @@ export type AuthOptions = {
 	audience?: string;
 	/** Set by the questions. Nothing changes on Auth0 until they're all answered. */
 	auth0ApiAction?: "create" | "update";
-	databaseProvider?: "none" | "postgres/typeorm";
+	databaseProvider?: DatabaseProvider;
 	adminUsername?: string;
 	adminPassword?: string;
 };
 
 const ADMIN_ROLE = "admin";
-
-const USER_ENTITY_TS = `import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
-
-@Entity()
-export class UserEntity {
-\t@PrimaryGeneratedColumn()
-\tpublic id!: number;
-
-\t@Column({ unique: true })
-\tpublic sub!: string;
-
-\t@Column({ type: "varchar", nullable: true })
-\tpublic email!: string | null;
-
-\t@Column()
-\tpublic displayName!: string;
-
-\t/** App-owned roles. The \`admin\` role grants CASL \`manage\`/\`all\` (wildcard). */
-\t@Column({ type: "simple-json", default: "[]" })
-\tpublic roles!: string[];
-}
-`;
 
 const USER_REPOSITORY_TS = `import { injectable } from "@decohere/crucible/decorators";
 import { injectUnitOfWork, type IUnitOfWork, Repository } from "@decohere/data";
@@ -216,7 +197,7 @@ async function getAuth0Options(
 		console.log(`  \u2713 Selected: ${audience}`);
 	}
 
-	const withLocalUsers = cliOptions.databaseProvider === "postgres/typeorm";
+	const withLocalUsers = ormOf(cliOptions.databaseProvider) != null;
 	let adminUsername: string | undefined;
 	let adminPassword: string | undefined;
 	if (withLocalUsers) {
@@ -275,11 +256,12 @@ function createAuth0AdminUser(
 	}
 }
 
-function scaffoldLocalUserProfile(workspace: WorkspaceScaffold): void {
+function scaffoldLocalUserProfile(workspace: WorkspaceScaffold, orm: Orm): void {
+	const user = userTable(orm);
 	for (const project of workspace.getProjects()) {
 		project
 			.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
-			?.addEntity({ className: "UserEntity", importPath: "./entities/user.entity.js" })
+			?.addEntity(user.entity)
 			.addRepository({
 				className: "UserEntityRepository",
 				importPath: "./repositories/user.repository.js",
@@ -291,25 +273,21 @@ function scaffoldLocalUserProfile(workspace: WorkspaceScaffold): void {
 			})
 			.addImport("defineAbilitiesFor", "./auth/ability.factory.js")
 			.addImport("mapPrincipal", "./auth/ability.factory.js")
-			.setTypeOrmSeed(
-				[
-					"const sub = process.env.AUTH0_ADMIN_USER_SUB;",
-					"if (!sub) return;",
-					"const repo = dataSource.getRepository(UserEntity);",
-					"const existing = await repo.findOne({ where: { sub } });",
-					"if (existing) return;",
-					"await repo.save(repo.create({",
-					"  sub,",
-					"  email: process.env.AUTH0_ADMIN_USER_EMAIL ?? null,",
-					'  displayName: process.env.AUTH0_ADMIN_USERNAME ?? "admin",',
-					'  roles: ["admin"],',
-					"}));",
-				].join(" "),
-			);
+			.setSeed(adminSeed(orm));
+		if (orm === "mikro-orm") {
+			// The seed creates a UserEntity; the provider is given its mapping.
+			project
+				.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
+				?.addImport("UserEntity", "./entities/user.entity.js");
+		}
+		(
+			project.getModel<MigrationsModel>(WELL_KNOWN_FILES.MIGRATIONS) ??
+			project.addModel(new MigrationsModel())
+		).add(user.migration.name, user.migration.up, user.migration.down);
 
 		project.addFile({
 			files: () => [
-				{ filePath: "src/entities/user.entity.ts", content: USER_ENTITY_TS },
+				...user.files,
 				{ filePath: "src/repositories/user.repository.ts", content: USER_REPOSITORY_TS },
 				{ filePath: "src/services/user.service.ts", content: USER_SERVICE_TS },
 				{ filePath: "src/auth/ability.factory.ts", content: ABILITY_FACTORY_TS },
@@ -387,7 +365,8 @@ function scaffold(workspace: WorkspaceScaffold, chosen: AuthOptions): void {
 	};
 
 	const resource = "Hello";
-	const withLocalUsers = options.databaseProvider === "postgres/typeorm";
+	const orm = ormOf(options.databaseProvider);
+	const withLocalUsers = orm != null;
 
 	for (const controller of workspace.getModels(ControllerSourceFile)) {
 		controller
@@ -428,7 +407,7 @@ function scaffold(workspace: WorkspaceScaffold, chosen: AuthOptions): void {
 	}
 
 	if (withLocalUsers) {
-		scaffoldLocalUserProfile(workspace);
+		scaffoldLocalUserProfile(workspace, orm);
 		for (const project of workspace.getProjects()) {
 			project
 				.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)

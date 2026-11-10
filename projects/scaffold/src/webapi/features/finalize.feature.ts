@@ -1,3 +1,4 @@
+import type { DatabaseProvider } from "../database-provider.js";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PackageManager } from "@decohere/devkit/interop";
@@ -28,7 +29,7 @@ let _shouldInstall = true;
 type FinalizeOptions = {
 	installDependencies?: "yes" | "no";
 	add?: boolean;
-	databaseProvider?: "none" | "postgres/typeorm";
+	databaseProvider?: DatabaseProvider;
 	authProvider?: "auth0" | "none";
 };
 

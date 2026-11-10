@@ -1,13 +1,12 @@
 // mikroOrm() in a running app, against Postgres, the way a generated app uses it in development:
-// it bootstraps the database and roles, creates the tables, seeds, gives each request its own
-// unit of work, reports ready, and closes when the app stops. Needs Docker: `pnpm test:docker`.
+// building it bootstraps the database and roles and connects; starting it creates the tables and
+// seeds. Each request gets its own unit of work, and it closes when the app stops. Needs Docker: `pnpm test:docker`.
 import "reflect-metadata";
-import { Builder, type BuilderPlugin } from "@decohere/core/hosting";
+import { Builder } from "@decohere/core/hosting";
 import {
 	ConfigurationServiceToken,
 	type IConfigurationService,
 } from "@decohere/core/configuration";
-import type { IContainer } from "@decohere/core/composition";
 import type { Constructable } from "@decohere/core/reflection";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import {
@@ -47,16 +46,6 @@ class StaticConfig implements IConfigurationService {
 	}
 }
 
-/** The app's container, which App keeps to itself, caught the way a plugin sees it. */
-function containerOf() {
-	let container: IContainer;
-	const plugin: BuilderPlugin = (builder) =>
-		builder.registerPostBuildStep((c) => {
-			container = c;
-		});
-	return { plugin, get: () => container };
-}
-
 describe("mikroOrm() in an app", () => {
 	let server: PostgresContainer;
 
@@ -74,7 +63,7 @@ describe("mikroOrm() in an app", () => {
 		await server?.stop();
 	});
 
-	it("bootstraps, creates tables, seeds, and gives each request its own unit of work", async () => {
+	it("bootstraps when built, creates tables and seeds when started, and gives each request its own unit of work", async () => {
 		const connection: ConnectionInfo = {
 			name: "notes",
 			provider: "postgres",
@@ -92,7 +81,6 @@ describe("mikroOrm() in an app", () => {
 			migrateUsername: "notes_migrate",
 			migratePassword: "migrate-pw",
 		};
-		const probe = containerOf();
 		const app = await Builder.create(new ServiceContainerBuilder(), {
 			applicationName: "notes.api",
 		})
@@ -102,31 +90,40 @@ describe("mikroOrm() in an app", () => {
 			.use(
 				mikroOrm({
 					entities: [NoteSchema],
-					bootstrap: postgres.bootstrap,
+					database: postgres,
 					seed: async (orm) => {
 						const em = orm.em.fork();
 						await em.persist(new Note("seeded")).flush();
 					},
 				}),
 			)
-			.use(probe.plugin)
 			.build();
+		const orm = app.services.resolve<MikroORM>(MikroOrmToken);
+		const table = async () =>
+			(
+				await orm.em
+					.getConnection()
+					.execute<{ found: string | null }[]>("select to_regclass('notes.note') as found")
+			)[0].found;
+		expect(await table()).toBeNull();
+
+		await app.start({ port: 0, shutdownSignals: false });
+		expect(await table()).toBe("notes.note");
 
 		{
-			await using scope = probe.get().beginScope("first request");
+			await using scope = app.services.beginScope("first request");
 			const uow = scope.resolve<IUnitOfWork>(DEFAULT_DATA_SOURCE);
 			expect(scope.resolve(DEFAULT_DATA_SOURCE)).toBe(uow);
 			uow.add(new Note("from a request"));
 			await uow.commit();
 		}
 		{
-			await using scope = probe.get().beginScope("second request");
+			await using scope = app.services.beginScope("second request");
 			const uow = scope.resolve<IUnitOfWork>(DEFAULT_DATA_SOURCE);
 			const notes = await uow.find(Note, { orderBy: { id: "asc" } });
 			expect(notes.map((n) => n.text)).toEqual(["seeded", "from a request"]);
 		}
 
-		const orm = probe.get().resolve<MikroORM>(MikroOrmToken);
 		const [who] = await orm.em
 			.getConnection()
 			.execute<{ user: string; app: string }[]>(

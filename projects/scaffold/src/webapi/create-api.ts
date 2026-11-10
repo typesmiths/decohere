@@ -1,3 +1,4 @@
+import type { DatabaseProvider } from "./database-provider.js";
 import { existsSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { DockerCompose } from "../models/compose.model.js";
@@ -54,7 +55,7 @@ export type ApiOptions = {
 	/** Add APIs to an existing Decohere workspace instead of creating a new one. */
 	add?: boolean;
 	authProvider?: "auth0" | "none";
-	databaseProvider?: "none" | "postgres/typeorm";
+	databaseProvider?: DatabaseProvider;
 	installDependencies?: "yes" | "no";
 };
 

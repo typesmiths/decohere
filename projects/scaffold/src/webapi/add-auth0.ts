@@ -9,7 +9,7 @@ const CONFIGURATION_CALL = /^([ \t]*)\.use\(config\([^\n]*\)\)[ \t]*$/m;
 const IMPORT_STATEMENT = /^import\b[^;]*;[ \t]*$/gm;
 
 /**
- * Add auth to the text of a main.ts, or return undefined if it can't be done safely. Only
+ * Add auth to the text of an app.ts (or an older main.ts), or return undefined if it can't be done safely. Only
  * handles the shape the scaffolder generates, because this file belongs to the user.
  */
 export function addAuthToMain(source: string): string | undefined {
@@ -42,13 +42,17 @@ function addAuthToConfig(targetDir: string): void {
 	writeFileSync(path, `${text}${separator}${AUTH_CONFIG_SECTION}`);
 }
 
-/** Wire auth into each API. Returns the main.ts files the user has to change by hand. */
+/** Wire auth into each API. Returns the files (app.ts, or main.ts) the user has to change by hand. */
 export function addAuthToWorkspace(targetDir: string): string[] {
 	addAuthToConfig(targetDir);
 
 	const byHand: string[] = [];
 	for (const apiName of listExistingApiNames(targetDir)) {
-		const relativePath = join("projects", apiName, "src/main.ts");
+		// Generated apps build in app.ts; older ones did it all in main.ts.
+		const app = join("projects", apiName, "src/app.ts");
+		const relativePath = existsSync(join(targetDir, app))
+			? app
+			: join("projects", apiName, "src/main.ts");
 		const path = join(targetDir, relativePath);
 		const patched = existsSync(path) ? addAuthToMain(readFileSync(path, "utf8")) : undefined;
 		if (patched == null) {

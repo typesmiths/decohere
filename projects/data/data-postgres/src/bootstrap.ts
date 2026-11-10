@@ -24,7 +24,7 @@ const SHARED_FIELDS = ["auth", "adminUser", "migrateUsername"] as const;
  * other: in parallel they would race to create the same database and roles. Running it again
  * changes nothing.
  *
- * Pass it to a provider as `bootstrap: postgres.bootstrap`; runners and scripts that open their own
+ * A provider given `database: postgres` runs it as `postgres.bootstrap`; runners and scripts that open their own
  * connection can call it directly.
  */
 export async function bootstrapDataSources(

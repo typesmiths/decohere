@@ -26,6 +26,11 @@ export type ConnectionInfo = {
 	database: string;
 	port: number;
 	synchronize: boolean;
+	/**
+	 * Apply pending migrations when the app starts, before it serves. For development: elsewhere a
+	 * release step runs `db migrate`, as the migrate role. Not with `synchronize`.
+	 */
+	migrateOnStart?: boolean;
 	seed: boolean;
 	/** Runtime app role (TypeORM connection). */
 	username: string;

@@ -1,6 +1,7 @@
 import type { Command } from "commander";
 import { resolveTargetDir } from "../resolve-target-dir.js";
 import { parseApiNames } from "./api-name.js";
+import { DATABASE_PROVIDERS, parseDatabaseProvider } from "./database-provider.js";
 import type { ApiOptions } from "./create-api.js";
 import { scaffoldApi } from "./create-api.js";
 
@@ -11,7 +12,7 @@ export function collectName(value: string, previous: string[]): string[] {
 
 export function addWebapiFeatureOptions(cmd: Command): Command {
 	return cmd
-		.option("--database <provider>", "Database provider: none | postgres/typeorm")
+		.option("--database <provider>", `Database provider: ${DATABASE_PROVIDERS.join(" | ")}`)
 		.option("--auth <provider>", "Auth provider: none | auth0")
 		.option("-y, --yes", "Install dependencies without prompting")
 		.option("--install <mode>", "Dependency install mode: ask | yes | no", "ask");
@@ -30,7 +31,7 @@ export function toApiOptions(
 			: extra.names;
 	return {
 		d: resolveTargetDir(directory, typeof opts.d === "string" ? opts.d : undefined),
-		databaseProvider: opts.database as ApiOptions["databaseProvider"],
+		databaseProvider: parseDatabaseProvider(opts.database),
 		authProvider: opts.auth as ApiOptions["authProvider"],
 		installDependencies:
 			opts.yes === true
