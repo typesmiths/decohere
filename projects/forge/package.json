@@ -31,6 +31,10 @@
       "types": "./types/src/transpile/index.d.ts",
       "import": "./es6/src/transpile/index.js"
     },
+    "./vite": {
+      "types": "./types/src/vite/index.d.ts",
+      "import": "./es6/src/vite/index.js"
+    },
     "./vitest": {
       "types": "./types/src/vitest/index.d.ts",
       "import": "./es6/src/vitest/index.js"

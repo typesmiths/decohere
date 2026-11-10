@@ -49,6 +49,10 @@ export default {
 
 Per-project settings go under `projects`, keyed by package name: `docker` (image, Dockerfile, tags, build args) and `ui` (the UI project a deployable ships, see [forge](../forge/README.md#shipping-the-ui-with-the-api)).
 
+### A project's own scripts
+
+A project whose `package.json` declares a script for a step has a builder of its own (Astro, Vite, Angular), and Decohere's tools run that script in its folder instead of doing the step: `build` for `forge build`, `dev` or `serve` for `flux serve`. `Project.ownScript(name)` (and `projectScripts.own(scripts, name)`) is that rule, in one place. A script that calls `forge`, `flux` or `decohere` doesn't count: running it would only call the tool again. See [forge](../forge/README.md#projects-with-a-builder-of-their-own).
+
 `--config-file` on `forge` / `flux` selects a different config path. The default is `.decohere.js` in the workspace root (`--root-dir`, else the current folder).
 
 ### Package aliases
@@ -57,7 +61,7 @@ For each discovered project, the workspace package maps `package.json` `name` to
 
 - **The entry:** a TypeScript `main` as written (default `src/index.ts`). A `main` or `exports["."]` that describes the published layout (`index.js`, `./es6/src/index.js`) maps back to the source under `src/`.
 - **Each subpath in `exports`:** `./auth` → `./es6/src/auth/auth.extensions.js` becomes `src/auth/auth.extensions.ts`. Entries whose source doesn't exist are left out.
-- **Any other subpath (`name/*`):** `src/<sub>.ts` (or `.tsx`, `.mts` for `.mjs`, `.cts` for `.cjs`), else `src/<sub>/index.ts`. A package with only subpaths and no root entry resolves them under `src/`.
+- **Any other subpath (`name/*`):** `src/<sub>.ts` (or `.tsx`, `.mts` for `.mjs`, `.cts` for `.cjs`), else `src/<sub>/index.ts`, else `src/<sub>` itself when it is a file (a UI package's `Button.astro` or `theme.css`). A package with only subpaths and no root entry resolves them under `src/`.
 
 Root `tsconfig.json` `paths` override the same keys. In this repo they come from `forge paths`, which writes this map to `tsconfig.paths.json` for `tsc`.
 

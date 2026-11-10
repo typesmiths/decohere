@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import path from "node:path";
 import type { Project } from "./project.model.js";
 import { sourceExtensions } from "./source-extensions.js";
@@ -113,13 +113,17 @@ function toPosixRelative(from: string, to: string): string {
 /**
  * The source file a wildcard subpath names: `<sub>` with a source extension (`.ts`, `.tsx`, or
  * `.mts`/`.cts` for `.mjs`/`.cjs`), else the `index` source of the directory it names (as
- * `@pkg/models` is `src/models/index.ts`), else `<sub>.ts` for the caller to report missing.
+ * `@pkg/models` is `src/models/index.ts`), else the file as written when it is one (a UI
+ * package's `Button.astro` or `theme.css`), else `<sub>.ts` for the caller to report missing.
  */
 function subpathSource(candidate: string): string {
 	const files = sourceExtensions.candidates(candidate);
 	const directory = candidate.replace(/\.([mc]?[jt]sx?)$/, "");
 	const indexes = sourceExtensions.candidates(path.join(directory, "index"));
-	return [...files, ...indexes].find((file) => existsSync(file)) ?? toTsSourcePath(candidate);
+	const found = [...files, ...indexes].find((file) => existsSync(file));
+	if (found != null) return found;
+	if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+	return toTsSourcePath(candidate);
 }
 
 /** A target as a source path: itself when it is one, else its first source candidate. */

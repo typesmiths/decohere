@@ -158,3 +158,17 @@ it("resolves a wildcard subpath to the directory's index.ts when there is no <su
 		path.resolve("/ws/projects/web/src/http/index.ts"),
 	);
 });
+
+// A UI package's components and styles aren't TypeScript, and Vite resolves them by package name too.
+it("maps a subpath that names a file that isn't TypeScript to that file", () => {
+	vol.fromJSON({
+		"/workspace/projects/lib/src/Button.astro": "---\n---\n<button />",
+		"/workspace/projects/lib/src/theme.css": "",
+	});
+	expect(packageAliases.resolvePath("@hmr/lib/Button.astro", aliasPaths, "/workspace")).toBe(
+		path.resolve("/workspace/projects/lib/src/Button.astro"),
+	);
+	expect(packageAliases.resolvePath("@hmr/lib/theme.css", aliasPaths, "/workspace")).toBe(
+		path.resolve("/workspace/projects/lib/src/theme.css"),
+	);
+});

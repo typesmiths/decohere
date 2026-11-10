@@ -8,6 +8,7 @@ import type { Options } from "@swc/core";
 import { SwcTranspiler } from "../services/swc-transpiler.js";
 import { BuildTargets } from "../types/build-target.type.js";
 import { createWorkspace } from "../create-workspace.js";
+import { aliasResolver } from "../vite/forge-aliases.plugin.js";
 
 // Above fatal (60) so all standard levels are nooped when logLevel is "silent"
 const SILENT_LEVEL = 999;
@@ -51,6 +52,13 @@ export function forgeBuild(options?: ForgeBuildOptions) {
 		workspace = await createWorkspace({ rootDir: workspaceRoot });
 	};
 
+	// Package names to their source, as `forgeAliases()` does for a site: SWC rewrites them in the
+	// TypeScript it compiles, and this resolves them everywhere else (a .css or .astro import).
+	const resolveAlias = aliasResolver(async () => {
+		await initWorkspace();
+		return workspace as Workspace;
+	});
+
 	const baseConfigFor = (project: Project | undefined): Options => {
 		const cached = baseConfigs.get(project);
 		if (cached != null) return cached;
@@ -70,14 +78,17 @@ export function forgeBuild(options?: ForgeBuildOptions) {
 		configResolved(): void {
 			logger.debug("Plugin loaded");
 		},
-		resolveId(source: string, importer: string | undefined): string | null {
+		resolveId(
+			source: string,
+			importer: string | undefined,
+		): Promise<string | null> | string | null {
 			// `./a.js` is `a.ts` or `a.tsx`, `./a.mjs` is `a.mts`, `./a.cjs` is `a.cts`.
 			if (importer != null && /\.[mc]?jsx?$/.test(source) && source.startsWith(".")) {
 				const written = path.resolve(path.dirname(importer), source);
 				return sourceExtensions.candidates(written).find((c) => existsSync(c)) ?? null;
 			}
 
-			return null;
+			return resolveAlias(source, importer);
 		},
 		watchChange(id: string): void {
 			transformCache.delete(id);
