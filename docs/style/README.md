@@ -21,6 +21,14 @@ function isBareSpecifier(/* … */) { /* … */ }
 export const packageAliases = { build, isBareSpecifier };
 ```
 
+## Names
+
+Functions do something; everything else is something.
+
+- **Functions and methods are verbs:** `getOwnScript`, `runPackageScript`, `findWorkspaceRoot`, `build`. A predicate asks a question: `isBareSpecifier`, `hasEntry`. A function named like a value (`packageScriptCommand(options)`) reads as one, and the call site no longer says what happens.
+- **Everything else is a noun:** classes, types, values, namespace objects and getters. `packageAliases.build(...)` reads "package aliases: build"; `project.name` is a property.
+- **Rename when you touch it.** When you change a function with a poor name, rename it in the same PR and update every caller. Anything a package doesn't export can be renamed at any time. Until 1.0, so can what a package exports: Decohere's public surface is small, and its packages are the main callers of each other. After 1.0, renaming an export is a breaking change, so now is the time to fix names.
+
 ## Rules
 
 1. ES modules; `.js` extensions in TypeScript import paths.
