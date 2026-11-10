@@ -6,7 +6,15 @@ Build system (SWC). `forge build --configuration debug` rewrites workspace impor
 
 `forge build` transpiles without waiting for a whole-workspace typecheck. Run `forge typecheck` independently (including in the background) and require it before shipping. Why executable tests come before static contracts: [testing principles](../../docs/testing/#executable-behavior-before-type-contracts).
 
-With no `tsconfig.json`, `forge typecheck` reads a project as plain `tsc` would, with decorators on because forge and flux compile them by default. Add a `tsconfig.json` to choose your own options; forge then limits `lib` to ES2022 and turns off `@types` discovery unless it sets them (`types: ["node"]`).
+With no `tsconfig.json`, `forge typecheck` reads a project as plain `tsc` would, with decorators on because forge and flux compile them by default. A `tsconfig.json` at the workspace root chooses the options for every project without one of its own; forge then limits `lib` to ES2022 and turns off `@types` discovery unless it sets them (`types: ["node"]`), which keeps a backend workspace's check fast. A project with a `tsconfig.json` in its own folder (a site, a browser library) has made its own choices, so what it leaves out means what it means to `tsc`: `lib` follows its `target`, DOM included.
+
+A project with its own `check` script (`astro check`, `svelte-check`, `vue-tsc`) is checked by that script, not by `forge typecheck`'s compiler: only the framework's checker reads component files (`.astro`, `.svelte`, `.vue`) and virtual modules (`astro:content`). It runs in the project's folder by [the same rule as a project's own `build` script](#projects-with-a-builder-of-their-own), and a failing script fails `forge typecheck`:
+
+```
+$ pnpm forge typecheck
+Type-checking @app/api
+Type-checking @app/site.web with its own check script (pnpm run check)
+```
 
 ## Debug path aliases (not `node_modules` links)
 
@@ -114,6 +122,7 @@ Building @app/site.web with its own build script (pnpm run build)
 
 - **The builder owns the output.** It writes where its config says (for Astro and Vite, the project's `dist/`). Forge writes nothing for the project under its own `dist/`, copies none of its files, and doesn't rebuild it in `--watch`: `flux serve` runs its `dev` script instead.
 - **A failing script fails `forge build`.** The other projects are compiled first, in the same run.
+- **`forge typecheck` does the same with a `check` script** (`astro check`, `svelte-check`): only the framework's checker reads its component files.
 - **The builder is found at the workspace root.** Decohere installs once, at the root, so the script runs with each `node_modules/.bin` from the project up to the root on its `PATH`.
 - **A script that calls `forge`, `flux` or `decohere` doesn't count**, so forge never calls itself: such a project is compiled as usual.
 - **The project stays in the workspace.** Other projects still import it by name, and `forge package` still finds it as a `ui`. Don't list it in `ignoreProjects`.
