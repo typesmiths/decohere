@@ -12,7 +12,7 @@ import {
 	Query,
 	UnauthorizedError,
 } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 class OutOfStockError extends HttpError {
 	public constructor(sku: string) {
@@ -70,7 +70,7 @@ describe("problem details error responses", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [OrderController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	}
 
 	async function get(path: string) {

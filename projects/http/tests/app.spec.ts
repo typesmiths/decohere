@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "@decohere/http-fastify";
 import { Controller, Get, Param, Query } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 @Controller({ prefix: "/echo" })
 class EchoController {
@@ -38,7 +38,7 @@ describe("App HTTP routing", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [EchoController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	});
 
 	afterEach(async () => {
@@ -82,7 +82,7 @@ describe("App HTTP routing", () => {
 			.use(http(FastifyProvider, { accessLog: false, controllers: [EchoController] }))
 			.build();
 		try {
-			const originB = await listenEphemeral(other);
+			const originB = (await startTestApp(other)).baseUrl;
 			expect(originA).not.toBe(originB);
 			expect(originB).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
 		} finally {
@@ -117,7 +117,7 @@ describe("App container dispose", () => {
 			hub = container.resolve(SocketHub);
 		});
 		const disposable = await builder.build();
-		const origin = await listenEphemeral(disposable);
+		const origin = (await startTestApp(disposable)).baseUrl;
 		await axios.get(`${origin}/echo`);
 
 		await disposable.dispose();

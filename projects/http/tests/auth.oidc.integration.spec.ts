@@ -10,7 +10,7 @@ import { ConfigurationServiceToken } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
 import { FastifyProvider } from "@decohere/http-fastify";
 import { Authorize, Controller, Get } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 import { LocalOidcServer } from "./helpers/local-oidc-server.js";
 
 // Started once for the whole suite — key generation is expensive.
@@ -61,7 +61,7 @@ describe("Auth integration — discoveryUrl + real RS256 tokens", () => {
 			.use(auth())
 			.build();
 
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	});
 
 	afterEach(async () => {
@@ -130,7 +130,7 @@ describe("Auth integration — principalMapper", () => {
 			)
 			.build();
 
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	});
 
 	afterEach(async () => {

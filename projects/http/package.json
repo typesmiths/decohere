@@ -28,10 +28,6 @@
       "types": "./types/src/index.d.ts",
       "import": "./es6/src/index.js"
     },
-    "./providers": {
-      "types": "./types/src/providers/index.d.ts",
-      "import": "./es6/src/providers/index.js"
-    },
     "./testing": {
       "types": "./types/src/testing/index.d.ts",
       "import": "./es6/src/testing/index.js"
@@ -44,7 +40,6 @@
     "@casl/ability": "^6.8.1",
     "@decohere/core": "0.0.1-dev.5",
     "@decohere/crucible": "0.0.1-dev.5",
-    "@decohere/http-fastify": "0.0.1-dev.5",
     "@decohere/scribe": "0.0.1-dev.5",
     "ajv": "^8.20.0",
     "jose": "^6.2.3",

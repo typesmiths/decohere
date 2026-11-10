@@ -15,7 +15,7 @@ import { FastifyProvider } from "@decohere/http-fastify";
 import { Authorize, Controller, Get, REQUEST_ID_HEADER } from "../src/routing/index.js";
 import { Sse, type SseStream } from "../src/sse/index.js";
 import { bootModule } from "../src/testing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 const log = scribe.logger("OrderService");
 
@@ -95,7 +95,7 @@ describe("request context in log lines", () => {
 			.withServices((services) => services.registerRequestScoped(OrderService))
 			.use(http(FastifyProvider, { controllers: [OrderController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	}
 
 	it("a service's log line carries the request id the response sends back", async () => {
@@ -134,7 +134,7 @@ describe("request context in log lines", () => {
 			.use(http(FastifyProvider, { controllers: [MyOrdersController] }))
 			.use(auth())
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		await axios.get("/my-orders", { headers: { Authorization: "Bearer any-token" } });
 
@@ -143,7 +143,10 @@ describe("request context in log lines", () => {
 	});
 
 	it("a server-sent event stream logs with its request's id", async () => {
-		await using api = await bootModule({ controllers: [TickController] });
+		await using api = await bootModule({
+			provider: FastifyProvider,
+			controllers: [TickController],
+		});
 
 		await api.readEvents("/ticks", { count: 2, headers: { [REQUEST_ID_HEADER]: "stream-1" } });
 

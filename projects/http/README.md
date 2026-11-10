@@ -2,7 +2,7 @@
 
 HTTP/API platform for Decohere: decorator-based controllers, routing, auth, OpenAPI, health, problem details, and the `HttpProvider` contract a web server implements. Architecture and the provider boundary: [docs/architecture](../../docs/architecture/).
 
-Controllers and services depend on the contracts exported from `@decohere/http`. The web server itself is a provider the app picks, in its own package: [`@decohere/http-fastify`](../http-fastify/README.md) (`FastifyProvider`) today.
+Controllers and services depend on the contracts exported from `@decohere/http`. The web server itself is a provider the app picks, in its own package: [`@decohere/http-fastify`](../http-fastify/README.md) (`FastifyProvider`) today. This package installs no web server.
 
 The app itself is built with `Builder`, from `@decohere/core/hosting`, on a container from `@decohere/crucible`. This package gives it plugins: `http(provider, settings)` adds the web server, with `health()` and `auth()` beside it, so an app with no web API doesn't need this package.
 
@@ -19,6 +19,49 @@ await Builder.create(new ServiceContainerBuilder())
 ```
 
 Everything `http(...)` takes is on `HttpSettings`. `configureHttp(settings)` adds to them from elsewhere, such as a plugin of your own that brings its controllers.
+
+## Testing an app
+
+`@decohere/http/testing` starts an app on a free loopback port, so a test calls it over HTTP the way a client would, through routing, auth, validation and the real provider. `await using` stops it at the end of the block.
+
+```ts
+import { startTestApp } from "@decohere/http/testing";
+import { createApp } from "../src/app.js";
+
+it("says hello", async () => {
+	await using api = await startTestApp(createApp());
+
+	const response = await fetch(`${api.baseUrl}/hello`);
+
+	expect(response.status).toBe(200);
+});
+```
+
+`startTestApp(app)` takes a built app, or the promise `build()` returns. It starts it on `127.0.0.1:0` with no SIGTERM or SIGINT handlers, and gives back `baseUrl`, its origin (such as `http://127.0.0.1:41233`), `app` (its services are at `app.services`), `readEvents` for [streams](#testing-a-stream) and `stop()`. If the app fails to start, it is stopped and the error is thrown.
+
+To test some controllers without the rest of the app (no database, no identity provider), `bootModule` builds an app of only those, on the provider you name, with the services you give it. The provider is required, so this package installs no web server for tests either:
+
+```ts
+import { config, EnvDataSource } from "@decohere/config";
+import { bootModule } from "@decohere/http/testing";
+import { FastifyProvider } from "@decohere/http-fastify";
+
+it("greets with the configured greeting", async () => {
+	vi.stubEnv("SAMPLE__GREETING", "Hi");
+	await using api = await bootModule({
+		provider: FastifyProvider,
+		controllers: [HelloController],
+		services: (services) => services.registerSingleton(SampleService),
+		configure: (builder) => builder.use(config(EnvDataSource)),
+	});
+
+	const response = await fetch(`${api.baseUrl}/hello`);
+
+	expect(await response.json()).toEqual({ message: "Hi" });
+});
+```
+
+To stand in for a service, register an object under its class: `services.registerSingleton(UserService, { ensureFromPrincipal: async () => user })`. A scaffolded app comes with a spec like this, `tests/hello.controller.spec.ts`.
 
 ## Request context in log lines
 
@@ -236,9 +279,11 @@ Why this shape, and what is left for later: [ADR 0005](../../docs/adr/0005-serve
 
 ```ts
 import { bootModule } from "@decohere/http/testing";
+import { FastifyProvider } from "@decohere/http-fastify";
 
 it("streams the first three prices", async () => {
 	await using api = await bootModule({
+		provider: FastifyProvider,
 		controllers: [PriceController],
 		services: (c) => c.registerSingleton(PriceFeed),
 		configure: (builder) => builder.use(auth()),

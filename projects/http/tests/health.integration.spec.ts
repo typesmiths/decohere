@@ -12,7 +12,7 @@ import { ConfigurationServiceToken } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
 import { FastifyProvider } from "@decohere/http-fastify";
 import { Authorize, Controller, Get } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 class DevStaticConfigService implements IConfigurationService {
 	public get dataSources() {
@@ -50,7 +50,7 @@ describe("health / ready probes", () => {
 			.use(http(FastifyProvider, { accessLog: false }))
 			.use(health())
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const res = await axios.get("/health");
 		expect(res.status).toBe(200);
@@ -62,7 +62,7 @@ describe("health / ready probes", () => {
 			.use(http(FastifyProvider, { accessLog: false }))
 			.use(health())
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const res = await axios.get("/ready");
 		expect(res.status).toBe(200);
@@ -81,7 +81,7 @@ describe("health / ready probes", () => {
 			.use(http(FastifyProvider, { accessLog: false }))
 			.use(health({ checks: [failing] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const res = await axios.get("/ready", { validateStatus: () => true });
 		expect(res.status).toBe(503);
@@ -104,7 +104,7 @@ describe("health / ready probes", () => {
 			.use(auth())
 			.use(health())
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const liveness = await axios.get("/health");
 		expect(liveness.status).toBe(200);

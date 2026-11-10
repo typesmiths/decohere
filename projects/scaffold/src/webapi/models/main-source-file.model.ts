@@ -40,8 +40,10 @@ const PROVIDER = {
 /**
  * Model for an API's entry files:
  *
- * - `src/app.ts`: `createApp()` builds the app and starts nothing, so a tool or a test can use it;
- * - `src/main.ts`: sets up logging and starts the app;
+ * - `src/app.ts`: `createApp()` sets up logging and builds the app, and starts nothing, so a tool
+ *   or a test can use it. It spells out every part (HTTP on Fastify, config, health, OpenAPI), so
+ *   the app owns its composition and can swap any of them;
+ * - `src/main.ts`: starts the app;
  * - `src/db.ts`, with a database: the db commands (`pnpm decohere db migrate`).
  *
  * Starts with the minimal HTTP + YAML config setup. Features mutate the model by calling
@@ -138,10 +140,12 @@ export class MainSourceFile implements KeyedModel {
 	private renderApp(): string {
 		const provider = PROVIDER[this._orm];
 		const imports: string[] = [
+			'import "@decohere/scribe-pino";',
 			'import { config, EnvDataSource, YamlDataSource } from "@decohere/config";',
 			'import { Builder } from "@decohere/core/hosting";',
 			'import { ServiceContainerBuilder } from "@decohere/crucible";',
-			'import { FastifyProvider } from "@decohere/http/providers";',
+			'import { FastifyProvider } from "@decohere/http-fastify";',
+			'import { scribe } from "@decohere/scribe";',
 			'import { SampleService } from "./services/sample.service.js";',
 		];
 
@@ -204,6 +208,7 @@ export class MainSourceFile implements KeyedModel {
 			"",
 			"/** Builds the app and starts nothing: main.ts starts it, and db.ts and tests use it as built. */",
 			"export function createApp() {",
+			`\tscribe.withPinoPretty().and.withPinoRoll({ file: "logs/${this.appName}.log" });`,
 			`\treturn Builder.create(new ServiceContainerBuilder(), { applicationName: "${this.appName}" })`,
 			...builderCalls,
 			`\t\t.build();`,
@@ -214,15 +219,10 @@ export class MainSourceFile implements KeyedModel {
 
 	private renderMain(): string {
 		return [
-			'import "@decohere/scribe-pino";',
-			'import { scribe } from "@decohere/scribe";',
 			'import { createApp } from "./app.js";',
-			"",
-			`scribe.withPinoPretty().and.withPinoRoll({ file: "logs/${this.appName}.log" });`,
 			"",
 			"const app = await createApp();",
 			"await app.start({ port: Number(process.env.PORT ?? 3000) });",
-			"",
 			"export default app;",
 			"",
 		].join("\n");

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "@decohere/http-fastify";
 import { Controller, Get, Query } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 @Controller({ prefix: "/flags" })
 class FlagController {
@@ -26,7 +26,7 @@ describe("BooleanPipe over HTTP query", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [FlagController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	}
 
 	it.each([

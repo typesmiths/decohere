@@ -16,7 +16,7 @@ import { realFs } from "../../../vitest.setup.js";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "@decohere/http-fastify";
 import { Controller, Get } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 @Controller({ prefix: "/funding-arb" })
 class FundingArbStubController {
@@ -59,7 +59,7 @@ describe("Flux-style reboot with pino-roll", () => {
 		const logFile = join(logDir, "funding-fee.api.log");
 
 		app = await bootWithPinoRoll(logFile);
-		const origin1 = await listenEphemeral(app);
+		const origin1 = (await startTestApp(app)).baseUrl;
 		const first = await axios.get(`${origin1}/funding-arb`);
 		expect(first.status).toBe(200);
 		expect(first.data).toEqual({ ok: true });
@@ -69,7 +69,7 @@ describe("Flux-style reboot with pino-roll", () => {
 		await dying.dispose();
 
 		app = await bootWithPinoRoll(logFile);
-		const origin2 = await listenEphemeral(app);
+		const origin2 = (await startTestApp(app)).baseUrl;
 		const second = await axios.get(`${origin2}/funding-arb`, { timeout: 5_000 });
 
 		expect(second.status).toBe(200);

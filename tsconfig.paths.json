@@ -134,9 +134,6 @@
       "@decohere/http/*": [
         "./projects/http/src/*"
       ],
-      "@decohere/http/providers": [
-        "./projects/http/src/providers/index.ts"
-      ],
       "@decohere/http/testing": [
         "./projects/http/src/testing/index.ts"
       ],

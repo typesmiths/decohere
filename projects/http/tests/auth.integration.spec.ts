@@ -21,7 +21,7 @@ import {
 	Get,
 	Query,
 } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 // Provides devStatic auth config — no JWT signing required.
 class DevStaticConfigService implements IConfigurationService {
@@ -118,7 +118,7 @@ describe("Auth integration — devStatic", () => {
 			.use(auth())
 			.build();
 
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	});
 
 	afterEach(async () => {

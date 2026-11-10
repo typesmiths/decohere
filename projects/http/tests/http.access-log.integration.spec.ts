@@ -12,7 +12,7 @@ import {
 	HttpAccessLogMiddleware,
 	REQUEST_ID_HEADER,
 } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 @Controller({ prefix: "/ping" })
 class PingController {
@@ -41,7 +41,7 @@ describe("http() request id + access logging", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { controllers: [PingController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const inboundId = "req-test-869eja7vz";
 		const response = await axios.get("/ping", {
@@ -69,7 +69,7 @@ describe("http() request id + access logging", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { controllers: [PingController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const response = await axios.get("/ping");
 		const requestId = response.headers[REQUEST_ID_HEADER];
@@ -87,7 +87,7 @@ describe("http() request id + access logging", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [PingController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const response = await axios.get("/ping");
 		expect(response.status).toBe(200);

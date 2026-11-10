@@ -138,13 +138,29 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 		existsSync(join(root, "projects/api/src/main.ts")),
 		`${root}/projects/api/src/main.ts`,
 	).toBe(true);
-	expect(readFileSync(join(root, "projects/api/src/app.ts"), "utf8")).toContain("health()");
-	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain(
-		"Number(process.env.PORT ?? 3000)",
+	const app = readFileSync(join(root, "projects/api/src/app.ts"), "utf8");
+	// The app spells out its composition, so it can swap any part.
+	expect(app).toContain("http(FastifyProvider, { controllers: [HelloController]");
+	expect(app).toContain('import { FastifyProvider } from "@decohere/http-fastify";');
+	const apiManifest = JSON.parse(
+		readFileSync(join(root, "projects/api/package.json"), "utf8"),
 	);
-	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain(
-		"scribe.withPinoPretty().and.withPinoRoll",
-	);
+	expect(apiManifest.dependencies).toHaveProperty("@decohere/http-fastify");
+	expect(app).toContain('.use(config(new YamlDataSource({ app: "api" }), EnvDataSource))');
+	expect(app).toContain(".use(health())");
+	expect(app).toContain("scribe.withPinoPretty().and.withPinoRoll");
+	expect(app).not.toContain("webApi");
+	const main = readFileSync(join(root, "projects/api/src/main.ts"), "utf8");
+	expect(main.trimEnd().split("\n").length, main).toBeLessThanOrEqual(5);
+	expect(main).toContain("Number(process.env.PORT ?? 3000)");
+	expect(main).toContain("export default app;");
+	const spec = readFileSync(join(root, "projects/api/tests/hello.controller.spec.ts"), "utf8");
+	expect(spec).toContain('import { bootModule } from "@decohere/http/testing";');
+	expect(spec).toContain('import { FastifyProvider } from "@decohere/http-fastify";');
+	expect(spec).toContain("provider: FastifyProvider,");
+	expect(spec).toContain("controllers: [HelloController]");
+	expect(spec).toContain("await fetch(`${api.baseUrl}/hello`)");
+	expect(spec).toContain("expect(response.status).toBe(200);");
 	expect(readFileSync(join(root, ".gitignore"), "utf8")).toContain("logs");
 	expect(
 		existsSync(join(root, "projects/api/src/controllers/hello.controller.ts")),

@@ -356,4 +356,25 @@ describe("scaffoldApi auth0 wiring", () => {
 		expect(rootPkg.dependencies?.["@casl/ability"]).toBeUndefined();
 		expect(apiPkg.dependencies?.["@casl/ability"]).toBeUndefined();
 	});
+
+	// The sample spec boots the controller without the rest of the app: no Auth0, no database.
+	it("gives the sample spec a token check of its own and no database", async () => {
+		await scaffoldApi(baseOpts());
+
+		const spec = read("projects/api/tests/hello.controller.spec.ts");
+		expect(spec).toContain('import { auth } from "@decohere/http";');
+		expect(spec).toContain("builder.use(config(EnvDataSource)).use(auth())");
+		expect(spec).toContain('vi.stubEnv("AUTH__SECRET",');
+		expect(spec).toContain('vi.stubEnv("AUTH__AUDIENCE",');
+		expect(spec).toContain('import { UserService } from "../src/services/user.service.js";');
+		expect(spec).toContain("services.registerSingleton(UserService, {");
+	});
+
+	it("needs no stand-in for the users without a database", async () => {
+		await scaffoldApi({ ...baseOpts(), databaseProvider: "none" });
+
+		const spec = read("projects/api/tests/hello.controller.spec.ts");
+		expect(spec).toContain(".use(auth())");
+		expect(spec).not.toContain("UserService");
+	});
 });
