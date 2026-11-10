@@ -19,7 +19,7 @@ import {
 	type MiddlewareContext,
 	Post,
 } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 class NotFoundError extends HttpError {
 	public constructor(message = "Not Found") {
@@ -105,7 +105,7 @@ describe("HTTP surface (filters, HttpCode/Header, middleware, CORS, global prefi
 				}),
 			)
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const created = await axios.post(
 			"/api/widgets",
@@ -125,7 +125,11 @@ describe("HTTP surface (filters, HttpCode/Header, middleware, CORS, global prefi
 
 		const boom = await axios.get("/api/widgets/boom", { validateStatus: () => true });
 		expect(boom.status).toBe(500);
-		expect(boom.data).toEqual({ message: "Internal Server Error" });
+		expect(boom.data).toEqual({
+			type: "about:blank",
+			title: "Internal Server Error",
+			status: 500,
+		});
 		expect(JSON.stringify(boom.data)).not.toMatch(/kaboom/i);
 
 		const preflight = await axios.options("/api/widgets", {
@@ -150,7 +154,7 @@ describe("HTTP surface (filters, HttpCode/Header, middleware, CORS, global prefi
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [WidgetController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const missing = await axios.get("/nope", { validateStatus: () => true });
 		expect(missing.status).toBe(404);
@@ -160,7 +164,7 @@ describe("HTTP surface (filters, HttpCode/Header, middleware, CORS, global prefi
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [ScopedController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const first = await axios.get("/scope");
 		const second = await axios.get("/scope");

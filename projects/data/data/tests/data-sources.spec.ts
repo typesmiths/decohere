@@ -134,6 +134,7 @@ describe("dataSources.start", () => {
 				steps.push("migrate");
 				return [];
 			}),
+			baseline: vi.fn(),
 			revert: vi.fn(),
 			status: vi.fn(),
 		};

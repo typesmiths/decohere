@@ -21,7 +21,7 @@ import {
 	Get,
 	Query,
 } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 // Provides devStatic auth config — no JWT signing required.
 class DevStaticConfigService implements IConfigurationService {
@@ -118,7 +118,7 @@ describe("Auth integration — devStatic", () => {
 			.use(auth())
 			.build();
 
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	});
 
 	afterEach(async () => {
@@ -144,7 +144,7 @@ describe("Auth integration — devStatic", () => {
 		it("returns a generic Unauthorized body (no internal auth detail)", async () => {
 			const res = await axios.get("/guard/protected", { validateStatus: () => true });
 			expect(res.status).toBe(401);
-			expect(res.data).toEqual({ message: "Unauthorized" });
+			expect(res.data).toEqual({ type: "about:blank", title: "Unauthorized", status: 401 });
 			expect(JSON.stringify(res.data)).not.toMatch(/Authorization|header|Bearer/i);
 		});
 
@@ -160,7 +160,7 @@ describe("Auth integration — devStatic", () => {
 				validateStatus: () => true,
 			});
 			expect(res.status).toBe(401);
-			expect(res.data).toEqual({ message: "Unauthorized" });
+			expect(res.data).toEqual({ type: "about:blank", title: "Unauthorized", status: 401 });
 		});
 	});
 
@@ -172,7 +172,11 @@ describe("Auth integration — devStatic", () => {
 				validateStatus: () => true,
 			});
 			expect(res.status).toBe(403);
-			expect(res.data).toEqual({ message: expect.stringMatching(/delete.*Article/) });
+			expect(res.data).toMatchObject({
+				title: "Forbidden",
+				status: 403,
+				detail: expect.stringMatching(/delete.*Article/),
+			});
 		});
 	});
 

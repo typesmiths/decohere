@@ -668,14 +668,14 @@ describe("serving a built UI from the API", () => {
 		const json = { accept: "application/json" };
 		const notFound = async (response: Response) => {
 			expect(response.status).toBe(404);
-			expect(response.headers.get("content-type")).toContain("application/json");
+			expect(response.headers.get("content-type")).toContain("application/problem+json");
 			const body = (await response.json()) as {
-				message: string;
-				error: string;
-				statusCode: number;
+				title: string;
+				status: number;
+				detail: string;
 			};
-			expect(body.error).toBe("Not Found");
-			expect(body.statusCode).toBe(404);
+			expect(body.title).toBe("Not Found");
+			expect(body.status).toBe(404);
 			return body;
 		};
 
@@ -717,7 +717,7 @@ describe("serving a built UI from the API", () => {
 			for (const headers of [json, { accept: "*/*" }, {}, { accept: "text/*" }]) {
 				const response = await fetch(`${api.baseUrl}/some/client/route`, { headers });
 				const body = await notFound(response);
-				expect(body.message).toBe("Route GET:/some/client/route not found");
+				expect(body.detail).toBe("Route GET:/some/client/route not found");
 			}
 		});
 
@@ -781,7 +781,7 @@ describe("serving a built UI from the API", () => {
 			});
 
 			const body = await notFound(response);
-			expect(body.message).toBe("Route POST:/some/route not found");
+			expect(body.detail).toBe("Route POST:/some/route not found");
 		});
 
 		it("never answers an excluded path, as a file or as the app", async () => {

@@ -30,6 +30,7 @@ const folder = new URL("file:///app/src/migrations/");
 function fakeMigrator(states: MigrationState[] = []): Migrator {
 	return {
 		migrate: vi.fn(async () => []),
+		baseline: vi.fn(async () => []),
 		revert: vi.fn(async () => undefined),
 		status: vi.fn(async () => states),
 	};

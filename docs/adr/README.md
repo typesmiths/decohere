@@ -87,3 +87,4 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 | [0007](0007-serving-a-built-ui-from-http.md) | `statics` serves a module's built UI: outside the pipeline and rate limit, cached by file kind, SPA fallback | Proposed |
 | [0008](0008-response-compression-in-http.md) | Responses are compressed by default with the `compression` setting, a thin wrapper around `@fastify/compress` | Proposed |
 | [0010](0010-hosted-services.md) | Background work runs as hosted services, started before HTTP listens and stopped before the container is disposed | Proposed |
+| [0025](0025-errors-are-problem-details.md) | Every error is an RFC 9457 problem (`application/problem+json`); domain errors add a `type` and extensions | Proposed |

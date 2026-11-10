@@ -29,6 +29,33 @@ describe("PinoAdapter", () => {
 		expect(output).toContain("something went wrong");
 	});
 
+	it("writes a field once when a log call passes one a context source also adds", () => {
+		const { stream, lines } = makeStream();
+		const adapter = new PinoAdapter({ level: "info" }, stream);
+		const logger = scribe.configure({ adapter, options: { logLevel: "info" } })("test");
+		const remove = scribe.addContextSource(() => ({
+			requestId: "from-request",
+			tenant: "t-1",
+		}));
+		try {
+			logger.info({ requestId: "mine" }, "fields first");
+			logger.info("fields second", { requestId: "mine" });
+			logger.info("passed none");
+		} finally {
+			remove();
+		}
+
+		const [first, second, none] = lines();
+		for (const [line, msg] of [
+			[first, "fields first"],
+			[second, "fields second"],
+		]) {
+			expect(line?.match(/"requestId"/g)).toHaveLength(1);
+			expect(JSON.parse(line ?? "")).toMatchObject({ requestId: "mine", tenant: "t-1", msg });
+		}
+		expect(JSON.parse(none ?? "")).toMatchObject({ requestId: "from-request", tenant: "t-1" });
+	});
+
 	it("flush finishes through flushSync on a worker transport, whose flush can wait forever", () => {
 		const hangingFlush = vi.fn();
 		const flushSync = vi.fn();

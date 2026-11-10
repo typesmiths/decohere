@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Field, Get, Post, Query, RequestParts } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 const ISO = "2024-01-15T00:00:00.000Z";
 
@@ -40,7 +40,7 @@ describe("DatePipe over HTTP", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [EventController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	}
 
 	it("binds an ISO date query to a Date", async () => {
@@ -54,7 +54,7 @@ describe("DatePipe over HTTP", () => {
 		await start();
 		const res = await axios.get("/events?when=", { validateStatus: () => true });
 		expect(res.status).toBe(400);
-		expect(res.data).toMatchObject({ statusCode: 400, error: "Bad Request" });
+		expect(res.data).toMatchObject({ type: "about:blank", title: "Bad Request", status: 400 });
 	});
 
 	it("binds a JSON body date field to a Date", async () => {

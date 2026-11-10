@@ -50,6 +50,7 @@ import {
 } from "../routing/filters/exception-filter-host.js";
 import { REQUEST_ID_HEADER, resolveRequestId } from "../routing/middleware/request-id.js";
 import { normalizePrefix } from "../routing/path.util.js";
+import { PROBLEM_CONTENT_TYPE, problemDetails } from "../routing/problem-details.js";
 import type { RouteRegistry } from "../routing/services/route-registry.js";
 import type { Router } from "../routing/services/router.js";
 import { encodeSse } from "../sse/sse.encoder.js";
@@ -90,6 +91,7 @@ export class FastifyProvider implements HttpProvider {
 		await this.registerRateLimit(this.httpOptions?.rateLimit, statics);
 		await this.registerCors(this.httpOptions?.cors);
 		await this.registerCompression(this.httpOptions?.compression);
+		this.registerProblemReplies(statics);
 		this.registerOpenApi(this.httpOptions);
 		this.registerAllRoutes(this.routeRegistry);
 		for (const mount of statics) {
@@ -244,15 +246,51 @@ export class FastifyProvider implements HttpProvider {
 						fellBack.add(request);
 						return reply.sendFile(mount.index);
 					}
-					return reply.code(404).send({
-						message: `Route ${request.method}:${pathname} not found`,
-						error: "Not Found",
-						statusCode: 404,
-					});
+					return this.sendRouteNotFound(request, reply);
 				});
 			},
 			{ prefix: withoutSlash },
 		);
+	}
+
+	/**
+	 * Fastify's own replies, for an unknown route or a request it rejects before any handler
+	 * (a body that isn't valid JSON, too large, the rate limit), are problems like the API's.
+	 */
+	private registerProblemReplies(statics: ResolvedStaticMount[]) {
+		// A UI served from the root owns the root's not-found handler, and answers the same 404.
+		if (!statics.some((mount) => mount.prefix === "/")) {
+			this.provider.setNotFoundHandler((request, reply) =>
+				this.sendRouteNotFound(request, reply),
+			);
+		}
+		this.provider.setErrorHandler((error: unknown, _request, reply) => {
+			const status = this.getErrorStatus(error);
+			const message = error instanceof Error ? error.message : undefined;
+			if (status >= 500) {
+				this.logger.error(
+					message ?? "Request failed",
+					error instanceof Error ? error.stack : undefined,
+				);
+			}
+			const problem = problemDetails.create(status, {
+				detail: status >= 500 ? undefined : message,
+			});
+			return reply.status(status).header("content-type", PROBLEM_CONTENT_TYPE).send(problem);
+		});
+	}
+
+	private getErrorStatus(error: unknown): number {
+		const status = (error as { statusCode?: unknown } | null)?.statusCode;
+		return typeof status === "number" && status >= 400 && status < 600 ? status : 500;
+	}
+
+	private sendRouteNotFound(request: FastifyRequest, reply: FastifyReply) {
+		const [pathname = ""] = request.url.split("?");
+		const problem = problemDetails.create(404, {
+			detail: `Route ${request.method}:${pathname} not found`,
+		});
+		return reply.code(404).header("content-type", PROBLEM_CONTENT_TYPE).send(problem);
 	}
 
 	/** What the static fallback leaves to the API: the global prefix, else the registered routes. ADR 0007. */

@@ -5,6 +5,7 @@ import { scribe } from "@decohere/scribe";
 import { HttpOptionsToken } from "../../const.js";
 import type { HttpOptions } from "../../http/http.options.js";
 import { HttpError, ValidationError } from "../http.types.js";
+import { type ProblemDetails, problemDetails } from "../problem-details.js";
 import {
 	type ExceptionContext,
 	type ExceptionFilter,
@@ -16,36 +17,36 @@ import {
 export class DefaultHttpExceptionFilter implements ExceptionFilter {
 	private readonly logger = scribe.logger(DefaultHttpExceptionFilter.name);
 
+	/** Every answer is an RFC 9457 problem (`application/problem+json`). */
 	public catch(error: unknown, _ctx: ExceptionContext): ExceptionResult {
+		return problemDetails.toResult(this.toProblem(error));
+	}
+
+	private toProblem(error: unknown): ProblemDetails {
 		if (error instanceof ValidationError) {
-			return {
-				status: 400,
-				body: {
-					statusCode: 400,
-					error: "Bad Request",
-					message: error.message,
-					errors: error.errors,
-				},
-			};
+			return problemDetails.create(400, {
+				...error.problem,
+				detail: error.message,
+				extensions: { ...error.problem.extensions, errors: error.errors },
+			});
 		}
 		if (error instanceof HttpError) {
 			// Never expose internal auth failure details (header shape, issuer, etc.) to clients.
 			if (error.status === 401) {
 				this.logger.warn(error.message);
-				return { status: 401, body: { message: "Unauthorized" } };
+				return problemDetails.create(401);
 			}
 			// Sanitize only true 500s. Keep intentional 503 probe messages (e.g. /ready).
 			if (error.status === 500) {
 				this.logger.error(error.message);
-				return { status: 500, body: { message: "Internal Server Error" } };
+				return problemDetails.create(500);
 			}
-			return { status: error.status, body: { message: error.message } };
+			return problemDetails.create(error.status, { ...error.problem, detail: error.message });
 		}
 		if (error instanceof Error) {
 			this.logger.error(error.message, error.stack);
-			return { status: 500, body: { message: "Internal Server Error" } };
 		}
-		return { status: 500, body: { message: "Internal Server Error" } };
+		return problemDetails.create(500);
 	}
 }
 

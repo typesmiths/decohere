@@ -63,6 +63,7 @@ Import `@decohere/scribe-pino` **before** calling `withPino*` so runtime methods
 | `scribe.logger(name?, customLevels?)` | Named logger; default levels `fatal` … `trace` |
 | `scribe.configure({ adapter, options?, tap? })` | Install an adapter (and an entry tap); returns `(name?) => Logger` |
 | `scribe.flush(cb?)` / `scribe.stop()` | Drain / dispose the active adapter |
+| `scribe.addContextSource(source)` | Add fields from what the caller is doing now (a request, a job) to every line; returns a remover |
 | `LoggerAdapter` / `LogAdapter` | Contract and base class for writers |
 | `LogEntryAdapter` | Base class for structured writers: implement `write(entry)` |
 | `Logger<CustomLevels, CustomOnly>` | Typed log methods, `isLevelEnabled`, `child(fields)` |
@@ -153,6 +154,18 @@ const log = scribe.logger("Api").child({ requestId });
 log.info("received"); // { name: "Api", requestId, msg: "received" }
 log.child({ job: "sync" }).warn("slow"); // { name: "Api", requestId, job: "sync", msg: "slow" }
 ```
+
+### Context sources
+
+A host can add fields to every line without each call site binding them. `scribe.addContextSource(source)` takes a function that returns the fields for the work going on now, or `undefined` when there is none. Scribe calls it on every log call from a `scribe.logger(...)` handle and binds what it returns, as `child` would, for every adapter and the tap:
+
+```ts
+const remove = scribe.addContextSource(() => currentJob == null ? undefined : { job: currentJob.id });
+```
+
+`@decohere/http` adds one that returns the request's `requestId` and `principalId` ([request context](../http/README.md#request-context-in-log-lines)). Sources outlive `configure`, adding the same function twice adds it once, and the returned function removes it. Fields a child binds win over a source's. Scribe itself keeps no context: the source decides what "now" means (Node's `AsyncLocalStorage`, a Worker's request), so the facade stays runtime-free.
+
+A log call can pass a field a source also adds, such as its own `requestId`: the call's value wins, and the line has the field once.
 
 ### Errors
 

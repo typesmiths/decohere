@@ -7,6 +7,7 @@ import { type MigrationTarget, MigrationTargetToken } from "./migration-target.j
 const USAGE = `Usage: db <command> [--data-source <name>]
 
   migrate [--to <id>] [--dry-run]   apply pending migrations, in id order
+  baseline <id> [--dry-run]         record migrations up to <id> as applied, without running them
   status                            list migrations: applied, pending, or only in the history
   revert                            undo the last applied migration
   new <name> [--data]               write an empty migration (--data: one that changes rows)
@@ -111,6 +112,21 @@ async function run(app: BuiltApp, argv: string[], options: DbCommandOptions): Pr
 				log: out,
 			});
 			if (applied.length === 0) out("Nothing to apply");
+			return;
+		}
+		case "baseline": {
+			const [to] = rest;
+			if (to == null) {
+				throw new DbCommandError(
+					`db baseline needs the id of the last migration the database already has\n\n${USAGE}`,
+				);
+			}
+			const recorded = await target.migrator.baseline(target.source, {
+				to,
+				dryRun: values["dry-run"],
+				log: out,
+			});
+			if (recorded.length === 0) out("Nothing to record");
 			return;
 		}
 		case "revert": {

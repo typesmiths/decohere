@@ -87,6 +87,27 @@ it("greets with the configured greeting", async () => {
 
 To stand in for a service, register an object under its class: `services.registerSingleton(UserService, { ensureFromPrincipal: async () => user })`. A scaffolded app comes with a spec like this, `tests/hello.controller.spec.ts`.
 
+## Request context in log lines
+
+Every line a `scribe.logger(...)` handle writes while a request is being served carries that request's `requestId`, and `principalId` (the principal's `sub`) once auth has checked it. That includes lines from services the controller calls, from middleware, and from an `@Sse()` stream while it runs. The app writes no code for it:
+
+```ts
+const log = scribe.logger("Orders");
+
+@injectable()
+export class OrderService {
+	public async place(order: Order) {
+		log.info("order placed"); // { name: "Orders", requestId: "…", principalId: "user-7", msg: "order placed" }
+	}
+}
+```
+
+The id is the client's `x-request-id`, or one generated for the request, and the response sends it back in the same header. Lines written outside a request (at start-up, in a hosted service) have neither field. Fields a child logger binds win over these.
+
+To read it yourself, for auditing or to pass the id on to another service, call `requestContext.getCurrent()`. It returns `{ requestId, principalId? }`, or `undefined` outside a request.
+
+`http(...)` does this with Node's `AsyncLocalStorage`, and hands the fields to scribe through `scribe.addContextSource` ([scribe: context sources](../scribe/README.md#context-sources)).
+
 ## Serving a built UI
 
 A module can serve its UI's build from its own API: one image, one origin, no CORS.
@@ -174,6 +195,37 @@ The `globalPrefix` setting puts every **controller route** under the prefix. It 
 What stays out is decided by the controller, never by matching a path, so a controller of yours that declares `/health` is prefixed like any other.
 
 The prefix is also what the static fallback treats as the API, see [Serving the UI from the root](#serving-the-ui-from-the-root).
+
+## Errors
+
+Every error the API sends is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem, with `Content-Type: application/problem+json`, so a client reads one shape:
+
+```json
+{ "type": "about:blank", "title": "Gone", "status": 410, "detail": "order 7 was cancelled" }
+```
+
+- **`throw new HttpError(message, status)`** answers `status`, with the message as `detail`. `UnauthorizedError`, `ForbiddenError` and `ValidationError` are kinds of it.
+- **Validation** (a pipe, an OpenAPI request schema) answers `400` and lists each issue under `errors`: `{ "path", "message", "keyword" }`.
+- **Nothing leaks.** A `401` and a `500` carry no `detail`: the message is logged, not sent. Any other thrown error is a `500`.
+- **Fastify's own answers** are problems too: an unknown route (`404`, `detail: "Route GET:/nope not found"`), a body that isn't valid JSON or is too large, the rate limit.
+
+A domain error names its problem with a `type` URI, and can add its own members:
+
+```ts
+class OutOfStockError extends HttpError {
+	public constructor(sku: string) {
+		super(`${sku} is out of stock`, 409, {
+			type: "https://shop.example/problems/out-of-stock",
+			title: "Out of stock",
+			extensions: { sku },
+		});
+	}
+}
+// 409 { "type": "https://shop.example/problems/out-of-stock", "title": "Out of stock",
+//       "status": 409, "detail": "SKU-1 is out of stock", "sku": "SKU-1" }
+```
+
+For an error that isn't an `HttpError`, such as one from a library, register an exception filter (`http(provider, { exceptionFilters: [...] })`, with `@Catch(TheError)`) and return `problemDetails.toResult(problemDetails.create(status, { detail }))`.
 
 ## Compression
 
