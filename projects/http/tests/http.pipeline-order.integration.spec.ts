@@ -18,7 +18,7 @@ import {
 	Post,
 	RequestParts,
 } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 class SecretConfigService implements IConfigurationService {
 	public get dataSources() {
@@ -72,7 +72,7 @@ describe("request pipeline order", () => {
 			})
 			.use(auth())
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	});
 
 	afterEach(async () => {

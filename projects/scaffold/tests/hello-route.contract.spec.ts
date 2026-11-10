@@ -25,10 +25,11 @@ describe("Hello controller route contract", () => {
 		expect(content).not.toMatch(/@Post\("\/"\)/);
 	});
 
-	it("enables openApi by default so Hello @Field bodies are validated", () => {
+	it("keeps webApi()'s OpenAPI document on, so Hello @Field bodies are validated", () => {
 		const content = new MainSourceFile("demo.api").files()[0]?.content ?? "";
-		expect(content).toContain("openApi:");
-		expect(content).toContain('title: "demo.api"');
+		expect(content).toContain("webApi({");
+		expect(content).not.toContain("openApi: false");
+		expect(content).toContain('applicationName: "demo.api"');
 	});
 
 	it("registers the paths clients call", () => {

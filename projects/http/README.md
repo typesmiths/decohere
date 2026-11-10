@@ -20,6 +20,73 @@ await Builder.create(new ServiceContainerBuilder())
 
 Everything `http(...)` takes is on `HttpSettings`. `configureHttp(settings)` adds to them from elsewhere, such as a plugin of your own that brings its controllers.
 
+## A web API in one call
+
+`webApi()`, from `@decohere/http/web-api`, adds the parts most APIs start with: the Fastify provider, configuration from YAML files and the environment, Pino logging, `/health` and `/ready`, and an OpenAPI document at `/openapi.json`. A whole app:
+
+```ts
+import { Builder } from "@decohere/core/hosting";
+import { ServiceContainerBuilder } from "@decohere/crucible";
+import { webApi } from "@decohere/http/web-api";
+
+export default await Builder.create(new ServiceContainerBuilder(), { applicationName: "orders" })
+	.use(webApi({ controllers: [HelloController] }))
+	.buildAndStart();
+```
+
+What it sets up, and how to change each part:
+
+| Part | Default | Change it with |
+|---|---|---|
+| HTTP | `http(FastifyProvider, { controllers })` | `provider`, and `http: { globalPrefix, cors, statics, ... }` for anything else `http()` takes |
+| Config | `config(new YamlDataSource({ app }), EnvDataSource)`: the files in `config/` if there are any (none is fine), then `SECTION__KEY` variables | `config: [...sources]`, or `false` to add your own `config(...)` |
+| Logging | Pino: pretty lines and a rolled `logs/<applicationName>.log` in development, JSON on stdout in production | `logging: { file, level }`; `file: false` writes no file; `false` leaves Scribe alone |
+| Probes | `health()` | `health: { checks, underGlobalPrefix }`, or `false` |
+| OpenAPI | Titled with the application name, version `1.0.0`; validates requests | `openApi: { info, path, ... }`, or `false` |
+
+`app` names the app in a project with several: it also reads `config.<app>.yaml` and `config.<app>.<NODE_ENV>.yaml`, and one of them must exist ([config](../config/README.md#yaml-files)). Anything else goes on the builder as usual (`.use(auth())`, `.withServices(...)`, `.withHostedService(...)`), and an app that spells every part out with `http(...)`, `config(...)` and `health()` works as before. Logging is set when `webApi()` is applied to the builder, since Scribe is one per process. Why a preset, and why here: [ADR 0026](../../docs/adr/0026-web-api-preset-and-test-helper.md).
+
+## Testing an app
+
+`@decohere/http/testing` starts an app on a free loopback port, so a test calls it over HTTP the way a client would, through routing, auth, validation and the real provider. `await using` stops it at the end of the block.
+
+```ts
+import { startTestApp } from "@decohere/http/testing";
+import { createApp } from "../src/app.js";
+
+it("says hello", async () => {
+	await using api = await startTestApp(createApp());
+
+	const response = await fetch(`${api.baseUrl}/hello`);
+
+	expect(response.status).toBe(200);
+});
+```
+
+`startTestApp(app)` takes a built app, or the promise `build()` returns. It starts it on `127.0.0.1:0` with no SIGTERM or SIGINT handlers, and gives back `baseUrl`, its origin (such as `http://127.0.0.1:41233`), `app` (its services are at `app.services`), `readEvents` for [streams](#testing-a-stream) and `stop()`. If the app fails to start, it is stopped and the error is thrown.
+
+To test some controllers without the rest of the app (no database, no identity provider), `bootModule` builds an app of only those, with the services you give it:
+
+```ts
+import { config, EnvDataSource } from "@decohere/config";
+import { bootModule } from "@decohere/http/testing";
+
+it("greets with the configured greeting", async () => {
+	vi.stubEnv("SAMPLE__GREETING", "Hi");
+	await using api = await bootModule({
+		controllers: [HelloController],
+		services: (services) => services.registerSingleton(SampleService),
+		configure: (builder) => builder.use(config(EnvDataSource)),
+	});
+
+	const response = await fetch(`${api.baseUrl}/hello`);
+
+	expect(await response.json()).toEqual({ message: "Hi" });
+});
+```
+
+To stand in for a service, register an object under its class: `services.registerSingleton(UserService, { ensureFromPrincipal: async () => user })`. A scaffolded app comes with a spec like this, `tests/hello.controller.spec.ts`.
+
 ## Serving a built UI
 
 A module can serve its UI's build from its own API: one image, one origin, no CORS.

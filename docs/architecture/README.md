@@ -13,7 +13,7 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 | [`@decohere/scribe`](../../projects/scribe/README.md) | `projects/scribe/scribe` | Logging facade; no dependencies, any runtime with a `console` ([ADR 0016](../adr/0016-scribe-on-any-runtime.md)) |
 | `@decohere/scribe-pino` | `projects/scribe/scribe-pino` | Pino writer |
 | `@decohere/scribe-console` | `projects/scribe/scribe-console` | JSON console writer (Workers, browsers, Deno, Bun, Node) |
-| [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: Fastify, routing, auth, OpenAPI, the app builder |
+| [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: Fastify, routing, auth, OpenAPI; the `webApi()` preset at `/web-api` and the test helpers at `/testing` ([ADR 0026](../adr/0026-web-api-preset-and-test-helper.md)) |
 | [`@decohere/config`](../../projects/config/README.md) | `projects/config` | Configuration from YAML and environment sources |
 | [`@decohere/data`](../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)) |
 | [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `bootstrap` |
@@ -33,7 +33,7 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 Layers, simplified:
 
 ```text
-runtime  (what a production app installs):  scribe → core → crucible → http, config, data*
+runtime  (what a production app installs):  scribe → core → crucible → config, data* · http (on config and scribe-pino)
 tooling  (never in a production app):       core → devkit → workspace → forge → flux → cli
 other:                                      testing · create (launcher) / scaffold · ci-tools
 ```
@@ -66,4 +66,4 @@ A fact has one owner, and consumers ask it. Flux and Forge both call `workspace.
 - **Configuration:** `@decohere/config` sources behind tokens.
 - **Data:** `@decohere/data` repositories over a request-scoped unit of work that tracks changes and writes them on `commit()`; queries in Decohere's `Query<T>`, never an ORM's options. Migrations are Decohere's own, the same with either provider; building an app changes nothing in its database, and starting it migrates (in development), synchronizes and seeds.
 - **Build and test:** Forge builds packages; tests compile through `@decohere/forge/vitest` (`forgeBuild`).
-- **Scaffolded apps:** `projects/<api>/`, with `main.ts` as the composition root.
+- **Scaffolded apps:** `projects/<api>/`: `app.ts` composes the app (`createApp()`, on `webApi()`), and `main.ts` starts it.

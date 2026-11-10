@@ -1,13 +1,11 @@
 import type { App } from "@decohere/core/hosting";
+import { startTestApp } from "../../src/testing/index.js";
 
 /**
- * Bind an OS-assigned port (`listen(0)`) on loopback and return the advertised origin.
+ * Start `app` on a free loopback port and return its origin. Only a shorter name for
+ * `startTestApp`, which owns this, kept for the suites that still call it: new tests use
+ * `startTestApp` from `@decohere/http/testing`, and this goes once nothing calls it.
  */
 export async function listenEphemeral(app: App): Promise<string> {
-	await app.start({ port: 0, host: "127.0.0.1" });
-	const address = app.addresses[0];
-	if (address == null) {
-		throw new Error("app.start({ port: 0 }) advertised no IPv4 address");
-	}
-	return address;
+	return (await startTestApp(app)).baseUrl;
 }

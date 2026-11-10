@@ -41,12 +41,12 @@ const PROVIDER = {
  * Model for an API's entry files:
  *
  * - `src/app.ts`: `createApp()` builds the app and starts nothing, so a tool or a test can use it;
- * - `src/main.ts`: sets up logging and starts the app;
+ * - `src/main.ts`: starts the app;
  * - `src/db.ts`, with a database: the db commands (`pnpm decohere db migrate`).
  *
- * Starts with the minimal HTTP + YAML config setup. Features mutate the model by calling
- * addImport / addBuilderCall / addEntity / addRepository. files() renders whatever has been
- * accumulated.
+ * Starts with `webApi()`: HTTP, config, logging, health and OpenAPI. Features mutate the model by
+ * calling addImport / addBuilderCall / addEntity / addRepository. files() renders whatever has
+ * been accumulated.
  */
 export class MainSourceFile implements KeyedModel {
 	public readonly key = WELL_KNOWN_FILES.MAIN_TS;
@@ -63,9 +63,7 @@ export class MainSourceFile implements KeyedModel {
 	public constructor(
 		private readonly appName: string,
 		private readonly apiName = "api",
-	) {
-		this.addImport("health", "@decohere/http").addImport("http", "@decohere/http");
-	}
+	) {}
 
 	/** Adds a named import to `app.ts`, e.g. `import { Foo } from "bar"`. */
 	public addImport(name: string, from: string, typeOnly = false): this {
@@ -76,7 +74,7 @@ export class MainSourceFile implements KeyedModel {
 	}
 
 	/**
-	 * Adds a builder call inserted after `.use(config())` and before
+	 * Adds a builder call inserted after `.use(webApi(...))` and before
 	 * `.withServices()`. Pass the call with its leading dot, e.g. `.use(auth())`.
 	 */
 	public addBuilderCall(call: string): this {
@@ -138,10 +136,9 @@ export class MainSourceFile implements KeyedModel {
 	private renderApp(): string {
 		const provider = PROVIDER[this._orm];
 		const imports: string[] = [
-			'import { config, EnvDataSource, YamlDataSource } from "@decohere/config";',
 			'import { Builder } from "@decohere/core/hosting";',
 			'import { ServiceContainerBuilder } from "@decohere/crucible";',
-			'import { FastifyProvider } from "@decohere/http/providers";',
+			'import { webApi } from "@decohere/http/web-api";',
 			'import { SampleService } from "./services/sample.service.js";',
 		];
 
@@ -180,9 +177,8 @@ export class MainSourceFile implements KeyedModel {
 		].join(" ");
 
 		const builderCalls: string[] = [
-			`\t\t.use(http(FastifyProvider, { controllers: [HelloController], openApi: { info: { title: "${this.appName}", version: "1.0.0" } } }))`,
-			`\t\t.use(config(new YamlDataSource({ app: "${this.apiName}" }), EnvDataSource))`,
-			`\t\t.use(health())`,
+			// HTTP, config from YAML and the environment, logging, /health and OpenAPI.
+			`\t\t.use(webApi({ app: "${this.apiName}", controllers: [HelloController] }))`,
 			...this._builderCalls.map((c) => `\t\t${c}`),
 			`\t\t.withServices((cb) => { ${serviceRegs} })`,
 		];
@@ -214,15 +210,10 @@ export class MainSourceFile implements KeyedModel {
 
 	private renderMain(): string {
 		return [
-			'import "@decohere/scribe-pino";',
-			'import { scribe } from "@decohere/scribe";',
 			'import { createApp } from "./app.js";',
-			"",
-			`scribe.withPinoPretty().and.withPinoRoll({ file: "logs/${this.appName}.log" });`,
 			"",
 			"const app = await createApp();",
 			"await app.start({ port: Number(process.env.PORT ?? 3000) });",
-			"",
 			"export default app;",
 			"",
 		].join("\n");

@@ -39,6 +39,7 @@ import { FinalizeFeature } from "./features/finalize.feature.js";
 import { ApiPackageJson } from "./models/api-package-json.model.js";
 import { ControllerSourceFile } from "./models/controller-source-file.model.js";
 import { GithubCiWorkflows } from "./models/github-ci.model.js";
+import { HelloSpecFile } from "./models/hello-spec-file.model.js";
 import { MainSourceFile } from "./models/main-source-file.model.js";
 import { WebapiProductionDockerfile } from "./models/production-dockerfile.model.js";
 import { SampleConfigModel, SampleServiceModel } from "./models/sample-files.model.js";
@@ -305,6 +306,7 @@ function addApiProject(
 	apiProject.addModel(new ApiPackageJson(workspaceName, apiName));
 	apiProject.addModel(new MainSourceFile(`${workspaceName}.${apiName}`, apiName));
 	apiProject.addModel(new ControllerSourceFile());
+	apiProject.addModel(new HelloSpecFile());
 	// main.ts names this app, and an app named in code must have a config file.
 	monoRepo.addModel(
 		new ConfigYaml(

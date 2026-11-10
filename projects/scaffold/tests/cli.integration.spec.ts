@@ -138,13 +138,18 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 		existsSync(join(root, "projects/api/src/main.ts")),
 		`${root}/projects/api/src/main.ts`,
 	).toBe(true);
-	expect(readFileSync(join(root, "projects/api/src/app.ts"), "utf8")).toContain("health()");
-	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain(
-		"Number(process.env.PORT ?? 3000)",
-	);
-	expect(readFileSync(join(root, "projects/api/src/main.ts"), "utf8")).toContain(
-		"scribe.withPinoPretty().and.withPinoRoll",
-	);
+	const app = readFileSync(join(root, "projects/api/src/app.ts"), "utf8");
+	expect(app).toContain('import { webApi } from "@decohere/http/web-api";');
+	expect(app).toContain('.use(webApi({ app: "api", controllers: [HelloController] }))');
+	const main = readFileSync(join(root, "projects/api/src/main.ts"), "utf8");
+	expect(main.trimEnd().split("\n").length, main).toBeLessThanOrEqual(5);
+	expect(main).toContain("Number(process.env.PORT ?? 3000)");
+	expect(main).toContain("export default app;");
+	const spec = readFileSync(join(root, "projects/api/tests/hello.controller.spec.ts"), "utf8");
+	expect(spec).toContain('import { bootModule } from "@decohere/http/testing";');
+	expect(spec).toContain("controllers: [HelloController]");
+	expect(spec).toContain("await fetch(`${api.baseUrl}/hello`)");
+	expect(spec).toContain("expect(response.status).toBe(200);");
 	expect(readFileSync(join(root, ".gitignore"), "utf8")).toContain("logs");
 	expect(
 		existsSync(join(root, "projects/api/src/controllers/hello.controller.ts")),
@@ -911,7 +916,7 @@ describe("decohere add auth0", () => {
 		const source = readFileSync(main, "utf8");
 		expect(source).toContain('import { auth } from "@decohere/http";');
 		expect(source).toMatch(
-			/\.use\(config\(new YamlDataSource\(\{ app: "api" \}\), EnvDataSource\)\)\n\s*\.use\(auth\(\)\)/,
+			/\.use\(webApi\(\{ app: "api", controllers: \[HelloController\] \}\)\)\n\s*\.use\(auth\(\)\)/,
 		);
 		expect(readFileSync("/my-app/config/config.yaml", "utf8")).toContain(
 			"discoveryUrl: ${AUTH0_ISSUER_BASE_URL}",
@@ -1066,7 +1071,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(env).not.toContain("PASSWORD");
 
 		const app = readFileSync("/my-app/projects/api/src/app.ts", "utf8");
-		expect(app).toContain("health()");
+		expect(app).toContain("webApi({");
 		expect(app).toContain(
 			'mikroOrm({ name: "api", entities: [SampleEntityMapping], repositories: [SampleEntityRepository], database: postgres, migrations })',
 		);

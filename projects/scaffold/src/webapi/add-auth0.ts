@@ -5,7 +5,8 @@ import { runAuth0Configure } from "./auth0-commands.js";
 import { AUTH_CONFIG_SECTION } from "./models/auth-config.model.js";
 
 const AUTH_IMPORT = 'import { auth } from "@decohere/http";';
-const CONFIGURATION_CALL = /^([ \t]*)\.use\(config\([^\n]*\)\)[ \t]*$/m;
+// After the preset in a generated app.ts, or after config(...) in an app from before it.
+const CONFIGURATION_CALL = /^([ \t]*)\.use\((?:webApi|config)\([^\n]*\)\)[ \t]*$/m;
 const IMPORT_STATEMENT = /^import\b[^;]*;[ \t]*$/gm;
 
 /**

@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Field, Param, Post, RequestParts } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 class NoteBody {
 	@Field(RequestParts.body, "text")
@@ -41,7 +41,7 @@ describe("request validation compiles each route's schemas once", () => {
 				}),
 			)
 			.build();
-		const baseURL = await listenEphemeral(app);
+		const baseURL = (await startTestApp(app)).baseUrl;
 		const compile = vi.spyOn(Ajv.prototype, "compile");
 		const post = (body: object) =>
 			axios.post("/notes/1", body, { baseURL, validateStatus: () => true });

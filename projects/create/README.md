@@ -82,11 +82,15 @@ my-app/
       Dockerfile        # copies .package/ (written by `forge package`)
       .dockerignore
       src/
-        main.ts
+        app.ts          # createApp(): webApi() and your services
+        main.ts         # starts it
         sample.config.ts
-        sample.service.ts
+        services/
+          sample.service.ts
         controllers/
           hello.controller.ts
+      tests/
+        hello.controller.spec.ts  # GET /hello over HTTP, no database or Docker
 ```
 
 Every API gets its own `projects/<name>/Dockerfile`; that folder is the Docker build context. The Dockerfile copies `.package/`, which `forge package` writes (see below).
@@ -100,6 +104,20 @@ USER root
 RUN apt-get update && apt-get install -y --no-install-recommends g++ make python3 && rm -rf /var/lib/apt/lists/*
 USER node
 ```
+
+#### The app and its test
+
+`src/app.ts` builds the app with [`webApi()`](../http/README.md#a-web-api-in-one-call), which brings Fastify, config from `config/` and the environment, Pino logging, `/health` and OpenAPI. `src/main.ts` only starts it:
+
+```ts
+import { createApp } from "./app.js";
+
+const app = await createApp();
+await app.start({ port: Number(process.env.PORT ?? 3000) });
+export default app;
+```
+
+`tests/hello.controller.spec.ts` boots the Hello controller as a real app on a free port and calls `GET /hello`, with no database, Auth0 or Docker, so `pnpm test` passes in a new project. Copy it for your own controllers; [Testing an app](../http/README.md#testing-an-app) shows how to test the whole app instead.
 
 #### Scripts
 
@@ -151,7 +169,7 @@ In the project's Dev Container:
 pnpm decohere add auth0
 ```
 
-This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.use(auth())` to each API's `main.ts`. Running it again changes nothing. If a `main.ts` no longer has the generated shape, the command leaves it alone and prints the lines to add. It also creates a `<project> Token` machine app (written to `.env` as `AUTH0_TOKEN_CLIENT_ID`). It doesn't add the local user profile a new project with Postgres gets.
+This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.use(auth())` to each API's `app.ts`. Running it again changes nothing. If an `app.ts` no longer has the generated shape, the command leaves it alone and prints the lines to add. It also creates a `<project> Token` machine app (written to `.env` as `AUTH0_TOKEN_CLIENT_ID`). It doesn't add the local user profile a new project with Postgres gets.
 
 Once Auth0 is added, **every route needs a token** unless it has `@AllowAnonymous()`, because `auth()` is secure by default. To call one, in the Dev Container:
 
@@ -204,7 +222,7 @@ Each API builds in `src/app.ts` (`createApp()`) and starts in `src/main.ts`. Its
 
 #### Health probes
 
-Scaffolded APIs call `.use(health())` so these routes are available **without auth**:
+Scaffolded APIs use `webApi()`, which adds `health()`, so these routes are available **without auth**:
 
 | Route | Purpose | Status |
 |---|---|---|
