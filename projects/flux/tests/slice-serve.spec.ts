@@ -3,7 +3,6 @@ import {
 	classifySliceProject,
 	classifySliceProjects,
 	isFluxAppMain,
-	isFluxOwnedScript,
 	isUnderSlice,
 	normalizeSlicePrefix,
 	projectsInSlice,
@@ -78,16 +77,20 @@ describe("projectsInSlice", () => {
 	});
 });
 
-describe("resolveDeferScript / isFluxOwnedScript", () => {
+describe("resolveDeferScript", () => {
 	it("prefers dev over serve when neither is Flux-owned", () => {
 		expect(resolveDeferScript({ serve: "vite", dev: "vite" })).toBe("dev");
 	});
 
 	it("skips Flux-owned scripts and falls through", () => {
-		expect(isFluxOwnedScript("flux serve --project api")).toBe(true);
 		expect(resolveDeferScript({ dev: "flux serve --project api", serve: "vite" })).toBe(
 			"serve",
 		);
+	});
+
+	it("leaves a script that calls forge or decohere to Flux too", () => {
+		expect(resolveDeferScript({ dev: "forge build --watch" })).toBeUndefined();
+		expect(resolveDeferScript({ dev: "decohere dev" })).toBeUndefined();
 	});
 
 	it("returns undefined when only Flux scripts exist", () => {
