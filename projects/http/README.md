@@ -20,37 +20,6 @@ await Builder.create(new ServiceContainerBuilder())
 
 Everything `http(...)` takes is on `HttpSettings`. `configureHttp(settings)` adds to them from elsewhere, such as a plugin of your own that brings its controllers.
 
-## Errors
-
-Every error the API sends is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem, with `Content-Type: application/problem+json`, so a client reads one shape:
-
-```json
-{ "type": "about:blank", "title": "Gone", "status": 410, "detail": "order 7 was cancelled" }
-```
-
-- **`throw new HttpError(message, status)`** answers `status`, with the message as `detail`. `UnauthorizedError`, `ForbiddenError` and `ValidationError` are kinds of it.
-- **Validation** (a pipe, an OpenAPI request schema) answers `400` and lists each issue under `errors`: `{ "path", "message", "keyword" }`.
-- **Nothing leaks.** A `401` and a `500` carry no `detail`: the message is logged, not sent. Any other thrown error is a `500`.
-- **Fastify's own answers** are problems too: an unknown route (`404`, `detail: "Route GET:/nope not found"`), a body that isn't valid JSON or is too large, the rate limit.
-
-A domain error names its problem with a `type` URI, and can add its own members:
-
-```ts
-class OutOfStockError extends HttpError {
-	public constructor(sku: string) {
-		super(`${sku} is out of stock`, 409, {
-			type: "https://shop.example/problems/out-of-stock",
-			title: "Out of stock",
-			extensions: { sku },
-		});
-	}
-}
-// 409 { "type": "https://shop.example/problems/out-of-stock", "title": "Out of stock",
-//       "status": 409, "detail": "SKU-1 is out of stock", "sku": "SKU-1" }
-```
-
-For an error that isn't an `HttpError`, such as one from a library, register an exception filter (`http(provider, { exceptionFilters: [...] })`, with `@Catch(TheError)`) and return `problemDetails.toResult(problemDetails.create(status, { detail }))`.
-
 ## Serving a built UI
 
 A module can serve its UI's build from its own API: one image, one origin, no CORS.
@@ -138,6 +107,37 @@ The `globalPrefix` setting puts every **controller route** under the prefix. It 
 What stays out is decided by the controller, never by matching a path, so a controller of yours that declares `/health` is prefixed like any other.
 
 The prefix is also what the static fallback treats as the API, see [Serving the UI from the root](#serving-the-ui-from-the-root).
+
+## Errors
+
+Every error the API sends is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem, with `Content-Type: application/problem+json`, so a client reads one shape:
+
+```json
+{ "type": "about:blank", "title": "Gone", "status": 410, "detail": "order 7 was cancelled" }
+```
+
+- **`throw new HttpError(message, status)`** answers `status`, with the message as `detail`. `UnauthorizedError`, `ForbiddenError` and `ValidationError` are kinds of it.
+- **Validation** (a pipe, an OpenAPI request schema) answers `400` and lists each issue under `errors`: `{ "path", "message", "keyword" }`.
+- **Nothing leaks.** A `401` and a `500` carry no `detail`: the message is logged, not sent. Any other thrown error is a `500`.
+- **Fastify's own answers** are problems too: an unknown route (`404`, `detail: "Route GET:/nope not found"`), a body that isn't valid JSON or is too large, the rate limit.
+
+A domain error names its problem with a `type` URI, and can add its own members:
+
+```ts
+class OutOfStockError extends HttpError {
+	public constructor(sku: string) {
+		super(`${sku} is out of stock`, 409, {
+			type: "https://shop.example/problems/out-of-stock",
+			title: "Out of stock",
+			extensions: { sku },
+		});
+	}
+}
+// 409 { "type": "https://shop.example/problems/out-of-stock", "title": "Out of stock",
+//       "status": 409, "detail": "SKU-1 is out of stock", "sku": "SKU-1" }
+```
+
+For an error that isn't an `HttpError`, such as one from a library, register an exception filter (`http(provider, { exceptionFilters: [...] })`, with `@Catch(TheError)`) and return `problemDetails.toResult(problemDetails.create(status, { detail }))`.
 
 ## Compression
 
