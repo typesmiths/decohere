@@ -1,4 +1,8 @@
-import { WorkspaceFactory, type WorkspaceOptions } from "@decohere/workspace";
+import {
+	UserConfigFactory,
+	WorkspaceFactory,
+	type WorkspaceOptions,
+} from "@decohere/workspace";
 import { resetMemfs } from "@decohere/testing";
 import { fs, vol } from "memfs";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -144,4 +148,20 @@ it("fires projectFileChanged$ when a source file is written after watch starts",
 			reject(new Error("projectFileChanged$ did not fire within timeout"));
 		}, 800);
 	});
+});
+
+it("adds a user's ignoreProjects to the defaults instead of replacing them", async () => {
+	vol.fromJSON({
+		...mockFiles,
+		// Not inside another project, so only the defaults' "**/dist/**" leaves it out.
+		[`${root}/projects/old/dist/package.json`]: JSON.stringify({ name: "OLD_BUILD" }),
+		[`${root}/projects/infra/package.json`]: JSON.stringify({ name: "INFRA" }),
+	});
+	vi.spyOn(UserConfigFactory, "getUserConfig").mockResolvedValue({
+		ignoreProjects: ["projects/infra/**"],
+	});
+
+	const workspace = await WorkspaceFactory.create({ rootDir: root });
+
+	expect(workspace.getProjects("debug").map((p) => p.name)).toEqual([MOCK_PROJ1, MOCK_PROJ2]);
 });
