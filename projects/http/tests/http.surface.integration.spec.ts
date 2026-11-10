@@ -125,7 +125,11 @@ describe("HTTP surface (filters, HttpCode/Header, middleware, CORS, global prefi
 
 		const boom = await axios.get("/api/widgets/boom", { validateStatus: () => true });
 		expect(boom.status).toBe(500);
-		expect(boom.data).toEqual({ message: "Internal Server Error" });
+		expect(boom.data).toEqual({
+			type: "about:blank",
+			title: "Internal Server Error",
+			status: 500,
+		});
 		expect(JSON.stringify(boom.data)).not.toMatch(/kaboom/i);
 
 		const preflight = await axios.options("/api/widgets", {

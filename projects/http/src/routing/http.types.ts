@@ -3,6 +3,7 @@ import type { Constructable, Type } from "@decohere/core/reflection";
 import type { HTTPMethod } from "../const.js";
 import type { SseOptions } from "../sse/sse.types.js";
 import type { Pipe } from "./pipes/pipes.js";
+import type { ProblemOptions } from "./problem-details.js";
 
 export type Metadata =
 	| "controller"
@@ -115,11 +116,17 @@ export class RouteConfigurationError extends Error {}
 export class RoutingError extends Error {}
 export class TransformError extends Error {}
 
+/**
+ * An error the API answers with `status`, sent as an RFC 9457 problem whose `detail` is the
+ * message. A domain error subclasses it and passes a problem `type`, `title` and extensions.
+ */
 export class HttpError extends Error {
 	public readonly status: number;
-	public constructor(message: string, status: number) {
+	public readonly problem: ProblemOptions;
+	public constructor(message: string, status: number, problem: ProblemOptions = {}) {
 		super(message);
 		this.status = status;
+		this.problem = problem;
 	}
 }
 

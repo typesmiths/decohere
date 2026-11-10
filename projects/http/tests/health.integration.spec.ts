@@ -85,7 +85,12 @@ describe("health / ready probes", () => {
 
 		const res = await axios.get("/ready", { validateStatus: () => true });
 		expect(res.status).toBe(503);
-		expect(res.data).toEqual({ message: "Not ready" });
+		expect(res.data).toEqual({
+			type: "about:blank",
+			title: "Service Unavailable",
+			status: 503,
+			detail: "Not ready",
+		});
 	});
 
 	it("GET /health and /ready stay anonymous when auth() is enabled", async () => {
