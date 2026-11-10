@@ -32,7 +32,7 @@ Each links to the record that says why. Read it before changing the area.
 
 GitHub issues and milestones are the only tracker. The full flow: [contributing](docs/contributing/#how-work-flows).
 
-- One issue → one branch `<type>/<issue#>-<slug>` → one PR whose body says `Closes #N`. Closely related issues can share a branch and PR when they touch the same code or one needs the other: name the branch for the main issue and list each in the body (`Closes #N`, `Closes #M`).
+- One issue → one branch `<type>/<issue#>-<slug>` → one PR whose body says `Closes #N`. Issues that touch the same code, or where one needs the other, share one branch and PR rather than a stack: name the branch for the main issue and list each in the body (`Closes #N`, `Closes #M`). Never merge `main` into a stacked branch; use GitHub's Rebase stack ([contributing](docs/contributing/#how-work-flows)).
 - PR descriptions follow `.github/pull_request_template.md`: the problem, what changed, how we know it works, in plain language for someone new to the code.
 - Bug fixes: write the failing test first, then fix, then rerun the same test.
 - Durable design choices get an ADR in `docs/adr/`: one record per topic, so check [the index](docs/adr/README.md) and update the existing record before adding a new one.
