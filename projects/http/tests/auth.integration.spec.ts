@@ -12,7 +12,7 @@ import type { IConfigurationService } from "@decohere/core/configuration";
 import { ConfigurationServiceToken } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
 import type { Principal } from "../src/auth/auth.types.js";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import {
 	AllowAnonymous,
 	Authorize,

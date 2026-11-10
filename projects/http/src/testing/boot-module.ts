@@ -3,7 +3,7 @@ import { ServiceContainerBuilder } from "@decohere/crucible";
 import type { ContainerBuilder } from "@decohere/crucible";
 import type { Constructable } from "@decohere/core/reflection";
 import { type App, Builder } from "@decohere/core/hosting";
-import { FastifyProvider } from "../providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import type { HttpProvider } from "../routing/http.types.js";
 import {
 	type EventStreamRead,

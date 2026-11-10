@@ -8,7 +8,7 @@ import { type App, Builder } from "@decohere/core/hosting";
 import type { IConfigurationService } from "@decohere/core/configuration";
 import { ConfigurationServiceToken } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { Authorize, Controller, Get } from "../src/routing/index.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
 import { LocalOidcServer } from "./helpers/local-oidc-server.js";

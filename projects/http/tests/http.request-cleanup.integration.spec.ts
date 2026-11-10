@@ -4,7 +4,7 @@ import { inject, injectable } from "@decohere/crucible/decorators";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { Controller, Get } from "../src/routing/index.js";
 import { listenEphemeral } from "./helpers/listen-ephemeral.js";
 

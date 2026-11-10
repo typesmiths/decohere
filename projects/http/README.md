@@ -1,8 +1,8 @@
 # @decohere/http
 
-HTTP/API platform for Decohere: decorator-based controllers, auth, OpenAPI, health, and a Fastify provider at the edge. Architecture and the provider boundary: [docs/architecture](../../docs/architecture/).
+HTTP/API platform for Decohere: decorator-based controllers, routing, auth, OpenAPI, health, problem details, and the `HttpProvider` contract a web server implements. Architecture and the provider boundary: [docs/architecture](../../docs/architecture/).
 
-Controllers and services depend on the contracts exported from `@decohere/http`. Fastify stays inside `FastifyProvider`.
+Controllers and services depend on the contracts exported from `@decohere/http`. The web server itself is a provider the app picks, in its own package: [`@decohere/http-fastify`](../http-fastify/README.md) (`FastifyProvider`) today.
 
 The app itself is built with `Builder`, from `@decohere/core/hosting`, on a container from `@decohere/crucible`. This package gives it plugins: `http(provider, settings)` adds the web server, with `health()` and `auth()` beside it, so an app with no web API doesn't need this package.
 
@@ -10,7 +10,7 @@ The app itself is built with `Builder`, from `@decohere/core/hosting`, on a cont
 import { Builder } from "@decohere/core/hosting";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { health, http } from "@decohere/http";
-import { FastifyProvider } from "@decohere/http/providers";
+import { FastifyProvider } from "@decohere/http-fastify";
 
 await Builder.create(new ServiceContainerBuilder())
 	.use(http(FastifyProvider, { controllers: [HelloController] }))
@@ -73,10 +73,9 @@ Builder.create(new ServiceContainerBuilder()).use(
 ### Rules
 
 - **Public.** Static files are served before the HTTP pipeline: `@Authorize`, tokens, validation and middleware never apply to the prefix, with or without `auth()`. An API route next to it still answers `401`. They are not listed in OpenAPI.
-- **Outside the rate limit.** A page load fetches dozens of files, so the API's limit would block ordinary use. Anything that is not served by the static plugin (including a `POST` to the prefix) is limited as usual. Helmet and CORS still apply.
+- **Outside the rate limit.** A page load fetches dozens of files, so the API's limit would block ordinary use. Anything that is not a static file (including a `POST` to the prefix) is limited as usual. Security headers and CORS still apply.
 - **Caching.** `index.html` and `remoteEntry.js` (the `noCache` list; a module-federation host loads the remote entry by a fixed name): `Cache-Control: no-cache`. A file whose name carries a content hash, such as `assets/index-DiwrgTda.js` or `style.3f9a8c1b.css` (8 or more letters, digits or `_` after a `-` or `.`, with a digit or a lower-then-upper pair): `public, max-age=31536000, immutable`. Everything else: `public, max-age=0, must-revalidate` with `ETag` and `Last-Modified`, so it is revalidated and answered `304`. `HEAD` and conditional requests work.
 - **Client routes.** An unknown path under the prefix (`/ui/portfolio/42`) serves `index.html`, so a reload on a client route works. It decides by what is asking, and serves the app only when **all** of these hold: the method is `GET` or `HEAD`; the path has no extension and no dotfile (`/ui/assets/gone.js` is a real `404`); the `Accept` header includes `text/html` (what a browser sends when it navigates; `application/json` or `*/*` does not count); and the path is not under one of the app's own routes (below). Anything else gets the HTTP package's normal JSON `404`. `/ui` redirects to `/ui/`.
-- **Safe paths.** `..` in any encoding cannot leave the directory, dotfiles answer `404`, and a directory is never listed.
 - **Safe paths.** `..` in any encoding cannot leave the directory, dotfiles answer `404`, and a directory is never listed.
 - **Missing directory.** In production (`NODE_ENV` not `development` or `dev`) the app **fails at start** with the path that is missing. In development it logs a warning and boots, so the API runs before the UI is built; the prefix answers `404` until you restart with the UI built. Set `onMissingDirectory` to choose.
 - **Prefix.** The global prefix does not apply to it. Two mounts work, and the more specific prefix wins (`/admin/` over `/`).
@@ -94,7 +93,7 @@ Builder.create(new ServiceContainerBuilder())
 	.use(health());
 ```
 
-`GET /` serves `index.html`, and so do `GET /portfolio/42` or any other client route a browser opens. The API keeps working because Fastify matches a specific route before the static wildcard; what needed care was an unknown path, where the app is the not-found handler. A request the HTTP package does not hand to the app gets the same JSON `404` as an app without a UI. A mistyped `GET /lp/portfolo` from an API client asks for JSON (or `*/*`), so it never gets HTML with status `200`.
+`GET /` serves `index.html`, and so do `GET /portfolio/42` or any other client route a browser opens. The API keeps working because the provider matches a registered route before the static files; what needed care was an unknown path, where the app is the not-found handler. A request the HTTP package does not hand to the app gets the same JSON `404` as an app without a UI. A mistyped `GET /lp/portfolo` from an API client asks for JSON (or `*/*`), so it never gets HTML with status `200`.
 
 **Under one of the app's own routes.** Without a global prefix, a path is under a registered route when its first segment is the first segment of any controller route, of `/health` and of the OpenAPI document. With a route `/lp/portfolio`, `/lp/portfolo` and `/lp/a/b` are API paths and answer the JSON `404` even to a browser; `/lpx` and `/portfolio` are not, and get the app. A route whose first segment is a parameter (`/:id`) says nothing and is skipped. So a client route cannot start with the same name as an API route.
 
@@ -140,7 +139,7 @@ Every error the API sends is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc945
 - **`throw new HttpError(message, status)`** answers `status`, with the message as `detail`. `UnauthorizedError`, `ForbiddenError` and `ValidationError` are kinds of it.
 - **Validation** (a pipe, an OpenAPI request schema) answers `400` and lists each issue under `errors`: `{ "path", "message", "keyword" }`.
 - **Nothing leaks.** A `401` and a `500` carry no `detail`: the message is logged, not sent. Any other thrown error is a `500`.
-- **Fastify's own answers** are problems too: an unknown route (`404`, `detail: "Route GET:/nope not found"`), a body that isn't valid JSON or is too large, the rate limit.
+- **The provider's own answers** are problems too: an unknown route (`404`, `detail: "Route GET:/nope not found"`), a body that isn't valid JSON or is too large, the rate limit.
 
 A domain error names its problem with a `type` URI, and can add its own members:
 
@@ -162,35 +161,20 @@ For an error that isn't an `HttpError`, such as one from a library, register an 
 
 ## Compression
 
-Responses are compressed with `br` or `gzip`, whichever the client accepts (`Accept-Encoding`), in every environment. Nothing to switch on: the HTTP package registers [`@fastify/compress`](https://github.com/fastify/fastify-compress) with best-practice defaults, and you override them if you need to. The plugin owns the policy; the HTTP package does not re-implement it.
+Responses are compressed with `br` or `gzip`, whichever the client accepts (`Accept-Encoding`), in every environment. Nothing to switch on: the provider compresses with best-practice defaults, and you override them if you need to. The provider's compression library owns the policy; the HTTP package does not re-implement it. How `FastifyProvider` does it: [`@decohere/http-fastify`](../http-fastify/README.md#compression).
 
-Defaults: on, a 1024-byte threshold, `encodings: ["br", "gzip"]` (no `deflate`), and the plugin's own list of compressible types (text, JSON, XML, `octet-stream`, and anything the MIME database marks compressible). Images, video, woff2 fonts, zip and PDF are not compressed again, and `text/event-stream` is not compressed. A client that sends no `Accept-Encoding` gets the plain body.
+Defaults: on, a 1024-byte threshold, `encodings: ["br", "gzip"]` (no `deflate`), and the provider's own list of compressible types. `text/event-stream` is never compressed by default, because compression buffers output and events would arrive late. A client that sends no `Accept-Encoding` gets the plain body.
 
 ```ts
 compression: {
-	threshold: 2048,                  // bytes, default 1024
+	threshold: 2048,                  // bytes, default 1024; not applied to streamed bodies
 	encodings: ["br", "gzip"],        // in order of preference; "deflate" is allowed
-	types: /^application\/vnd\.acme/, // see below
-	providerOptions: {                // Fastify-specific: any @fastify/compress option, merged last
-		brotliOptions: { params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 } },
-	},
+	types: /^application\/vnd\.acme/, // content types to compress as well; don't match text/event-stream
+	providerOptions: {},              // the provider's own options, merged last; not portable
 } }))
 ```
 
-What to know about the plugin's behaviour:
-
-- **`types` is for adding types.** It is passed as `customTypes`: it replaces the plugin's default pattern, but anything the MIME database marks compressible is still compressed. Do not match `text/event-stream` unless you want streams buffered.
-- **The threshold does not apply to streams.** Files served by `statics` are streams, so even a small text file is compressed on the fly. Their `Cache-Control`, `ETag` and `304` behave as before.
-- **`application/octet-stream` is compressed by default.** If you serve already-compressed bytes under that type, set the `Content-Type` of the real format or set your own `Content-Encoding`.
-- **Server-sent events are not compressed** by the plugin's default pattern, because compression buffers output and events would arrive late. Keep it that way.
-- **Unread streamed bodies hold up stopping.** A compressed file stays open until the client has read it, so `app.dispose()` waits for a client that fetched a static file and never read the body. In tests, read or cancel the body (or send `Accept-Encoding: identity`).
-- **Already encoded.** A response that sets its own `Content-Encoding` is passed through.
-- **`Vary: Accept-Encoding`** is added when a response is compressed.
-- **`HEAD`** is answered uncompressed: Fastify builds a `HEAD` reply before the plugin runs, so it has the plain `Content-Length` and no `Vary`. It has no body either way.
-- **A `304`** for a file can carry the `Content-Encoding` header of the `200` it stands for. It has no body.
-- **Helmet, CORS and the rate limit** are unaffected, and an error reply (a `401`, a `400` with a large body) is compressed like any other.
 - **BREACH.** Compressing a response served over HTTPS that contains both a secret and input an attacker controls can leak the secret to someone who can watch response sizes. It mostly concerns HTML that reflects input next to a CSRF token. A JSON API that authenticates with a bearer token in a header is low risk, because the token is not in the body. If you render such pages, mask per-response secrets, do not reflect input beside them, or turn compression off for them.
-- **Pre-compressed files.** Serving `.br`/`.gz` files built ahead of time is a possible later step; today static files are compressed on the fly.
 - **Testing.** Node's `fetch` negotiates and decodes compression itself. To see what is on the wire, use `node:http` and read the body undecoded.
 
 Why this shape: [ADR 0008](../../docs/adr/0008-response-compression-in-http.md).

@@ -173,7 +173,7 @@ Each night [`nightly.mjs`](../../projects/ci-tools/src/bench/nightly.mjs) runs t
 
 ## Published packages
 
-All under `projects/`, all public on npm: `@decohere/` `core`, `http`, `config`, `data`, `data-typeorm`, `workspace`, `devkit`, `testing`, `crucible`, `scribe`, `scribe-pino`, `scribe-console`, `forge`, `flux`, `cli`, `create`, `scaffold`, `ci-tools`. The Vitest plugin is `@decohere/forge/vitest`. `devcontainer` is private and ships only as an image.
+All under `projects/`, all public on npm: `@decohere/` `core`, `http`, `http-fastify`, `config`, `data`, `data-typeorm`, `workspace`, `devkit`, `testing`, `crucible`, `scribe`, `scribe-pino`, `scribe-console`, `forge`, `flux`, `cli`, `create`, `scaffold`, `ci-tools`. The Vitest plugin is `@decohere/forge/vitest`. `devcontainer` is private and ships only as an image.
 
 The repo installs no published `@decohere/*` package (`tools/register.mjs` runs everything from source), so a bad publish cannot break CI.
 
@@ -232,8 +232,8 @@ To point `latest` at a version on every package without the workflow:
 ```bash
 VERSION=<version>   # must already be on npm for every package; check the dev tag
 read -rp "OTP code: " OTP
-printf '%s\n' core http config data data-typeorm workspace devkit testing crucible scribe scribe-pino scribe-console forge flux cli create scaffold ci-tools |
-  xargs -P 18 -I{} npm dist-tag add "@decohere/{}@$VERSION" latest --otp="$OTP"
+printf '%s\n' core http http-fastify config data data-typeorm workspace devkit testing crucible scribe scribe-pino scribe-console forge flux cli create scaffold ci-tools |
+  xargs -P 19 -I{} npm dist-tag add "@decohere/{}@$VERSION" latest --otp="$OTP"
 ```
 
 If some fail because the code expired, run it again with a new code; repeating a package that already moved does no harm. A `+latest: ...` line means that package moved. `npm view` can show the old tag for a minute or so afterwards, so don't take that as a failure or retry because of it; `npm dist-tag add` warning `already set` confirms the move. Then check with `npm view @decohere/<name> dist-tags`.

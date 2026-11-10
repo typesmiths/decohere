@@ -1,11 +1,10 @@
 {
   "name": "@decohere/http",
   "version": "0.0.1-dev.5",
-  "description": "Web API and microservice platform built on Fastify with decorator-based routing",
+  "description": "Web API and microservice platform with decorator-based routing, auth and OpenAPI, on a pluggable HTTP provider",
   "keywords": [
     "typescript",
     "http",
-    "fastify",
     "rest",
     "api",
     "microservice",
@@ -43,16 +42,11 @@
   },
   "dependencies": {
     "@casl/ability": "^6.8.1",
-    "@decohere/crucible": "0.0.1-dev.5",
     "@decohere/core": "0.0.1-dev.5",
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/http-fastify": "0.0.1-dev.5",
     "@decohere/scribe": "0.0.1-dev.5",
-    "@fastify/compress": "^9.2.1",
-    "@fastify/cors": "^11.3.0",
-    "@fastify/helmet": "^13.1.0",
-    "@fastify/rate-limit": "^11.2.2",
-    "@fastify/static": "^10.1.10",
     "ajv": "^8.20.0",
-    "fastify": "^5.12.8",
     "jose": "^6.2.3",
     "picomatch": "^4.0.4"
   },
