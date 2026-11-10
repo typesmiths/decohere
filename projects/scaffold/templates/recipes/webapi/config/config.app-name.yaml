@@ -1,0 +1,3 @@
+# Settings only the app-name app reads, over config.yaml.
+sample:
+  greeting: Hello from app-name

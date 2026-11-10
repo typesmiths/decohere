@@ -8,6 +8,9 @@ import { PackageJson } from "../models/package-json.model.js";
 import { Project, type ProjectConfig, type ProjectSeed } from "../models/project.model.js";
 import type { WorkspaceOptions } from "../models/workspace-config.type.js";
 
+/** A project's own `ignore` and `copyFiles` (under `projects` in `.decohere.js`) add to the workspace's. */
+const PROJECT_ADDITIVE = ["ignore", "copyFiles"] as const;
+
 export class ProjectFactory {
 	public static async getProjectSeeds(config: WorkspaceOptions) {
 		const { includeProjects, ignoreProjects, rootDir } = config;
@@ -93,12 +96,17 @@ export class ProjectFactory {
 		const name = packageJsonData.name;
 		const packageJson = new PackageJson(packageJsonData);
 		const projectDir = path.dirname(file.relativePath);
+		const own = config?.projects?.[name] ?? {};
 		const mergedConfig = merge.withOptions<ProjectConfig>(
 			{ mergeArrays: false },
 			config,
-			config?.projects?.[name] ?? {},
+			own,
 			{ projectDir, packageJson },
 		);
+		// A project's own lists add to the workspace's, so it names only what it leaves out or adds.
+		for (const key of PROJECT_ADDITIVE) {
+			mergedConfig[key] = [...new Set([...(config[key] ?? []), ...(own[key] ?? [])])];
+		}
 		return { name, config: mergedConfig };
 	}
 }

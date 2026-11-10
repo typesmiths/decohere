@@ -10,5 +10,6 @@ export class AddAuth0Command extends DecohereCommand {
 		super(name);
 		this.description("Add Auth0 to an existing Decohere workspace");
 		this.option("-d <directory>", "Workspace directory (default: current directory)", ".");
+		this.option("--dry-run", "List what would change, and change nothing (Auth0 included)");
 	}
 }

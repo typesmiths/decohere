@@ -13,7 +13,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { resetMemfs } from "@decohere/testing";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { seedDevcontainerTemplates } from "./seed-devcontainer-templates.js";
+import { seedTemplates } from "./seed-templates.js";
 
 const realFs = await vi.importActual<typeof import("node:fs")>("node:fs");
 
@@ -76,7 +76,7 @@ vi.mock(import("../../devkit/src/interop/index.js"), async (importOriginal) => {
 	};
 });
 
-vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) => {
+vi.mock(import("../src/webapi/auth0-cli.js"), async (importOriginal) => {
 	const actual = await importOriginal();
 	return {
 		...actual,
@@ -96,9 +96,9 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 	};
 });
 
-const { Auth0AuthError } = await import("../src/webapi/features/auth0-cli.js");
+const { Auth0AuthError } = await import("../src/webapi/auth0-cli.js");
 
-vi.mock("../src/webapi/features/format-files.js", () => ({
+vi.mock("../src/webapi/format-files.js", () => ({
 	formatScaffoldedFiles: vi.fn(),
 }));
 
@@ -140,7 +140,8 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	).toBe(true);
 	const app = readFileSync(join(root, "projects/api/src/app.ts"), "utf8");
 	// The app spells out its composition, so it can swap any part.
-	expect(app).toContain("http(FastifyProvider, { controllers: [HelloController]");
+	expect(app).toContain("http(FastifyProvider, {");
+	expect(app).toContain("controllers: [HelloController],");
 	expect(app).toContain('.use(config(new YamlDataSource({ app: "api" }), EnvDataSource))');
 	expect(app).toContain(".use(health())");
 	expect(app).toContain("scribe.withPinoPretty().and.withPinoRoll");
@@ -267,7 +268,7 @@ async function runCliAsNodeBin(
 	vi.resetModules();
 	if (options?.resetFs !== false) {
 		resetMemfs();
-		seedDevcontainerTemplates();
+		seedTemplates();
 	}
 	vi.spyOn(process, "cwd").mockReturnValue("/");
 	if (options?.builder === false) {
@@ -416,7 +417,7 @@ describe("scaffolder writes a webapi project", () => {
 		const pkg = JSON.parse(readFileSync(join("/workspace", "package.json"), "utf8")) as {
 			name?: string;
 		};
-		expect(pkg.name).toBe("test1.api");
+		expect(pkg.name).toBe("test1");
 	});
 });
 
@@ -1032,17 +1033,24 @@ describe("scaffolder writes a root README with CLI examples", () => {
 		expect(readme).toContain("pnpm dev");
 	});
 
-	it("refreshes API scripts when webapi add runs", async () => {
+	it("adds the new API's scripts, and leaves the README as it was, when webapi add runs", async () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+		const before = readFileSync("/my-app/README.md", "utf8");
 		await runCliAsNodeBin(["add", "api", "billing", "-d", "my-app", ...NON_INTERACTIVE], {
 			resetFs: false,
 		});
 
-		const readme = readFileSync("/my-app/README.md", "utf8");
-		expect(readme).toContain("pnpm run start:api");
-		expect(readme).toContain("pnpm run start:billing");
-		expect(readme).toContain("pnpm run dev:billing");
-		expect(readme).toContain("decohere add api <name>");
+		const scripts = (
+			JSON.parse(readFileSync("/my-app/package.json", "utf8")) as {
+				scripts: Record<string, string>;
+			}
+		).scripts;
+		expect(scripts["start:api"]).toBeTruthy();
+		expect(scripts["start:billing"]).toBe(
+			"node dist/release/projects/billing/es6/src/main.js",
+		);
+		expect(scripts["dev:billing"]).toContain("PORT=3001");
+		expect(readFileSync("/my-app/README.md", "utf8")).toBe(before);
 	});
 
 	it("keeps db:* after webapi add when the workspace already has postgres", async () => {
@@ -1053,7 +1061,7 @@ describe("scaffolder writes a root README with CLI examples", () => {
 
 		const readme = readFileSync("/my-app/README.md", "utf8");
 		expect(readme).toContain("pnpm db:up");
-		expect(readme).toContain("pnpm run start:billing");
+		expect(readme.match(/^## Database$/gm)).toHaveLength(1);
 	});
 });
 
@@ -1077,7 +1085,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		const app = readFileSync("/my-app/projects/api/src/app.ts", "utf8");
 		expect(app).toContain("health()");
 		expect(app).toContain(
-			'mikroOrm({ name: "api", entities: [SampleEntityMapping], repositories: [SampleEntityRepository], database: postgres, migrations })',
+			'mikroOrm({\n\t\t\t\tname: "api",\n\t\t\t\tentities: [SampleEntityMapping],\n\t\t\t\trepositories: [SampleEntityRepository],\n\t\t\t\tdatabase: postgres,\n\t\t\t\tmigrations,',
 		);
 		expect(app).toContain('import { migrations } from "./migrations/index.js";');
 
@@ -1206,11 +1214,9 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(billingDb).toBeTruthy();
 		expect(apiDb).not.toBe(billingDb);
 
-		expect(readFileSync("/my-app/projects/api/src/app.ts", "utf8")).toContain(
-			'mikroOrm({ name: "api"',
-		);
+		expect(readFileSync("/my-app/projects/api/src/app.ts", "utf8")).toContain('name: "api",');
 		expect(readFileSync("/my-app/projects/billing/src/app.ts", "utf8")).toContain(
-			'mikroOrm({ name: "billing"',
+			'name: "billing",',
 		);
 
 		const compose = readFileSync("/my-app/.devcontainer/docker-compose.yml", "utf8");
@@ -1303,7 +1309,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(env).toContain("API_DB_HOST=postgres");
 		expect(env).toContain("BILLING_DB_HOST=postgres");
 		expect(readFileSync("/my-app/projects/billing/src/app.ts", "utf8")).toContain(
-			'mikroOrm({ name: "billing"',
+			'name: "billing",',
 		);
 
 		expect(existsSync("/my-app/projects/api/src/db.ts")).toBe(true);

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resetMemfs } from "@decohere/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { seedDevcontainerTemplates } from "./seed-devcontainer-templates.js";
+import { seedTemplates } from "./seed-templates.js";
 
 /**
  * Feature-level coverage for Auth0 wiring.
@@ -60,7 +60,7 @@ vi.mock(import("../../devkit/src/interop/index.js"), async (importOriginal) => {
 	};
 });
 
-vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) => {
+vi.mock(import("../src/webapi/auth0-cli.js"), async (importOriginal) => {
 	const actual = await importOriginal();
 	return {
 		...actual,
@@ -71,6 +71,7 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 		listTenants: () => [{ name: "dev-tenant.us.auth0.com", active: true }],
 		listApis: () => [{ name: "webapi API", identifier: "https://api.webapi" }],
 		updateApiScopes: mockUpdateApiScopes,
+		listApiScopes: () => [],
 		createApi: mockCreateApi,
 		createAdminDatabaseUser: mockCreateAdminDatabaseUser,
 		ensureSpaApp: mockEnsureSpaApp,
@@ -78,7 +79,7 @@ vi.mock(import("../src/webapi/features/auth0-cli.js"), async (importOriginal) =>
 	};
 });
 
-vi.mock("../src/webapi/features/format-files.js", () => ({
+vi.mock("../src/webapi/format-files.js", () => ({
 	formatScaffoldedFiles: vi.fn(),
 }));
 
@@ -86,13 +87,7 @@ const { scaffoldApi } = await import("../src/webapi/create-api.js");
 
 const TARGET = "/my-api";
 
-/** Extra Auth0 fields accepted via the shared options bag (AuthFeature). */
-type ScaffoldOpts = Parameters<typeof scaffoldApi>[0] & {
-	issuerBaseUrl?: string;
-	audience?: string;
-	adminUsername?: string;
-	adminPassword?: string;
-};
+type ScaffoldOpts = Parameters<typeof scaffoldApi>[0];
 
 function read(rel: string): string {
 	return readFileSync(join(TARGET, rel), "utf8");
@@ -107,8 +102,7 @@ const baseOpts = (): ScaffoldOpts => ({
 	d: TARGET,
 	databaseProvider: "postgres/typeorm",
 	authProvider: "auth0",
-	issuerBaseUrl: "https://dev-tenant.us.auth0.com",
-	audience: "https://api.webapi",
+	auth0Api: { audience: "https://api.webapi", create: false },
 	adminUsername: "admin",
 	adminPassword: "Generated1!",
 	installDependencies: "no",
@@ -118,7 +112,7 @@ beforeEach(() => {
 	vi.spyOn(process, "cwd").mockReturnValue("/");
 	process.env.DECOHERE_BUILDER = "1";
 	resetMemfs();
-	seedDevcontainerTemplates();
+	seedTemplates();
 	mockInstall.mockClear();
 	mockAsk.mockClear();
 	mockCreateApi.mockClear();
@@ -145,7 +139,7 @@ afterEach(() => {
 describe("scaffoldApi auth0 wiring", () => {
 	describe("when you answer the questions yourself", () => {
 		const asked = (): ScaffoldOpts => {
-			const { issuerBaseUrl: _i, audience: _a, adminUsername: _u, ...options } = baseOpts();
+			const { auth0Api: _a, adminUsername: _u, ...options } = baseOpts();
 			return options;
 		};
 		const quitAtAdminPrompt = () => {
@@ -196,7 +190,10 @@ describe("scaffoldApi auth0 wiring", () => {
 			await scaffoldApi(asked());
 
 			expect(mockCreateApi).not.toHaveBeenCalled();
-			expect(mockUpdateApiScopes).toHaveBeenCalledWith("https://api.webapi");
+			expect(mockUpdateApiScopes).toHaveBeenCalledWith(
+				"https://api.webapi",
+				expect.arrayContaining(["read:Hello"]),
+			);
 			expect(read(".env")).toContain("AUTH0_AUDIENCE=https://api.webapi");
 		});
 	});

@@ -26,7 +26,9 @@ Test what the program does for its users (files written, HTTP responses, exit co
 
 | Concern | Canonical behavior suite | Units only for |
 |---|---|---|
-| scaffolder tree | `projects/scaffold/tests/cli.integration.spec.ts` | model and contract edges |
+| scaffolder tree | `projects/scaffold/tests/cli.integration.spec.ts` | contract edges |
+| a recipe runs as it is | `projects/scaffold/tests/recipes.spec.ts`, plus each recipe's own `tests/` | none |
+| each `decohere add` step, once on a recipe | `projects/scaffold/tests/add-steps.integration.spec.ts` | Auth0 setup in `auth.wiring.spec.ts` |
 | a generated app's types | `projects/scaffold/e2e/generated-app-types.e2e.spec.ts`, against the release build, in CI's `package` job on PRs | none |
 | what a user installs | `projects/create/e2e/real-install.e2e.spec.ts`, against a temporary registry, in CI's `verify-release` job on `main` | `runInBuilder` and argv in `projects/create/tests/runner.spec.ts` |
 | product CLI shape | `projects/cli/tests/product.integration.spec.ts` | per-module forge, flux and create suites |

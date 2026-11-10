@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "db:up": "bash .devcontainer/initialize.sh && docker compose -f .devcontainer/docker-compose.yml up -d postgres",
+    "db:down": "docker compose -f .devcontainer/docker-compose.yml down",
+    "db:reset": "docker compose -f .devcontainer/docker-compose.yml down && rm -rf .devcontainer/postgres-data && bash .devcontainer/initialize.sh && docker compose -f .devcontainer/docker-compose.yml up -d postgres"
+  },
+  "dependencies": {
+    "@decohere/data": "*",
+    "@decohere/data-postgres": "*"
+  }
+}

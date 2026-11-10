@@ -61,7 +61,8 @@ A fact has one owner, and consumers ask it. Flux and Forge both call `workspace.
 
 A new app should run in minutes, and a grown app should use only what it needs and be able to swap any part.
 
-- **A recipe is code the scaffolder writes into the app**, not a package the app imports. A web API on Fastify gets an `app.ts` that spells out its composition: logging, `http(FastifyProvider, …)`, `config(…)`, `health()`. Swapping the HTTP provider or the logger is editing that line. More recipes (another provider, a worker without HTTP) are more scaffolder templates, not more packages.
+- **A recipe is a working app checked into the scaffolder, which copies it into the workspace**, not a package the app imports. A web API on Fastify gets an `app.ts` that spells out its composition: logging, `http(FastifyProvider, …)`, `config(…)`, `health()`. Swapping the HTTP provider or the logger is editing that line. The repo boots each recipe as it is. More recipes (another provider, a worker without HTTP) are more folders, not more packages.
+- **Options are add steps on top of a recipe.** Postgres, Auth0 and the rest are `decohere add` steps, the same at create time and later: they only add, change `app.ts` only in its generated shape (else print the lines), and change nothing when run again ([ADR 0026](../adr/0026-app-recipes-and-test-helper.md)).
 - **No preset hides the composition.** A plugin that wires several packages would hard-wire one vendor per part, and need one more package for each combination.
 - **Each package depends only on what its own code needs.** `@decohere/http` doesn't install config or a logging library. A package that pulls in more is a bug against this rule.
 

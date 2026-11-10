@@ -20,7 +20,7 @@ const {
 	login,
 	requestAccessToken,
 	updateApiScopes,
-} = await import("../src/webapi/features/auth0-cli.js");
+} = await import("../src/webapi/auth0-cli.js");
 
 beforeEach(() => {
 	mockSpawnSync.mockReset();

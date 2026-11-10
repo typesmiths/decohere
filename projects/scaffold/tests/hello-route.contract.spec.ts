@@ -1,55 +1,26 @@
-import { describe, expect, it } from "vitest";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
 import type { RouteMetadata } from "../../http/src/routing/http.types.js";
-import {
-	Controller,
-	Delete,
-	Get,
-	Param,
-	Post,
-	Put,
-	Query,
-} from "../../http/src/routing/index.js";
 import { RouteRegistry } from "../../http/src/routing/services/route-registry.js";
-import { ControllerSourceFile } from "../src/webapi/models/controller-source-file.model.js";
-import { MainSourceFile } from "../src/webapi/models/main-source-file.model.js";
+import { templates } from "../src/templates/templates.js";
+import { HelloController } from "../templates/recipes/webapi/projects/app-name/src/controllers/hello.controller.js";
+
+const realFs = await vi.importActual<typeof import("node:fs")>("node:fs");
 
 /**
- * Contract: scaffolded Hello routes register without a trailing slash.
+ * Contract: the recipe's Hello routes register without a trailing slash.
  * Regression: `@Post("/")` registered POST /hello/ while clients called POST /hello.
  */
-
-describe("Hello controller route contract", () => {
-	it("generates @Post() without a trailing-slash path", () => {
-		const content = new ControllerSourceFile().files()[0]?.content ?? "";
-		expect(content).toMatch(/@Post\(\)/);
-		expect(content).not.toMatch(/@Post\("\/"\)/);
-	});
-
-	it("enables openApi by default so Hello @Field bodies are validated", () => {
-		const content = new MainSourceFile("demo.api").files()[0]?.content ?? "";
-		expect(content).toContain("openApi:");
-		expect(content).toContain('title: "demo.api"');
+describe("the web API recipe's Hello routes", () => {
+	it("enables openApi, so Hello's @Field bodies are validated", () => {
+		const app = realFs.readFileSync(
+			join(templates.recipesDir(), "webapi/projects/app-name/src/app.ts"),
+			"utf8",
+		);
+		expect(app).toContain("openApi:");
 	});
 
 	it("registers the paths clients call", () => {
-		@Controller({ prefix: "/hello" })
-		class HelloController {
-			@Get()
-			public getAll(@Query("filter") _filter: string) {}
-
-			@Get("/:id")
-			public getOne(@Param("id") _id: string) {}
-
-			@Post()
-			public create() {}
-
-			@Put("/:id")
-			public update(@Param("id") _id: string) {}
-
-			@Delete("/:id")
-			public remove(@Param("id") _id: string) {}
-		}
-
 		const registry = new RouteRegistry();
 		registry.addController(HelloController);
 

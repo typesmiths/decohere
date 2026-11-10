@@ -1,0 +1,13 @@
+{
+  "configurations": [
+    {
+      "name": "Serve / Dev (app-name)",
+      "type": "node",
+      "request": "launch",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["run", "dev:app-name"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

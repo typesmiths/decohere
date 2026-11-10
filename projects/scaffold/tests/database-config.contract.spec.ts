@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { resetMemfs } from "@decohere/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveYamlConfig } from "../../config/src/yaml-data-source.js";
-import { seedDevcontainerTemplates } from "./seed-devcontainer-templates.js";
+import { seedTemplates } from "./seed-templates.js";
 
 /**
  * Contract: the config files the scaffold writes are read the way an app boots them.
@@ -29,7 +29,7 @@ vi.mock(import("../../devkit/src/interop/index.js"), async (importOriginal) => {
 	};
 });
 
-vi.mock("../src/webapi/features/format-files.js", () => ({
+vi.mock("../src/webapi/format-files.js", () => ({
 	formatScaffoldedFiles: vi.fn(),
 }));
 
@@ -95,7 +95,7 @@ beforeEach(() => {
 	vi.spyOn(process, "cwd").mockReturnValue("/");
 	vi.stubEnv("DECOHERE_BUILDER", "1");
 	resetMemfs();
-	seedDevcontainerTemplates();
+	seedTemplates();
 });
 
 afterEach(() => {

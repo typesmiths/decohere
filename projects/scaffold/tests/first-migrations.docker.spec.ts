@@ -1,5 +1,6 @@
 // A generated app's first migrations are exactly what its ORM's `db generate` would write for the
 // mappings beside them, so the app's first `db generate` finds nothing until a mapping changes.
+// The mappings and migrations are the add steps' own files, imported where they are.
 // Needs Docker: `pnpm test:docker`.
 import "reflect-metadata";
 import { join } from "node:path";
@@ -26,15 +27,8 @@ import {
 	type PostgresContainer,
 	startPostgres,
 } from "../../data/data-postgres/tests/postgres-container.js";
+import { templates } from "../src/templates/templates.js";
 import type { Orm } from "../src/webapi/database-provider.js";
-import {
-	sampleTable,
-	type TableTemplate,
-	userTable,
-} from "../src/webapi/features/orm-templates.js";
-
-// vitest.setup.ts swaps node:fs for memfs; the templates go on the real disk so they can import packages.
-const realFs = await vi.importActual<typeof import("node:fs")>("node:fs");
 
 class StaticConfig implements IConfigurationService {
 	public readonly dataSources = [];
@@ -46,78 +40,74 @@ class StaticConfig implements IConfigurationService {
 	}
 }
 
-/** The scaffold's own migration, as a migration: what its file does. */
-function asMigration(id: string, table: TableTemplate): Migration {
-	return {
-		id,
-		async up({ sql }) {
-			for (const statement of table.migration.up) await sql(statement);
-		},
-		async down({ sql }) {
-			for (const statement of table.migration.down) await sql(statement);
-		},
-	};
+/** A table an add step maps: the step's folder, its mapping, and its migration's name. */
+type Table = { step: string; mapping: string; exported: string; migration: string };
+
+function table(orm: Orm, step: string, entity: "sample" | "user"): Table {
+	const Entity = entity === "sample" ? "SampleEntity" : "UserEntity";
+	return orm === "mikro-orm"
+		? {
+				step,
+				mapping: `mappings/${entity}.mapping.ts`,
+				exported: `${Entity}Mapping`,
+				migration: `create-${entity}-entity`,
+			}
+		: {
+				step,
+				mapping: `entities/${entity}.entity.ts`,
+				exported: Entity,
+				migration: `create-${entity}-entity`,
+			};
 }
 
-const cases: { orm: Orm; tables: () => TableTemplate[] }[] = [
-	{ orm: "mikro-orm", tables: () => [sampleTable("mikro-orm")] },
-	{ orm: "mikro-orm", tables: () => [sampleTable("mikro-orm"), userTable("mikro-orm")] },
-	{ orm: "typeorm", tables: () => [sampleTable("typeorm")] },
-	{ orm: "typeorm", tables: () => [sampleTable("typeorm"), userTable("typeorm")] },
+async function load(path: string): Promise<Record<string, unknown>> {
+	return (await import(pathToFileURL(path).href)) as Record<string, unknown>;
+}
+
+const src = (step: string) => join(templates.dir(), "steps", step, "projects/app-name/src");
+
+const cases: { orm: Orm; tables: Table[] }[] = [
+	{ orm: "mikro-orm", tables: [table("mikro-orm", "mikro-orm", "sample")] },
+	{
+		orm: "mikro-orm",
+		tables: [
+			table("mikro-orm", "mikro-orm", "sample"),
+			table("mikro-orm", "users-mikro-orm", "user"),
+		],
+	},
+	{ orm: "typeorm", tables: [table("typeorm", "typeorm", "sample")] },
+	{
+		orm: "typeorm",
+		tables: [table("typeorm", "typeorm", "sample"), table("typeorm", "users-typeorm", "user")],
+	},
 ];
 
 describe("a generated app's first migrations", () => {
 	let server: PostgresContainer;
-	let folder: string;
 	let databases = 0;
 
 	beforeAll(async () => {
 		vi.stubEnv("NODE_ENV", "development");
 		server = await startPostgres({ trust: true });
-		folder = realFs.mkdtempSync(join(import.meta.dirname, ".first-migrations-"));
 	});
 
 	afterAll(async () => {
 		vi.unstubAllEnvs();
-		if (folder) realFs.rmSync(folder, { recursive: true, force: true });
 		await server?.stop();
 	});
 
-	/** Write a table's files under a folder of their own and import its mapping. */
-	async function mapping(orm: Orm, table: TableTemplate): Promise<unknown> {
-		const root = join(folder, orm);
-		for (const file of table.files) {
-			const path = join(root, file.filePath);
-			realFs.mkdirSync(join(path, ".."), { recursive: true });
-			realFs.writeFileSync(path, file.content);
-		}
-		const module = (await import(
-			pathToFileURL(
-				join(root, table.entity.importPath.replace(/^\.\//, "src/").replace(/\.js$/, ".ts")),
-			).href
-		)) as Record<string, unknown>;
-		return module[table.entity.className];
-	}
-
-	it.each(
-		cases.map(
-			(c) =>
-				[
-					c.orm,
-					c
-						.tables()
-						.map((t) => t.migration.name)
-						.join(" + "),
-					c,
-				] as const,
-		),
-	)(
+	it.each(cases.map((c) => [c.orm, c.tables.map((t) => t.migration).join(" + "), c] as const))(
 		"%s, %s: nothing left to generate once they're applied",
 		async (_orm, _tables, { orm, tables }) => {
-			const templates = tables();
-			const entities = await Promise.all(templates.map((t) => mapping(orm, t)));
-			const migrations = templates.map((t, i) =>
-				asMigration(`20261108-12000${i}-${t.migration.name}`, t),
+			const entities = await Promise.all(
+				tables.map(async (t) => (await load(join(src(t.step), t.mapping)))[t.exported]),
+			);
+			const migrations = await Promise.all(
+				tables.map(
+					async (t) =>
+						(await load(join(src(t.step), `migrations/00000000-000000-${t.migration}.ts`)))
+							.default as Migration,
+				),
 			);
 			databases += 1;
 			const info: ConnectionInfo = {
