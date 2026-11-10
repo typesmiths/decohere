@@ -18,6 +18,7 @@ import { ExceptionFilterHost } from "../routing/filters/exception-filter-host.js
 import { HttpAccessLogMiddleware } from "../routing/middleware/http-access-log.middleware.js";
 import type { Middleware } from "../routing/middleware/middleware.js";
 import { RouteRegistry } from "../routing/services/route-registry.js";
+import { requestContext } from "../routing/request-context.js";
 import { Router } from "../routing/services/router.js";
 import type { CompressionOptions } from "./http.compression.js";
 import { getOrCreateHttpOptions } from "./http.options.store.js";
@@ -96,6 +97,8 @@ export function http<Thttp extends Constructable<HttpProvider>>(
 		}
 
 		builder.withServices((containerBuilder: ContainerBuilder) => {
+			// The same function every time, so several apps in one process add it once.
+			scribe.addContextSource(requestContext.getLogFields);
 			scribe.logger("http").trace("Configuring Http Provider");
 
 			containerBuilder.registerSingleton(HttpOptionsToken, httpOptions);

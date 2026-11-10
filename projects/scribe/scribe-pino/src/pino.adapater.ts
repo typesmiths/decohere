@@ -215,6 +215,17 @@ function logMethod(this: pino.Logger, args: Parameters<LogFn>, method: LogFn) {
 		return;
 	}
 
+	// Fields first, `log.info({ orderId }, "text")`: Pino's own order.
+	if (message != null && typeof message === "object" && !Array.isArray(message)) {
+		const fields = data instanceof Error ? { ...message, error: data } : message;
+		if (typeof data === "string") {
+			method.call(this, fields, data);
+		} else {
+			method.call(this, fields);
+		}
+		return;
+	}
+
 	if (data instanceof Error) {
 		message = {
 			msg: message,

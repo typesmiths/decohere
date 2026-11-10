@@ -20,6 +20,27 @@ await Builder.create(new ServiceContainerBuilder())
 
 Everything `http(...)` takes is on `HttpSettings`. `configureHttp(settings)` adds to them from elsewhere, such as a plugin of your own that brings its controllers.
 
+## Request context in log lines
+
+Every line a `scribe.logger(...)` handle writes while a request is being served carries that request's `requestId`, and `principalId` (the principal's `sub`) once auth has checked it. That includes lines from services the controller calls, from middleware, and from an `@Sse()` stream while it runs. The app writes no code for it:
+
+```ts
+const log = scribe.logger("Orders");
+
+@injectable()
+export class OrderService {
+	public async place(order: Order) {
+		log.info("order placed"); // { name: "Orders", requestId: "…", principalId: "user-7", msg: "order placed" }
+	}
+}
+```
+
+The id is the client's `x-request-id`, or one generated for the request, and the response sends it back in the same header. Lines written outside a request (at start-up, in a hosted service) have neither field. Fields a child logger binds win over these.
+
+To read it yourself, for auditing or to pass the id on to another service, call `requestContext.getCurrent()`. It returns `{ requestId, principalId? }`, or `undefined` outside a request.
+
+`http(...)` does this with Node's `AsyncLocalStorage`, and hands the fields to scribe through `scribe.addContextSource` ([scribe: context sources](../scribe/README.md#context-sources)).
+
 ## Serving a built UI
 
 A module can serve its UI's build from its own API: one image, one origin, no CORS.

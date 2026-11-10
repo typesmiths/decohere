@@ -24,6 +24,12 @@ type LoggerFactoryOptions<
 
 export type LogTap = (entry: LogEntry) => void;
 
+/**
+ * Fields for whatever the caller is doing now, such as the request it serves.
+ * Called on every log call; return `undefined` outside that work.
+ */
+export type LogContextSource = () => Record<string, unknown> | undefined;
+
 export class scribe implements AsyncDisposable {
 	private loggerProvider: LoggerAdapter;
 	/** True after `configure({ adapter })` — the constructor’s ConsoleAdapter is only a fallback. */
@@ -31,6 +37,8 @@ export class scribe implements AsyncDisposable {
 	private defaultAdapterWarned = false;
 	private tap: LogTap | undefined;
 	private static instance: scribe = new scribe();
+	// Outlive configure(): a host adds its source once, adapters come and go.
+	private static readonly contextSources = new Set<LogContextSource>();
 
 	public static logger<T extends string = never, CustomOnly extends true | false = false>(
 		name?: string,
@@ -60,6 +68,43 @@ export class scribe implements AsyncDisposable {
 		return (name?: string) => scribe.logger<T, CustomOnly>(name);
 	}
 
+	/**
+	 * Add fields to every line a `scribe.logger(...)` handle writes while
+	 * `source` returns them: `@decohere/http` adds the request id this way.
+	 * Adding the same source twice adds it once. Returns a function that
+	 * removes it. Fields a child binds win over the source's.
+	 */
+	public static addContextSource(source: LogContextSource): () => void {
+		scribe.contextSources.add(source);
+		return () => {
+			scribe.contextSources.delete(source);
+		};
+	}
+
+	private static collectContext(): Record<string, unknown> | undefined {
+		let context: Record<string, unknown> | undefined;
+		for (const source of scribe.contextSources) {
+			const fields = source();
+			if (fields != null) {
+				context = { ...context, ...fields };
+			}
+		}
+		return context;
+	}
+
+	/**
+	 * The context's fields that the log call doesn't pass itself: the call's own value wins, and a
+	 * writer such as Pino would otherwise write the key twice.
+	 */
+	private static omitPassedFields(
+		context: Record<string, unknown>,
+		args: unknown[],
+	): Record<string, unknown> {
+		const passed = new Set(logEntry.getPassedFieldNames(args));
+		const kept = Object.entries(context).filter(([key]) => !passed.has(key));
+		return kept.length === Object.keys(context).length ? context : Object.fromEntries(kept);
+	}
+
 	public static flush(cb?: () => void): void {
 		scribe.instance.loggerProvider.flush(cb);
 	}
@@ -84,10 +129,9 @@ export class scribe implements AsyncDisposable {
 		T extends string = never,
 		CustomOnly extends true | false = false,
 	>(name?: string, bindings: Record<string, unknown> = {}): Logger<T, CustomOnly> {
-		const bound = Object.keys(bindings).length > 0;
-		const resolve = (): Logger<T, CustomOnly> => {
+		const resolve = (fields: Record<string, unknown>): Logger<T, CustomOnly> => {
 			const root = scribe.instance.getLogger<T, CustomOnly>(name);
-			return bound ? root.child(bindings) : root;
+			return Object.keys(fields).length > 0 ? root.child(fields) : root;
 		};
 		return new Proxy({} as Logger<T, CustomOnly>, {
 			get(_target, prop) {
@@ -95,7 +139,9 @@ export class scribe implements AsyncDisposable {
 					return (fields: Record<string, unknown>) =>
 						scribe.createLiveLogger<T, CustomOnly>(name, { ...bindings, ...fields });
 				}
-				const underlying = resolve();
+				const context = scribe.collectContext();
+				const fields = context == null ? bindings : { ...context, ...bindings };
+				const underlying = resolve(fields);
 				const value = Reflect.get(underlying, prop, underlying);
 				if (typeof value !== "function") {
 					return value;
@@ -103,20 +149,31 @@ export class scribe implements AsyncDisposable {
 				const method = (value as (...args: unknown[]) => unknown).bind(underlying);
 				const instance = scribe.instance;
 				if (
-					instance.tap == null ||
 					typeof prop !== "string" ||
 					!Object.hasOwn(underlying.logLevels, prop) ||
-					!underlying.isLevelEnabled(prop)
+					!underlying.isLevelEnabled(prop) ||
+					(instance.tap == null && context == null)
 				) {
 					return method;
 				}
 				return (...args: unknown[]) => {
-					method(...args);
-					instance.notifyTap(prop, name ?? "default", args, bindings);
+					const kept = context == null ? context : scribe.omitPassedFields(context, args);
+					if (kept === context) {
+						method(...args);
+						instance.notifyTap(prop, name ?? "default", args, fields);
+						return;
+					}
+					const lineFields = { ...kept, ...bindings };
+					const target = resolve(lineFields);
+					(Reflect.get(target, prop, target) as (...a: unknown[]) => unknown).apply(
+						target,
+						args,
+					);
+					instance.notifyTap(prop, name ?? "default", args, lineFields);
 				};
 			},
 			has(_target, prop) {
-				return Reflect.has(resolve(), prop);
+				return Reflect.has(resolve(bindings), prop);
 			},
 		});
 	}
