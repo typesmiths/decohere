@@ -36,10 +36,6 @@
     "./testing": {
       "types": "./types/src/testing/index.d.ts",
       "import": "./es6/src/testing/index.js"
-    },
-    "./web-api": {
-      "types": "./types/src/web-api/index.d.ts",
-      "import": "./es6/src/web-api/index.js"
     }
   },
   "scripts": {
@@ -47,11 +43,9 @@
   },
   "dependencies": {
     "@casl/ability": "^6.8.1",
-    "@decohere/config": "0.0.1-dev.5",
-    "@decohere/core": "0.0.1-dev.5",
     "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/core": "0.0.1-dev.5",
     "@decohere/scribe": "0.0.1-dev.5",
-    "@decohere/scribe-pino": "0.0.1-dev.5",
     "@fastify/compress": "^9.2.1",
     "@fastify/cors": "^11.3.0",
     "@fastify/helmet": "^13.1.0",

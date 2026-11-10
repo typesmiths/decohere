@@ -82,7 +82,7 @@ my-app/
       Dockerfile        # copies .package/ (written by `forge package`)
       .dockerignore
       src/
-        app.ts          # createApp(): webApi() and your services
+        app.ts          # createApp(): the app's composition and your services
         main.ts         # starts it
         sample.config.ts
         services/
@@ -107,7 +107,7 @@ USER node
 
 #### The app and its test
 
-`src/app.ts` builds the app with [`webApi()`](../http/README.md#a-web-api-in-one-call), which brings Fastify, config from `config/` and the environment, Pino logging, `/health` and OpenAPI. `src/main.ts` only starts it:
+`src/app.ts` is the app's composition, written out so you can see and change every part: Pino logging, `http(FastifyProvider, …)` with an OpenAPI document, `config(…)` from `config/` and the environment, and `health()`. To use another HTTP provider or logger, edit that line; nothing is hidden behind a preset ([architecture: progressive](../../docs/architecture/README.md#4-progressive-new-apps-start-from-a-recipe-the-app-owns)). `src/main.ts` only starts it:
 
 ```ts
 import { createApp } from "./app.js";
@@ -222,7 +222,7 @@ Each API builds in `src/app.ts` (`createApp()`) and starts in `src/main.ts`. Its
 
 #### Health probes
 
-Scaffolded APIs use `webApi()`, which adds `health()`, so these routes are available **without auth**:
+Scaffolded APIs call `.use(health())` so these routes are available **without auth**:
 
 | Route | Purpose | Status |
 |---|---|---|

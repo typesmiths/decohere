@@ -20,32 +20,6 @@ await Builder.create(new ServiceContainerBuilder())
 
 Everything `http(...)` takes is on `HttpSettings`. `configureHttp(settings)` adds to them from elsewhere, such as a plugin of your own that brings its controllers.
 
-## A web API in one call
-
-`webApi()`, from `@decohere/http/web-api`, adds the parts most APIs start with: the Fastify provider, configuration from YAML files and the environment, Pino logging, `/health` and `/ready`, and an OpenAPI document at `/openapi.json`. A whole app:
-
-```ts
-import { Builder } from "@decohere/core/hosting";
-import { ServiceContainerBuilder } from "@decohere/crucible";
-import { webApi } from "@decohere/http/web-api";
-
-export default await Builder.create(new ServiceContainerBuilder(), { applicationName: "orders" })
-	.use(webApi({ controllers: [HelloController] }))
-	.buildAndStart();
-```
-
-What it sets up, and how to change each part:
-
-| Part | Default | Change it with |
-|---|---|---|
-| HTTP | `http(FastifyProvider, { controllers })` | `provider`, and `http: { globalPrefix, cors, statics, ... }` for anything else `http()` takes |
-| Config | `config(new YamlDataSource({ app }), EnvDataSource)`: the files in `config/` if there are any (none is fine), then `SECTION__KEY` variables | `config: [...sources]`, or `false` to add your own `config(...)` |
-| Logging | Pino: pretty lines and a rolled `logs/<applicationName>.log` in development, JSON on stdout in production | `logging: { file, level }`; `file: false` writes no file; `false` leaves Scribe alone |
-| Probes | `health()` | `health: { checks, underGlobalPrefix }`, or `false` |
-| OpenAPI | Titled with the application name, version `1.0.0`; validates requests | `openApi: { info, path, ... }`, or `false` |
-
-`app` names the app in a project with several: it also reads `config.<app>.yaml` and `config.<app>.<NODE_ENV>.yaml`, and one of them must exist ([config](../config/README.md#yaml-files)). Anything else goes on the builder as usual (`.use(auth())`, `.withServices(...)`, `.withHostedService(...)`), and an app that spells every part out with `http(...)`, `config(...)` and `health()` works as before. Logging is set when `webApi()` is applied to the builder, since Scribe is one per process. Why a preset, and why here: [ADR 0026](../../docs/adr/0026-web-api-preset-and-test-helper.md).
-
 ## Testing an app
 
 `@decohere/http/testing` starts an app on a free loopback port, so a test calls it over HTTP the way a client would, through routing, auth, validation and the real provider. `await using` stops it at the end of the block.

@@ -134,9 +134,6 @@
       "@decohere/http/testing": [
         "./projects/http/src/testing/index.ts"
       ],
-      "@decohere/http/web-api": [
-        "./projects/http/src/web-api/index.ts"
-      ],
       "@decohere/scaffold": [
         "./projects/scaffold/src/index.ts"
       ],

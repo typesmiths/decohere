@@ -139,8 +139,12 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 		`${root}/projects/api/src/main.ts`,
 	).toBe(true);
 	const app = readFileSync(join(root, "projects/api/src/app.ts"), "utf8");
-	expect(app).toContain('import { webApi } from "@decohere/http/web-api";');
-	expect(app).toContain('.use(webApi({ app: "api", controllers: [HelloController] }))');
+	// The app spells out its composition, so it can swap any part.
+	expect(app).toContain("http(FastifyProvider, { controllers: [HelloController]");
+	expect(app).toContain('.use(config(new YamlDataSource({ app: "api" }), EnvDataSource))');
+	expect(app).toContain(".use(health())");
+	expect(app).toContain("scribe.withPinoPretty().and.withPinoRoll");
+	expect(app).not.toContain("webApi");
 	const main = readFileSync(join(root, "projects/api/src/main.ts"), "utf8");
 	expect(main.trimEnd().split("\n").length, main).toBeLessThanOrEqual(5);
 	expect(main).toContain("Number(process.env.PORT ?? 3000)");
@@ -916,7 +920,7 @@ describe("decohere add auth0", () => {
 		const source = readFileSync(main, "utf8");
 		expect(source).toContain('import { auth } from "@decohere/http";');
 		expect(source).toMatch(
-			/\.use\(webApi\(\{ app: "api", controllers: \[HelloController\] \}\)\)\n\s*\.use\(auth\(\)\)/,
+			/\.use\(config\(new YamlDataSource\(\{ app: "api" \}\), EnvDataSource\)\)\n\s*\.use\(auth\(\)\)/,
 		);
 		expect(readFileSync("/my-app/config/config.yaml", "utf8")).toContain(
 			"discoveryUrl: ${AUTH0_ISSUER_BASE_URL}",
@@ -1071,7 +1075,7 @@ describe("each API owns a database on the shared Postgres instance", () => {
 		expect(env).not.toContain("PASSWORD");
 
 		const app = readFileSync("/my-app/projects/api/src/app.ts", "utf8");
-		expect(app).toContain("webApi({");
+		expect(app).toContain("health()");
 		expect(app).toContain(
 			'mikroOrm({ name: "api", entities: [SampleEntityMapping], repositories: [SampleEntityRepository], database: postgres, migrations })',
 		);
