@@ -17,6 +17,7 @@ import type { HttpRequest } from "../http.types.js";
 import { RoutingError } from "../http.types.js";
 import { getAuthorizeOptions, isAllowAnonymous } from "../decorators/auth.decorator.js";
 import { composeMiddleware, type Middleware } from "../middleware/middleware.js";
+import { type RequestContext, requestContext } from "../request-context.js";
 import { RouteArgumentResolve } from "./route-argument-resolver.js";
 import { RouteRegistry } from "./route-registry.js";
 
@@ -62,7 +63,19 @@ export class Router {
 		}
 	}
 
-	public async route(routeKey: string, httpRequest: HttpRequest) {
+	public route(routeKey: string, httpRequest: HttpRequest) {
+		// Everything the handler awaits sees this request: log lines carry its id.
+		const context: RequestContext = { requestId: httpRequest.requestId };
+		return requestContext.run(context, () =>
+			this.routeInContext(routeKey, httpRequest, context),
+		);
+	}
+
+	private async routeInContext(
+		routeKey: string,
+		httpRequest: HttpRequest,
+		context: RequestContext,
+	) {
 		const routeConfig = this.routeRegistry.getRoute(routeKey);
 		if (!routeConfig) {
 			throw new RoutingError(`Route was not configured for key ${routeKey}`);
@@ -79,6 +92,7 @@ export class Router {
 		// the access log. Auth comes first so anonymous callers learn nothing about the body.
 		const handle = async () => {
 			const principal = await this.authorize(routeConfig, httpRequest);
+			context.principalId = principal?.sub;
 
 			if (this.httpOptions?.openapi?.validateRequests !== false && this.httpOptions?.openapi) {
 				validateRequest(routeConfig, httpRequest);
@@ -101,7 +115,9 @@ export class Router {
 					);
 				}
 				scopeHandedOff = true;
-				return new SseResponse(result, () => scope[Symbol.asyncDispose]());
+				return new SseResponse(requestContext.bindStream(context, result), () =>
+					scope[Symbol.asyncDispose](),
+				);
 			} catch (error) {
 				this.logger.error(error.message, error.stack);
 				throw error;
