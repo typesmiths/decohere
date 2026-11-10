@@ -23,6 +23,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { auth0Step } from "../src/steps/auth0.step.js";
+import { usersStep } from "../src/steps/users.step.js";
+import { WorkspaceChanges } from "../src/templates/workspace-changes.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const RELEASE = join(REPO, "dist/release/projects");
@@ -98,6 +101,74 @@ function forgeTypecheck(app: string) {
 	);
 }
 
+function generate(root: string, database: string) {
+	const generated = spawnSync(
+		process.execPath,
+		[
+			"--import",
+			join(REPO, "tools/register.mjs"),
+			join(REPO, "projects/scaffold/src/cli.ts"),
+			"create",
+			"webapi",
+			"orders",
+			"--database",
+			database,
+			"--auth",
+			"none",
+			"--install",
+			"no",
+		],
+		{ cwd: root, encoding: "utf8", input: "pnpm\n", timeout: TIMEOUT },
+	);
+	expect(generated.status, generated.stderr).toBe(0);
+	return join(root, "orders");
+}
+
+/**
+ * The Auth0 and users steps' code on top, without Auth0 itself: the files are what is checked
+ * here, and setting up a tenant needs a login.
+ */
+function addAuth0AndUsers(app: string) {
+	const changes = new WorkspaceChanges(app);
+	const targets = [{ name: "api", port: 3000 }];
+	auth0Step.apply(changes, "orders", targets, {});
+	usersStep.apply(changes, "orders", targets, {});
+	changes.commit();
+	expect(changes.byHand).toEqual([]);
+}
+
+// Each add step once, on top of the recipe: the recipe alone, then Postgres with each ORM, with
+// Auth0 and local users on top.
+describe.each(["postgres/mikro-orm", "postgres/typeorm"])(
+	"a generated app's types with %s, Auth0 and users",
+	(database) => {
+		let root: string;
+		let app: string;
+
+		beforeAll(() => {
+			root = mkdtempSync(join(tmpdir(), "decohere-generated-types-"));
+			app = generate(root, database);
+			addAuth0AndUsers(app);
+		}, TIMEOUT);
+
+		afterAll(() => {
+			rmSync(root, { recursive: true, force: true });
+		});
+
+		it(
+			"passes with what the app declares",
+			() => {
+				install(app, findBuiltPackages(RELEASE));
+
+				const result = forgeTypecheck(app);
+
+				expect(result.status, `${result.stdout}${result.stderr}`).toBe(0);
+			},
+			TIMEOUT,
+		);
+	},
+);
+
 describe("a generated app's types", () => {
 	let root: string;
 	let app: string;
@@ -113,26 +184,7 @@ describe("a generated app's types", () => {
 		}
 		built = findBuiltPackages(RELEASE);
 		root = mkdtempSync(join(tmpdir(), "decohere-generated-types-"));
-		app = join(root, "orders");
-		const generated = spawnSync(
-			process.execPath,
-			[
-				"--import",
-				join(REPO, "tools/register.mjs"),
-				join(REPO, "projects/scaffold/src/cli.ts"),
-				"create",
-				"webapi",
-				"orders",
-				"--database",
-				"none",
-				"--auth",
-				"none",
-				"--install",
-				"no",
-			],
-			{ cwd: root, encoding: "utf8", input: "pnpm\n", timeout: TIMEOUT },
-		);
-		expect(generated.status, generated.stderr).toBe(0);
+		app = generate(root, "none");
 		main = join(app, "projects/api/src/main.ts");
 		mainSource = readFileSync(main, "utf8");
 	}, TIMEOUT);

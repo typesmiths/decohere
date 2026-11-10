@@ -30,7 +30,13 @@ export default defineConfig({
 					name: "unit",
 					include: ["projects/**/*.{test,spec}.?(c|m)[jt]s?(x)"],
 					// *.docker.spec.ts need a Docker daemon: the "docker" project (`pnpm test:docker`).
-					exclude: ["**/node_modules/**", "**/e2e/**", "**/*.docker.spec.ts"],
+					// The scaffolder's add steps are parts of an app, with tests that only run inside one.
+					exclude: [
+						"**/node_modules/**",
+						"**/e2e/**",
+						"**/*.docker.spec.ts",
+						"projects/scaffold/templates/steps/**",
+					],
 					setupFiles: ["vitest.setup.ts"],
 				},
 			},

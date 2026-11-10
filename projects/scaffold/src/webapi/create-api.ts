@@ -1,24 +1,14 @@
-import type { DatabaseProvider } from "./database-provider.js";
-import { existsSync } from "node:fs";
-import { basename, join, resolve } from "node:path";
-import { DockerCompose } from "../models/compose.model.js";
-import { ConfigYaml } from "../models/config-yaml.model.js";
-import { WELL_KNOWN_FILES } from "../models/const.js";
-import { DevContainer } from "../models/dev-container.model.js";
-import {
-	commandHistory,
-	DockerfileModel,
-	withWorkspaceNodeModulesOwnership,
-} from "../models/docker-image.model.js";
-import { EnvFile } from "../models/env-file.model.js";
-import { Gitignore } from "../models/gitignore.model.js";
-import { LaunchJson } from "../models/launch-json.model.js";
-import { PackageJson, packageScript } from "../models/package-json.model.js";
-import { MonoRepoScaffold, ProjectScaffold } from "../models/project.model.js";
-import { TsConfig } from "../models/tsconfig.model.js";
-import { VitestConfig } from "../models/vitest-config.model.js";
-import { VSCodeSettings } from "../models/vscode-settings.model.js";
-import { ScaffoldService } from "../services/scaffold.service.js";
+import { basename, resolve } from "node:path";
+import type { PackageManager } from "@decohere/devkit/interop";
+import { detectPackageManager, promptForPackageManager } from "@decohere/devkit/interop";
+import { ask, closePrompt, pick } from "../domain/prompt.js";
+import type { AppTarget } from "../steps/apps.js";
+import { auth0Step } from "../steps/auth0.step.js";
+import { postgresStep } from "../steps/postgres.step.js";
+import { usersStep } from "../steps/users.step.js";
+import { merge } from "../templates/merge.js";
+import { templates } from "../templates/templates.js";
+import { WorkspaceChanges } from "../templates/workspace-changes.js";
 import {
 	CreateCliError,
 	isDecohereWorkspace,
@@ -26,26 +16,15 @@ import {
 	parseApiNames,
 } from "./api-name.js";
 import {
-	DEFAULT_WEBAPI_NAME,
-	webapiPackageName,
-	webapiPort,
-	webapiProjectDir,
-	webapiReleaseEntry,
-} from "./const.js";
-import { DevContainerHostScripts } from "./devcontainer/host-scripts.js";
-import { AuthFeature } from "./features/auth.feature.js";
-import { DatabaseFeature } from "./features/database.feature.js";
-import { FinalizeFeature } from "./features/finalize.feature.js";
-import { ApiPackageJson } from "./models/api-package-json.model.js";
-import { ControllerSourceFile } from "./models/controller-source-file.model.js";
-import { GithubCiWorkflows } from "./models/github-ci.model.js";
-import { HelloSpecFile } from "./models/hello-spec-file.model.js";
-import { MainSourceFile } from "./models/main-source-file.model.js";
-import { WebapiProductionDockerfile } from "./models/production-dockerfile.model.js";
-import { SampleConfigModel, SampleServiceModel } from "./models/sample-files.model.js";
-import { WebapiDevContainer } from "./models/webapi-image.model.js";
-
-export { WEBAPI_PROJECT_DIR, WEBAPI_RELEASE_ENTRY } from "./const.js";
+	type Auth0ApiChoice,
+	askAuth0Api,
+	configureTenant,
+	createAdminUser,
+} from "./auth0-commands.js";
+import { DEFAULT_WEBAPI_NAME, webapiPort, webapiProjectDir } from "./const.js";
+import { DATABASE_PROVIDERS, type DatabaseProvider, ormOf } from "./database-provider.js";
+import { formatScaffoldedFiles } from "./format-files.js";
+import { printByHand } from "./print-by-hand.js";
 
 export type ApiOptions = {
 	d?: string;
@@ -58,288 +37,164 @@ export type ApiOptions = {
 	authProvider?: "auth0" | "none";
 	databaseProvider?: DatabaseProvider;
 	installDependencies?: "yes" | "no";
+	/** The Auth0 API to use, instead of asking. */
+	auth0Api?: Auth0ApiChoice;
+	/** The Auth0 admin's username, instead of asking (with a database and Auth0). */
+	adminUsername?: string;
+	/** The Auth0 admin's password. Otherwise the launcher's, from `DECOHERE_ADMIN_PASSWORD`. */
+	adminPassword?: string;
 };
 
-const features = [DatabaseFeature, AuthFeature, FinalizeFeature];
+/** The recipe every web API starts from: templates/recipes/webapi. */
+const RECIPE = "recipes/webapi";
+
+async function askDatabase(): Promise<DatabaseProvider> {
+	const choices = DATABASE_PROVIDERS.map((label) => ({ label }));
+	return (await pick("\n  Database: ", choices, (c) => c.label))?.label ?? "none";
+}
+
+async function askAuth(): Promise<"auth0" | "none"> {
+	const choices = [{ label: "none" as const }, { label: "auth0" as const }];
+	return (await pick("\n  Auth provider: ", choices, (c) => c.label))?.label ?? "none";
+}
+
+/** Copies the recipe in as `projects/<name>/`, and forwards its port from the Dev Container. */
+function addApp(changes: WorkspaceChanges, workspace: string, target: AppTarget): void {
+	templates.apply(changes, RECIPE, { workspace, app: target.name, port: target.port });
+	const path = ".devcontainer/devcontainer.json";
+	const devcontainer = changes.read(path);
+	if (devcontainer == null) return;
+	const label = target.name === DEFAULT_WEBAPI_NAME ? "API" : target.name;
+	const ports = JSON.stringify({
+		forwardPorts: [target.port],
+		portsAttributes: { [target.port]: { label, requireLocalPort: true } },
+	});
+	const merged = merge.json(devcontainer, ports, path);
+	if (merged == null) {
+		changes.tellByHand(path, [`Forward port ${target.port} for ${target.name}.`]);
+		return;
+	}
+	changes.write(path, merged);
+}
 
 /**
- * Where a project's Auth0 CLI login lives on the host: in memory on Linux, and otherwise under the
- * home folder. One per project, so a project can't act on another's tenant. Keep in step with
- * `.devcontainer/initialize.sh`, which creates it first so Docker doesn't create it as root.
+ * `decohere create webapi` and `decohere add api`: the web API recipe for each name, then the
+ * chosen add steps on top. Every question is asked before Auth0 or the disk changes.
  */
-const AUTH0_LOGIN_ROOT = "${XDG_RUNTIME_DIR:-${HOME}/.config/decohere}/decohere-auth0";
-
-export async function scaffoldApi(cliOptions: ApiOptions) {
-	const targetDir = resolve(cliOptions.d ?? ".");
-	const projectName =
-		cliOptions.projectName?.trim() ||
+export async function scaffoldApi(options: ApiOptions): Promise<void> {
+	const targetDir = resolve(options.d ?? ".");
+	const workspace =
+		options.projectName?.trim() ||
 		process.env.DECOHERE_PROJECT_NAME?.trim() ||
 		basename(targetDir);
-	const names = parseApiNames(cliOptions.names);
-	const workspace = cliOptions.add
-		? createAddWorkspace(targetDir, projectName, names)
-		: createWorkspace(targetDir, projectName, names);
-	await ScaffoldService.scaffold(workspace, { ...cliOptions, names }, features);
-}
+	const names = parseApiNames(options.names);
+	const existing = options.add ? checkCanAdd(targetDir, names) : [];
+	const targets = names.map((name, index) => ({
+		name,
+		port: webapiPort(existing.length + index),
+	}));
 
-function createWorkspace(
-	targetDir: string,
-	projectName: string,
-	apiNames: readonly string[],
-): MonoRepoScaffold {
-	const monoRepo = new MonoRepoScaffold();
-	monoRepo.targetDir = targetDir;
-	monoRepo.setName(projectName);
-	const name = monoRepo.name;
-	// Project-named root so Cursor Agents (and other tools) label the workspace by name.
-	const workspaceRoot = `/${name}`;
+	const orm = ormOf(options.databaseProvider ?? (await askDatabase()));
+	const withAuth0 = (options.authProvider ?? (await askAuth())) === "auth0";
+	const auth0Api = withAuth0
+		? (options.auth0Api ?? (await askAuth0Api(workspace)))
+		: undefined;
+	const withUsers = withAuth0 && orm != null;
+	const adminUsername = withUsers
+		? (options.adminUsername ?? (await ask("\n  Admin username [admin]: ", "admin")))
+		: undefined;
+	const install = await askInstall(targetDir, options.installDependencies);
 
-	const compose = new DockerCompose()
-		.setProjectName(name)
-		.addNetwork(name, { name: `samples-${name}` })
-		.addService("devcontainer", {
-			build: ".",
-			volumes: [
-				// Repo bind in Compose (survives CLI recreates; Cursor-only mounts do not).
-				`..:${workspaceRoot}`,
-				// Outside the project, one per project. initialize.sh creates it first on the host, because
-				// Docker creates a missing host path as root.
-				`\${HOME}/.config/decohere/gh/${name}:/home/node/.config/gh`,
-				`webapi-node-modules:${workspaceRoot}/node_modules`,
-				// Named volume (not a Cursor-only mount) so CLI recreates keep Up-arrow history.
-				`${commandHistory.volumeName}:${commandHistory.dir}`,
-				// A folder on the host, so a rebuild keeps the Auth0 CLI login and you can see it.
-				`${AUTH0_LOGIN_ROOT}/${name}:/home/node/.config/auth0`,
-			],
-			env_file: [`\${HOME}/.config/decohere/gh/${name}.env`],
-			command: "sleep infinity",
-			networks: [name],
-		})
-		.addVolume("webapi-node-modules")
-		.addVolume(commandHistory.volumeName);
+	// Auth0 changes only once every question is answered.
+	const appCount = existing.length + names.length;
+	const auth0Env = auth0Api ? configureTenant(targetDir, workspace, appCount, auth0Api) : {};
+	const adminEnv =
+		adminUsername != null
+			? createAdminUser(
+					workspace,
+					adminUsername,
+					options.adminPassword ?? process.env.DECOHERE_ADMIN_PASSWORD,
+				)
+			: {};
 
-	const installCmd = "bash .devcontainer/post-create.sh";
-	const devContainer = new DevContainer()
-		.setWorkspaceFolder(workspaceRoot)
-		.addExtension("oxc.oxc-vscode", "esbenp.prettier-vscode", "vitest.explorer")
-		.setInitializeCommand("bash .devcontainer/initialize.sh")
-		.setPostCreateCommand(installCmd)
-		.setUpdateContentCommand(installCmd)
-		.useCompose();
-
-	forwardApiPorts(devContainer, apiNames, 0);
-
-	// Workspace-level models (repo root)
-	monoRepo.addModel(compose);
-	monoRepo.addModel(devContainer);
-	const appDevImage = new WebapiDevContainer();
-	appDevImage.addLayer(
-		withWorkspaceNodeModulesOwnership({ workspaceDir: workspaceRoot, asRoot: true }),
-	);
-	monoRepo.addModel(appDevImage);
-	monoRepo.addModel(new WebapiProductionDockerfile(apiNames));
-	monoRepo.addModel(new GithubCiWorkflows());
-	monoRepo.addModel(new VSCodeSettings(name));
-	monoRepo.addModel(new LaunchJson(apiNames));
-	monoRepo.addModel(new TsConfig());
-	monoRepo.addModel(new VitestConfig());
-	monoRepo.addModel(new PackageJson(`${name}.api`, { apiNames, workspaceName: name }));
-	monoRepo.addModel(new ConfigYaml(WELL_KNOWN_FILES.CONFIG_YAML, "config/config.yaml", ""));
-	monoRepo.addModel(
-		new ConfigYaml(WELL_KNOWN_FILES.CONFIG_DEV_YAML, "config/config.dev.yaml", ""),
-	);
-	monoRepo.addModel(new Gitignore());
-	monoRepo.addModel(new EnvFile());
-	monoRepo.addFile(new DevContainerHostScripts());
-
-	// Current pnpm fails the install on any dependency's install script nobody has decided about.
-	// The app works without these two, so decide "don't run" rather than run third-party scripts.
-	monoRepo.addFile({
-		files: () => [
-			{
-				filePath: "pnpm-workspace.yaml",
-				content: 'allowBuilds:\n  "@swc/core": false\n  esbuild: false\n',
-			},
-		],
-	});
-
-	// The same linter and formatter, set up the same way, as Decohere itself.
-	monoRepo.addFile({
-		files: () => [
-			{
-				filePath: ".oxlintrc.json",
-				content: JSON.stringify(
-					{
-						$schema: "./node_modules/oxlint/configuration_schema.json",
-						ignorePatterns: ["**/dist/**", "**/.package/**"],
-					},
-					null,
-					2,
-				),
-			},
-			{
-				filePath: ".prettierrc.json",
-				content: JSON.stringify(
-					{
-						useTabs: true,
-						printWidth: 95,
-						overrides: [
-							{
-								files: ["*.json", "*.yml", "*.yaml"],
-								options: { useTabs: false, tabWidth: 2 },
-							},
-						],
-					},
-					null,
-					2,
-				),
-			},
-			{
-				filePath: ".prettierignore",
-				content: [".devcontainer", "pnpm-lock.yaml", "*.md", ""].join("\n"),
-			},
-		],
-	});
-
-	for (const apiName of apiNames) {
-		addApiProject(monoRepo, name, apiName);
+	const changes = new WorkspaceChanges(targetDir);
+	if (!options.add) {
+		const [first] = targets;
+		templates.apply(changes, "workspace", { workspace, app: first.name, port: first.port });
 	}
+	for (const target of targets) addApp(changes, workspace, target);
+	if (orm != null) postgresStep.apply(changes, workspace, targets, orm);
+	if (withAuth0) auth0Step.apply(changes, workspace, targets, auth0Env);
+	if (withUsers) usersStep.apply(changes, workspace, targets, adminEnv);
+	const written = changes.commit();
 
-	return monoRepo;
+	await finish(targetDir, workspace, names, { add: options.add === true, install, written });
+	printByHand(changes);
 }
 
-function createAddWorkspace(
-	targetDir: string,
-	projectName: string,
-	apiNames: readonly string[],
-): MonoRepoScaffold {
+function checkCanAdd(targetDir: string, names: readonly string[]): string[] {
 	if (!isDecohereWorkspace(targetDir)) {
 		throw new CreateCliError(
 			`Not a Decohere workspace: ${targetDir}. Scaffold one first with \`npx @decohere/create webapi\`.`,
 		);
 	}
-
 	const existing = listExistingApiNames(targetDir);
-	for (const apiName of apiNames) {
-		if (existing.includes(apiName)) {
-			throw new CreateCliError(
-				`API "${apiName}" already exists at ${webapiProjectDir(apiName)}.`,
-			);
+	for (const name of names) {
+		if (existing.includes(name)) {
+			throw new CreateCliError(`API "${name}" already exists at ${webapiProjectDir(name)}.`);
 		}
 	}
-
-	const monoRepo = new MonoRepoScaffold();
-	monoRepo.targetDir = targetDir;
-	monoRepo.setName(projectName);
-	const name = monoRepo.name;
-
-	const pkg = PackageJson.fromFile(join(targetDir, "package.json"));
-	monoRepo.addModel(pkg);
-	monoRepo.addModel(
-		existsSync(join(targetDir, ".env"))
-			? EnvFile.fromFile(join(targetDir, ".env"))
-			: new EnvFile(),
-	);
-	monoRepo.addModel(
-		existsSync(join(targetDir, "config/config.yaml"))
-			? ConfigYaml.fromFile(
-					WELL_KNOWN_FILES.CONFIG_YAML,
-					"config/config.yaml",
-					join(targetDir, "config/config.yaml"),
-				)
-			: new ConfigYaml(WELL_KNOWN_FILES.CONFIG_YAML, "config/config.yaml", ""),
-	);
-	monoRepo.addModel(
-		existsSync(join(targetDir, "config/config.dev.yaml"))
-			? ConfigYaml.fromFile(
-					WELL_KNOWN_FILES.CONFIG_DEV_YAML,
-					"config/config.dev.yaml",
-					join(targetDir, "config/config.dev.yaml"),
-				)
-			: new ConfigYaml(WELL_KNOWN_FILES.CONFIG_DEV_YAML, "config/config.dev.yaml", ""),
-	);
-
-	// Load the workspace files features merge into, so e.g. --database on a workspace
-	// created without one adds the Postgres service instead of only the db:* scripts.
-	const compose = loadIfExists(targetDir, ".devcontainer/docker-compose.yml", (path) =>
-		DockerCompose.fromFile(path),
-	);
-	if (compose) monoRepo.addModel(compose);
-	const devContainer = loadIfExists(targetDir, ".devcontainer/devcontainer.json", (path) =>
-		DevContainer.fromFile(path),
-	);
-	if (devContainer) {
-		forwardApiPorts(devContainer, apiNames, existing.length);
-		monoRepo.addModel(devContainer);
-	}
-	const devImage = loadIfExists(targetDir, ".devcontainer/Dockerfile", (path) =>
-		DockerfileModel.fromFile(path, ".devcontainer/Dockerfile"),
-	);
-	if (devImage) monoRepo.addModel(devImage);
-	const gitignore = loadIfExists(targetDir, ".gitignore", (path) => Gitignore.fromFile(path));
-	if (gitignore) monoRepo.addModel(gitignore);
-
-	if (!pkg.hasScript("package")) {
-		pkg.addScript("package", "pnpm run build && forge package");
-	}
-	for (const [offset, apiName] of apiNames.entries()) {
-		const port = webapiPort(existing.length + offset);
-		pkg.addScript(`start:${apiName}`, `node ${webapiReleaseEntry(apiName)}`);
-		pkg.addScript(`package:${apiName}`, packageScript(name, apiName));
-		pkg.addScript(
-			`dev:${apiName}`,
-			`PORT=${port} flux serve --env-file-if-exists .env --project ${webapiPackageName(name, apiName)}`,
-		);
-		addApiProject(monoRepo, name, apiName);
-	}
-	monoRepo.addModel(new WebapiProductionDockerfile(apiNames));
-
-	return monoRepo;
+	return existing;
 }
 
-function addApiProject(
-	monoRepo: MonoRepoScaffold,
-	workspaceName: string,
-	apiName: string,
-): void {
-	const apiProject = new ProjectScaffold(webapiProjectDir(apiName));
-	apiProject.addModel(new ApiPackageJson(workspaceName, apiName));
-	apiProject.addModel(new MainSourceFile(`${workspaceName}.${apiName}`, apiName));
-	apiProject.addModel(new ControllerSourceFile());
-	apiProject.addModel(new HelloSpecFile());
-	// main.ts names this app, and an app named in code must have a config file.
-	monoRepo.addModel(
-		new ConfigYaml(
-			`config.${apiName}.yaml`,
-			`config/config.${apiName}.yaml`,
-			`# Settings only the ${apiName} API reads, over config.yaml.\n`,
-		),
-	);
-	apiProject.addFile(new SampleConfigModel());
-	apiProject.addFile(new SampleServiceModel());
-	monoRepo.addProject(apiProject);
-}
+type Install = { pm: PackageManager; run: boolean } | undefined;
 
-function forwardApiPorts(
-	devContainer: DevContainer,
-	apiNames: readonly string[],
-	firstIndex: number,
-): void {
-	for (const [offset, apiName] of apiNames.entries()) {
-		const port = webapiPort(firstIndex + offset);
-		devContainer.forwardPort(port);
-		devContainer.setPortAttributes(port, {
-			label: apiName === DEFAULT_WEBAPI_NAME ? "API" : apiName,
-			requireLocalPort: true,
-		});
-	}
-}
-
-function loadIfExists<T>(
+/** Whether to install once the files are written. The scaffolder image never installs. */
+async function askInstall(
 	targetDir: string,
-	relativePath: string,
-	load: (absolutePath: string) => T,
-): T | undefined {
-	const absolutePath = join(targetDir, relativePath);
-	return existsSync(absolutePath) ? load(absolutePath) : undefined;
+	mode: "yes" | "no" | undefined,
+): Promise<Install> {
+	if (process.env.DECOHERE_BUILDER === "1") return undefined;
+	const pm = detectPackageManager(targetDir) ?? (await promptForPackageManager());
+	if (mode != null) return { pm, run: mode === "yes" };
+	const answer = await ask("\nInstall dependencies now? [yes/no] (yes): ", "yes");
+	return { pm, run: answer.toLowerCase() !== "no" };
+}
+
+async function finish(
+	targetDir: string,
+	workspace: string,
+	names: readonly string[],
+	done: { add: boolean; install: Install; written: string[] },
+): Promise<void> {
+	// The scaffolder image has no Prettier. A new project formats itself on its first install, in
+	// `.devcontainer/post-create.sh`.
+	if (done.install != null) {
+		const paths = done.add ? done.written : ["."];
+		if (paths.length > 0) formatScaffoldedFiles(targetDir, paths);
+	}
+	if (done.install?.run) {
+		console.log(`\nScaffolded ${workspace}. Installing dependencies...\n`);
+		await done.install.pm.install({ cwd: targetDir });
+	}
+	// Whatever started the scaffolder says what to do next: only it knows where the project ends up.
+	if (done.install == null) {
+		closePrompt();
+		return;
+	}
+	console.log(`\nDone! ${done.install.run ? "Next" : "To get started:"} steps:\n`);
+	if (done.add) {
+		if (!done.install.run) console.log(`  ${done.install.pm.name} install`);
+		console.log(`  pnpm run dev:${names[0]}`);
+		console.log(`  pnpm run package:${names[0]} && docker build projects/${names[0]}`);
+	} else {
+		console.log(`  cd ${workspace}`);
+		console.log("  code .         # open in VS Code");
+		console.log(
+			"                 # then: Reopen in Container (first create runs pnpm install)\n",
+		);
+	}
+	console.log("  See README.md for what to run next.\n");
+	// Drop readline's stdin hold so the CLI / container can exit.
+	closePrompt();
 }

@@ -1,6 +1,7 @@
 import { Command, CommanderError } from "commander";
-import { runAddAuth0 } from "./webapi/add-auth0.js";
+import { runAddAuth0, runAddPostgres, runAddUsers } from "./webapi/add-steps.js";
 import { CreateCliError } from "./webapi/api-name.js";
+import { parseOrm } from "./webapi/database-provider.js";
 import { runAuth0Configure, runAuth0Login, runAuth0Token } from "./webapi/auth0-commands.js";
 import {
 	addWebapiFeatureOptions,
@@ -34,11 +35,38 @@ export function createProgram(): Command {
 
 	const add = program.command("add").description("Add to an existing Decohere workspace");
 	add
+		.command("postgres")
+		.description("Add Postgres, and a database for each API")
+		.option("--orm <orm>", "ORM: mikro-orm | typeorm", "mikro-orm")
+		.option("--dry-run", "List what would change, and change nothing")
+		.action((_opts: unknown, cmd: Command) => {
+			const opts = cmd.optsWithGlobals();
+			runAddPostgres(directoryOf(opts), {
+				orm: parseOrm(opts.orm),
+				dryRun: opts.dryRun === true,
+			});
+		});
+	add
 		.command("auth0")
 		.description("Add Auth0 to an existing Decohere workspace")
+		.option("--dry-run", "List what would change, and change nothing (Auth0 included)")
 		.action((_opts: unknown, cmd: Command) => {
-			const d = cmd.optsWithGlobals().d;
-			runAddAuth0(typeof d === "string" ? d : ".");
+			const opts = cmd.optsWithGlobals();
+			runAddAuth0(directoryOf(opts), { dryRun: opts.dryRun === true });
+		});
+	add
+		.command("users")
+		.description(
+			"Keep a local profile for each user Auth0 signs in (needs Postgres and Auth0)",
+		)
+		.option("--admin <username>", "The admin user to create on Auth0", "admin")
+		.option("--dry-run", "List what would change, and change nothing (Auth0 included)")
+		.action((_opts: unknown, cmd: Command) => {
+			const opts = cmd.optsWithGlobals();
+			runAddUsers(directoryOf(opts), {
+				admin: typeof opts.admin === "string" ? opts.admin : undefined,
+				dryRun: opts.dryRun === true,
+			});
 		});
 
 	addWebapiFeatureOptions(
@@ -74,6 +102,10 @@ export function createProgram(): Command {
 		});
 
 	return program;
+}
+
+function directoryOf(opts: Record<string, unknown>): string {
+	return typeof opts.d === "string" ? opts.d : ".";
 }
 
 /**

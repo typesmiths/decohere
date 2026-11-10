@@ -1,0 +1,75 @@
+name: CI
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
+  workflow_dispatch:
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+  SCRIBE_LOG_LEVEL: info
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Lint and typecheck
+        run: |
+          set +e
+          pnpm run lint:check &
+          lint_pid=$!
+          pnpm run typecheck &
+          tsc_pid=$!
+          wait "$lint_pid"
+          lint_code=$?
+          wait "$tsc_pid"
+          tsc_code=$?
+          set -e
+          if [[ "$lint_code" -ne 0 || "$tsc_code" -ne 0 ]]; then
+            exit 1
+          fi
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build and package (default branch)
+        if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: pnpm run package
+
+  ci:
+    needs: [lint, test]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Aggregate
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" || "${{ needs.test.result }}" != "success" ]]; then
+            echo "CI failed (lint=${{ needs.lint.result }} test=${{ needs.test.result }})"
+            exit 1
+          fi
+          echo "CI passed"

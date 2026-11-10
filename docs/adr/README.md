@@ -83,7 +83,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 | ADR | Decision | Status |
 |---|---|---|
 | [0005](0005-server-sent-events-in-http.md) | Server-sent events via `@Sse()` on a route, one-way, before WebSockets | Accepted |
-| [0026](0026-app-recipes-and-test-helper.md) | New apps start from a recipe the scaffolder writes into `app.ts`, every part spelled out; `startTestApp` starts an app on a free port for tests | Proposed |
+| [0026](0026-app-recipes-and-test-helper.md) | New apps start from a checked-in recipe the repo boots, with every part spelled out in `app.ts`; options are idempotent `decohere add` steps on top; `startTestApp` starts an app on a free port for tests | Proposed |
 | [0007](0007-serving-a-built-ui-from-http.md) | `statics` serves a module's built UI: outside the pipeline and rate limit, cached by file kind, SPA fallback | Proposed |
 | [0008](0008-response-compression-in-http.md) | Responses are compressed by default with the `compression` setting, a thin wrapper around `@fastify/compress` | Proposed |
 | [0010](0010-hosted-services.md) | Background work runs as hosted services, started before HTTP listens and stopped before the container is disposed | Proposed |

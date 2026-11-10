@@ -16,5 +16,11 @@
     "moduleDetection": "auto",
     "moduleResolution": "nodenext"
   },
-  "exclude": ["node_modules", "**/dist/**", "projects/forge/e2e/__fixtures__"]
+  "exclude": [
+    "node_modules",
+    "**/dist/**",
+    "projects/forge/e2e/__fixtures__",
+    // Add steps are parts of an app, not whole ones: generated-app-types.e2e checks each on a recipe.
+    "projects/scaffold/templates/steps"
+  ]
 }

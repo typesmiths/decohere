@@ -1,0 +1,32 @@
+services:
+  devcontainer:
+    env_file:
+      - ../.env
+  # One Postgres for every app: each app owns a database on it, created in development.
+  # Point {APP}_DB_HOST and {APP}_DB_PORT at another server to split them later.
+  #
+  # Its data is ./postgres-data under this folder (a bind mount: it goes with the working tree).
+  # It runs as you, using the IDs initialize.sh writes to .env here, so you can delete those files.
+  # For data that outlives the checkout, replace the volumes entry with a named volume, e.g.
+  # "workspace-name-postgres-data:/var/lib/postgresql/data", declared under the top-level volumes:.
+  postgres:
+    image: postgres:16
+    container_name: samples-workspace-name-postgres
+    user: "${DECOHERE_UID:-1000}:${DECOHERE_GID:-1000}"
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: workspace_name
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    networks:
+      workspace-name:
+        aliases:
+          - postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 15

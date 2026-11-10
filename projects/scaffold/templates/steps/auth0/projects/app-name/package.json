@@ -1,0 +1,7 @@
+{
+  "decohere": {
+    "steps": [
+      "auth0"
+    ]
+  }
+}

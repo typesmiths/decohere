@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { resetMemfs } from "@decohere/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { seedDevcontainerTemplates } from "./seed-devcontainer-templates.js";
+import { seedTemplates } from "./seed-templates.js";
 
 /**
  * Contract: a generated app installs the ORM version its provider package is built on. The
@@ -25,7 +25,7 @@ vi.mock(import("../../devkit/src/interop/index.js"), async (importOriginal) => {
 	};
 });
 
-vi.mock("../src/webapi/features/format-files.js", () => ({
+vi.mock("../src/webapi/format-files.js", () => ({
 	formatScaffoldedFiles: vi.fn(),
 }));
 
@@ -45,7 +45,7 @@ beforeEach(() => {
 	vi.spyOn(process, "cwd").mockReturnValue("/");
 	vi.stubEnv("DECOHERE_BUILDER", "1");
 	resetMemfs();
-	seedDevcontainerTemplates();
+	seedTemplates();
 });
 
 afterEach(() => {
@@ -110,7 +110,9 @@ describe("a generated Postgres app ↔ @decohere/data-postgres", () => {
 			expect(app.dependencies).toHaveProperty("@decohere/data-postgres");
 			const source = readFileSync(join("/my-app", "projects/api/src/app.ts"), "utf8");
 			expect(source).toContain('import { postgres } from "@decohere/data-postgres";');
-			expect(source).toMatch(new RegExp(`${plugin}\\(\\{[^)]*database: postgres, migrations`));
+			expect(source).toMatch(
+				new RegExp(`${plugin}\\(\\{[^)]*database: postgres,\\s+migrations`),
+			);
 		},
 	);
 });

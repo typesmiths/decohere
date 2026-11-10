@@ -4,7 +4,7 @@ import { fileExists, resetMemfs } from "@decohere/testing";
 import { vol } from "memfs";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Copy } from "../../src/actions/copy.action.js";
-import { WorkspaceDefaults } from "../../src/workspace.config.js";
+import { Debug, Release, WorkspaceDefaults } from "../../src/workspace.config.js";
 
 const mockFiles = {
 	"/package.json": JSON.stringify({ name: "ROOT", version: "1.0.0" }),
@@ -65,24 +65,46 @@ it("should skip copy when no-copy option is specified", async () => {
 it("copies configuration copyFiles into each pack target out dir", async () => {
 	vol.fromJSON({
 		...mockFiles,
-		"/projects/project1/src/webapi/devcontainer/templates/initialize.sh": "#!/bin/bash\n",
+		"/projects/project1/src/assets/initialize.sh": "#!/bin/bash\n",
 	});
+	const release = { ...Release, copyFiles: ["**/assets/**"] };
 
-	const workspace = await WorkspaceFactory.create(WorkspaceDefaults);
+	const workspace = await WorkspaceFactory.create(
+		{},
+		{ ...WorkspaceDefaults, configurations: [Debug, release] },
+	);
 	const copyAction = new Copy(workspace);
 	const response = await copyAction.run({ copy: true, configuration: "release" });
 
 	expect(response.succeeded).toBe(true);
-	expect(
-		fileExists(
-			"/dist/release/projects/project1/es6/src/webapi/devcontainer/templates/initialize.sh",
-		),
-	).toBe(true);
-	expect(
-		fileExists(
-			"/dist/release/projects/project1/src/webapi/devcontainer/templates/initialize.sh",
-		),
-	).toBe(true);
+	expect(fileExists("/dist/release/projects/project1/es6/src/assets/initialize.sh")).toBe(
+		true,
+	);
+	expect(fileExists("/dist/release/projects/project1/src/assets/initialize.sh")).toBe(true);
+});
+
+it("copies a project's own copyFiles from .decohere.js to its package root, beside package.json", async () => {
+	vol.fromJSON({
+		...mockFiles,
+		"/projects/project1/templates/app/src/app.ts": "export const app = 1;\n",
+	});
+
+	const workspace = await WorkspaceFactory.create(
+		{ projects: { MOCK_PROJ: { copyFiles: ["templates/**"] } } },
+		WorkspaceDefaults,
+	);
+	const response = await new Copy(workspace).run({ copy: true, configuration: "release" });
+
+	expect(response.succeeded).toBe(true);
+	expect(fileExists("/dist/release/projects/project1/templates/app/src/app.ts")).toBe(true);
+	expect(fileExists("/dist/release/projects/project1/package.json")).toBe(true);
+	expect(fileExists("/dist/release/projects/project1/es6/templates/app/src/app.ts")).toBe(
+		false,
+	);
+});
+
+it("ships no files of this repo's own by default", () => {
+	expect(Release.copyFiles ?? []).toEqual([]);
 });
 
 it("keeps workspace copyFiles (package.json) at the package root only", async () => {

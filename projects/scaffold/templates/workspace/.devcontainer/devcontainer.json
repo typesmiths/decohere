@@ -1,0 +1,17 @@
+{
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "devcontainer",
+  "workspaceFolder": "/workspace-name",
+  "initializeCommand": "bash .devcontainer/initialize.sh",
+  "mounts": ["source=..,target=/workspace-name,type=bind,consistency=cached"],
+  "customizations": {
+    "vscode": {
+      "extensions": ["oxc.oxc-vscode", "esbenp.prettier-vscode", "vitest.explorer"]
+    }
+  },
+  "forwardPorts": [],
+  "portsAttributes": {},
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "updateContentCommand": "bash .devcontainer/post-create.sh",
+  "remoteUser": "node"
+}

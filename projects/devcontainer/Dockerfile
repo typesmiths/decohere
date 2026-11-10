@@ -1,8 +1,6 @@
 # syntax=docker/dockerfile:1
 # App Dev Container base for Decohere-scaffolded projects.
-# Regenerated from AppDevContainerBaseImage — do not hand-edit layers:
-#   pnpm test:file projects/scaffold/tests/devcontainer-base-image.spec.ts
-#   (fails when out of sync; update this file from the expected content in the test error)
+# projects/scaffold/tests/devcontainer-base-image.spec.ts checks what scaffolded apps rely on.
 #
 # Publish: forge docker (image name from the repository in the root package.json). Scaffolded apps:
 #   FROM ghcr.io/typesmiths/decohere/devcontainer:<version>

@@ -20,9 +20,8 @@ export const Release: ForgeConfiguration = {
 	sourceMaps: false,
 	// Tests and benchmarks are not shipped: they import dev-only packages (vitest, @swc/core).
 	ignore: ["**/*.spec.ts", "**/*.test.ts", "**/*.bench.ts", "tests/**", "e2e/**", "bench/**"],
-	// Sit next to emitted JS under es6/types (import.meta.url).
-	// Do not put package.json here — that stays on workspace copyFiles (root only).
-	copyFiles: ["**/webapi/devcontainer/templates/**"],
+	// A configuration's copyFiles sit next to the emitted JS under es6/ and types/ (for
+	// import.meta.url). A repo's own files go in its .decohere.js, not in these defaults.
 };
 
 /**

@@ -1,0 +1,30 @@
+name: workspace-name
+
+services:
+  devcontainer:
+    build: .
+    command: sleep infinity
+    env_file:
+      # Outside the project, one per project: initialize.sh creates it first on the host.
+      - ${HOME}/.config/decohere/gh/workspace-name.env
+    volumes:
+      # The repo, bound by Compose so it survives the CLI recreating the container.
+      - ..:/workspace-name
+      # Outside the project, one per project. initialize.sh creates it first on the host,
+      # because Docker creates a missing host path as root.
+      - ${HOME}/.config/decohere/gh/workspace-name:/home/node/.config/gh
+      - webapi-node-modules:/workspace-name/node_modules
+      # A named volume, so recreating the container keeps the shell history.
+      - bashhistory:/commandhistory
+      # A folder on the host, so a rebuild keeps the Auth0 CLI login and you can see it.
+      - ${XDG_RUNTIME_DIR:-${HOME}/.config/decohere}/decohere-auth0/workspace-name:/home/node/.config/auth0
+    networks:
+      - workspace-name
+
+networks:
+  workspace-name:
+    name: samples-workspace-name
+
+volumes:
+  webapi-node-modules:
+  bashhistory:
