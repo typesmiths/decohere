@@ -9,7 +9,7 @@ import type ts from "typescript";
 import "../extensions/project.extensions.js";
 import { IncrementalWatch } from "../services/incremental-watch.js";
 import { OutputCache } from "../services/output-cache.js";
-import { tsCompilerOptions, tsconfigFileNames } from "../services/ts-compiler-options.js";
+import { tsCompilerOptions, getTsconfigFileNames } from "../services/ts-compiler-options.js";
 import { TsProgramHost } from "../services/ts-program-host.js";
 import {
 	TypeEmissionProgram,
@@ -182,7 +182,7 @@ export class TypeEmitter implements Transformer {
 					compilerOptions: own ? { ...TSC_DEFAULTS, ...compilerOptions } : compilerOptions,
 					tsconfigFiles:
 						own && options.includeTsconfigFiles && tsconfig.filePath != null
-							? tsconfigFileNames(tsconfig.filePath)
+							? getTsconfigFileNames(tsconfig.filePath)
 							: [],
 				};
 			}),

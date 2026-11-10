@@ -39,7 +39,7 @@ export class Build implements Action<BuildOptions> {
 		}
 		const { configuration: buildConfig } = options;
 		const projects = this.workspace.getProjects(buildConfig);
-		const compiled = projects.filter((project) => project.ownScript("build") == null);
+		const compiled = projects.filter((project) => project.getOwnScript("build") == null);
 		void this.fileWriter.warmup(compiled);
 		const transformResults = compiled.length > 0 ? await this.build(compiled) : [];
 
@@ -51,7 +51,7 @@ export class Build implements Action<BuildOptions> {
 		// Projects with a builder of their own (Astro, Vite) build with their `build` script: their
 		// builder writes its output where its config says.
 		await runOwnScripts(
-			projects.filter((project) => project.ownScript("build") != null),
+			projects.filter((project) => project.getOwnScript("build") != null),
 			{
 				script: "build",
 				verb: "Building",

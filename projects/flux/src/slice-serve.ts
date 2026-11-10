@@ -85,7 +85,7 @@ export function projectsInSlices(
  * that calls flux (or another Decohere tool) stays with Flux.
  */
 export function resolveDeferScript(scripts: Record<string, string>): string | undefined {
-	return DEFER_SCRIPT_CANDIDATES.find((name) => projectScripts.own(scripts, name) != null);
+	return DEFER_SCRIPT_CANDIDATES.find((name) => projectScripts.getOwn(scripts, name) != null);
 }
 
 /** Convention: Flux Node apps use `main` ending in `main.ts` / `main.tsx`. */

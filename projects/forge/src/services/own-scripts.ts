@@ -1,5 +1,5 @@
 import path from "node:path";
-import { packageScriptCommand, runPackageScript } from "@decohere/devkit/interop";
+import { getPackageScriptCommand, runPackageScript } from "@decohere/devkit/interop";
 import type { Logger } from "@decohere/scribe";
 import type { Project } from "@decohere/workspace";
 import { ForgeError } from "../errors.js";
@@ -16,7 +16,7 @@ export async function runOwnScripts(
 	const workspaceRoot = path.resolve(options.workspaceRoot);
 	for (const project of projects) {
 		const script = { cwd: project.projectRoot, script: options.script, workspaceRoot };
-		const { command, args } = packageScriptCommand(script);
+		const { command, args } = getPackageScriptCommand(script);
 		const run = `${command} ${args.join(" ")}`;
 		options.logger.info(
 			`${options.verb} ${project.name} with its own ${options.script} script (${run})`,

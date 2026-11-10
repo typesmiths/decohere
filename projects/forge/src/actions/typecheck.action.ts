@@ -27,7 +27,7 @@ export class TypeCheck implements Action<TypeCheckOptions> {
 		const projects = this.workspace.getProjects(options.configuration);
 		// A project with its own `check` script (`astro check`, `svelte-check`) is checked by it:
 		// only the framework's checker reads its component files and its virtual modules.
-		const checked = projects.filter((project) => project.ownScript("check") == null);
+		const checked = projects.filter((project) => project.getOwnScript("check") == null);
 		for (const project of checked) {
 			this.#logger.info(`Type-checking ${project.name}`);
 		}
@@ -49,7 +49,7 @@ export class TypeCheck implements Action<TypeCheckOptions> {
 		}
 
 		await runOwnScripts(
-			projects.filter((project) => project.ownScript("check") != null),
+			projects.filter((project) => project.getOwnScript("check") != null),
 			{
 				script: "check",
 				verb: "Type-checking",

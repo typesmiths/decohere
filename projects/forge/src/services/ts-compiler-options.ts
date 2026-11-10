@@ -49,7 +49,7 @@ export function tsCompilerOptions(tsconfig: Tsconfig): ts.CompilerOptions {
  * own tsconfig can list generated declaration files (a framework's `types.d.ts`) its code needs.
  * Read like `tsCompilerOptions` (through `node:fs`), with TypeScript's own walk for the globs.
  */
-export function tsconfigFileNames(filePath: string): string[] {
+export function getTsconfigFileNames(filePath: string): string[] {
 	const result = ts.parseConfigFileTextToJson(filePath, fs.readFileSync(filePath, "utf8"));
 	if (result.error) {
 		throw new ForgeError(

@@ -32,7 +32,7 @@ export class Copy implements Action<CopyOptions> {
 			// A project with its own build script owns its output: nothing of it goes in forge's.
 			this.workspace
 				.getProjects(options.configuration)
-				.filter((proj) => proj.ownScript("build") == null)
+				.filter((proj) => proj.getOwnScript("build") == null)
 				.map(async (proj) => {
 					const cwd = proj.projectDirectory;
 					const root = proj.getOutDir();

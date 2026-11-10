@@ -127,7 +127,7 @@ Building @app/site.web with its own build script (pnpm run build)
 - **A script that calls `forge`, `flux` or `decohere` doesn't count**, so forge never calls itself: such a project is compiled as usual.
 - **The project stays in the workspace.** Other projects still import it by name, and `forge package` still finds it as a `ui`. Don't list it in `ignoreProjects`.
 
-To import workspace packages by name from the site, add [`forgeAliases()`](#sites-vite-builds-decohereforgevite) to its Vite config. The same rule (`Project.ownScript` in `@decohere/workspace`) decides what `flux serve` hands to a project's `dev` script.
+To import workspace packages by name from the site, add [`forgeAliases()`](#sites-vite-builds-decohereforgevite) to its Vite config. The same rule (`Project.getOwnScript` in `@decohere/workspace`) decides what `flux serve` hands to a project's `dev` script.
 
 ## `forge package`: one folder a plain `node` can run
 

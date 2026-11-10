@@ -1,11 +1,11 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { packageScriptPath } from "../../src/interop/scripts/package-script.js";
+import { getPackageScriptPath } from "../../src/interop/scripts/package-script.js";
 
-describe("packageScriptPath", () => {
+describe("getPackageScriptPath", () => {
 	it("puts each node_modules/.bin from the project up to the workspace root before PATH", () => {
 		const root = path.resolve("/ws");
-		const entries = packageScriptPath(
+		const entries = getPackageScriptPath(
 			{ cwd: path.join(root, "projects/site/web"), script: "build", workspaceRoot: root },
 			"/usr/bin",
 		).split(path.delimiter);
@@ -21,7 +21,7 @@ describe("packageScriptPath", () => {
 
 	it("stops at the workspace root", () => {
 		const root = path.resolve("/ws");
-		const entries = packageScriptPath(
+		const entries = getPackageScriptPath(
 			{ cwd: root, script: "build", workspaceRoot: root },
 			"",
 		).split(path.delimiter);

@@ -212,7 +212,7 @@ Named serve profiles in `.decohere.js` (e.g. `shop-stack: ["app", "shop", "billi
 | **Flux app** | `package.json` `main` ends in `main.ts` / `main.tsx`, and no foreign serve script | Boot in-process (one HMR graph per app). |
 | **Library** | Everything else (e.g. `main`: `src/index.ts`) | Skip — imported via debug aliases. |
 
-Foreign scripts win over `main.ts` so Vite (and similar) apps are never loaded in the Node HMR hook. The **package script** is the contract, not a hard-coded Vite check. It is the same rule `forge build` uses for a project's `build` script (`Project.ownScript` in `@decohere/workspace`).
+Foreign scripts win over `main.ts` so Vite (and similar) apps are never loaded in the Node HMR hook. The **package script** is the contract, not a hard-coded Vite check. It is the same rule `forge build` uses for a project's `build` script (`Project.getOwnScript` in `@decohere/workspace`).
 
 Logs name skipped libraries and deferred packages (script + cwd). Child processes are stopped when the CLI exits (SIGINT or SIGTERM → dispose).
 
