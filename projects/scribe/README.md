@@ -165,7 +165,7 @@ const remove = scribe.addContextSource(() => currentJob == null ? undefined : { 
 
 `@decohere/http` adds one that returns the request's `requestId` and `principalId` ([request context](../http/README.md#request-context-in-log-lines)). Sources outlive `configure`, adding the same function twice adds it once, and the returned function removes it. Fields a child binds win over a source's. Scribe itself keeps no context: the source decides what "now" means (Node's `AsyncLocalStorage`, a Worker's request), so the facade stays runtime-free.
 
-A field a source adds and a field passed to the same log call can both reach the writer: Pino writes the key twice. Don't pass a field a source already adds.
+A log call can pass a field a source also adds, such as its own `requestId`: the call's value wins, and the line has the field once.
 
 ### Errors
 
