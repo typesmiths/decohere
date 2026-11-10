@@ -41,6 +41,8 @@ GitHub is the only tracker; the plan is the milestones.
 
 1. **Issue.** Every change starts as an issue in a milestone: the problem, the fix, what "done" means, and a `size: S`/`M`/`L` label. Title: `<type>(<area>): <summary>`, e.g. `fix(http): cache remote JWKS`. Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`.
 2. **Branch.** One issue, one branch, one PR, from the latest `main`: `git switch -c <type>/<issue>-<slug> origin/main` (e.g. `fix/512-cache-jwks`). Several at once? One worktree each: `git worktree add ../decohere-<issue> -b <branch> origin/main`.
+   - **Issues that build on each other share one branch and one PR.** If issue B needs A's code, or both change the same files, do them together: name the branch for the first issue and list each in the body (`Closes #A`, `Closes #B`). Squash merges give every PR a new commit on `main`, so a second PR branched off the first conflicts with `main` as soon as the first merges.
+   - **If a stack really is worth it** (big pieces that need reviewing apart), make it a GitHub stack and, after each merge, use its **Rebase stack** button to move the rest onto `main`. Never fix a stacked branch by merging `main` or its parent into it: the merge commit leaves the stack "diverged" and GitHub can't rebase it any more.
 3. **Change.**
    - Bugs: a failing test first, then the fix, then the same test again.
    - Test behaviour, not wiring ([testing](../testing/)).
