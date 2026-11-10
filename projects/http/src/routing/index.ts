@@ -6,3 +6,4 @@ export * from "./middleware/http-access-log.middleware.js";
 export * from "./middleware/middleware.js";
 export * from "./middleware/request-id.js";
 export * from "./pipes/index.js";
+export * from "./problem-details.js";

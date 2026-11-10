@@ -54,7 +54,7 @@ describe("DatePipe over HTTP", () => {
 		await start();
 		const res = await axios.get("/events?when=", { validateStatus: () => true });
 		expect(res.status).toBe(400);
-		expect(res.data).toMatchObject({ statusCode: 400, error: "Bad Request" });
+		expect(res.data).toMatchObject({ type: "about:blank", title: "Bad Request", status: 400 });
 	});
 
 	it("binds a JSON body date field to a Date", async () => {

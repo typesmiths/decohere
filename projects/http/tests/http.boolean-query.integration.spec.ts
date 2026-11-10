@@ -51,8 +51,9 @@ describe("BooleanPipe over HTTP query", () => {
 		});
 		expect(res.status).toBe(400);
 		expect(res.data).toMatchObject({
-			statusCode: 400,
-			error: "Bad Request",
+			type: "about:blank",
+			title: "Bad Request",
+			status: 400,
 		});
 	});
 });

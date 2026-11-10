@@ -58,7 +58,11 @@ describe("NumberPipe over HTTP query", () => {
 				validateStatus: () => true,
 			});
 			expect(res.status).toBe(400);
-			expect(res.data).toMatchObject({ statusCode: 400, error: "Bad Request" });
+			expect(res.data).toMatchObject({
+				type: "about:blank",
+				title: "Bad Request",
+				status: 400,
+			});
 		},
 	);
 });

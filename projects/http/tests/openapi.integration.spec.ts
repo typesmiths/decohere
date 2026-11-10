@@ -98,9 +98,10 @@ describe("OpenAPI integration", () => {
 		);
 		expect(bad.status).toBe(400);
 		expect(bad.data).toMatchObject({
-			statusCode: 400,
-			error: "Bad Request",
-			message: "Validation failed",
+			type: "about:blank",
+			title: "Bad Request",
+			status: 400,
+			detail: "Validation failed",
 		});
 		expect(bad.data.errors).toEqual(
 			expect.arrayContaining([
@@ -117,7 +118,7 @@ describe("OpenAPI integration", () => {
 			{ headers: { "Content-Type": "application/json" }, validateStatus: () => true },
 		);
 		expect(wrongType.status).toBe(400);
-		expect(wrongType.data.statusCode).toBe(400);
+		expect(wrongType.data.status).toBe(400);
 		expect(wrongType.data.errors).toEqual(
 			expect.arrayContaining([
 				expect.objectContaining({
@@ -175,9 +176,10 @@ describe("OpenAPI integration", () => {
 		);
 		expect(missing.status).toBe(400);
 		expect(missing.data).toMatchObject({
-			statusCode: 400,
-			error: "Bad Request",
-			message: "Validation failed",
+			type: "about:blank",
+			title: "Bad Request",
+			status: 400,
+			detail: "Validation failed",
 		});
 		expect(Array.isArray(missing.data.errors)).toBe(true);
 		expect(missing.data.errors.length).toBeGreaterThan(0);
