@@ -49,7 +49,7 @@ export function forgeAliases(options: ForgeAliasesOptions = {}) {
 			return { server: { fs: { allow: [workspaceRootFor(config.root ?? process.cwd())] } } };
 		},
 		async resolveId(source: string, importer: string | undefined): Promise<string | null> {
-			resolver ??= aliasResolver(
+			resolver ??= createAliasResolver(
 				() => createWorkspace({ rootDir: workspaceRootFor(process.cwd()) }),
 				options.fromRegistry,
 			);
@@ -67,7 +67,7 @@ export type AliasResolver = (
  * A package-name import to the source file it names in the workspace, or `null` to leave it to the
  * next resolver: not a workspace package, imported from `node_modules`, or taken from the registry.
  */
-export function aliasResolver(
+export function createAliasResolver(
 	workspace: () => Promise<Workspace>,
 	fromRegistry: readonly string[] = [],
 ): AliasResolver {

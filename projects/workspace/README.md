@@ -51,7 +51,7 @@ Per-project settings go under `projects`, keyed by package name: `docker` (image
 
 ### A project's own scripts
 
-A project whose `package.json` declares a script for a step has a builder of its own (Astro, Vite, Angular), and Decohere's tools run that script in its folder instead of doing the step: `build` for `forge build`, `check` for `forge typecheck`, `dev` or `serve` for `flux serve`. `Project.ownScript(name)` (and `projectScripts.own(scripts, name)`) is that rule, in one place. A script that calls `forge`, `flux` or `decohere` doesn't count: running it would only call the tool again. See [forge](../forge/README.md#projects-with-a-builder-of-their-own).
+A project whose `package.json` declares a script for a step has a builder of its own (Astro, Vite, Angular), and Decohere's tools run that script in its folder instead of doing the step: `build` for `forge build`, `check` for `forge typecheck`, `dev` or `serve` for `flux serve`. `Project.getOwnScript(name)` (and `projectScripts.getOwn(scripts, name)`) is that rule, in one place. A script that calls `forge`, `flux` or `decohere` doesn't count: running it would only call the tool again. See [forge](../forge/README.md#projects-with-a-builder-of-their-own).
 
 `--config-file` on `forge` / `flux` selects a different config path. The default is `.decohere.js` in the workspace root (`--root-dir`, else the current folder).
 

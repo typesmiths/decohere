@@ -1,6 +1,6 @@
 import type { ChildProcess } from "node:child_process";
 import { injectable } from "@decohere/crucible/decorators";
-import { packageScriptCommand, startPackageScript } from "@decohere/devkit/interop";
+import { getPackageScriptCommand, startPackageScript } from "@decohere/devkit/interop";
 import { type Logger, scribe } from "@decohere/scribe";
 
 export type DeferredScriptStart = {
@@ -52,7 +52,7 @@ export class DeferredScriptRunner implements AsyncDisposable {
 	private readonly children: ChildProcess[] = [];
 
 	public start(options: DeferredScriptStart): ChildProcess {
-		const { command, args } = packageScriptCommand(options);
+		const { command, args } = getPackageScriptCommand(options);
 		this.logger.info(
 			`deferred ${options.label} — running ${command} ${args.join(" ")} in ${options.cwd}`,
 		);

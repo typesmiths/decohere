@@ -62,8 +62,8 @@ export class Project extends mixwith(HasPackageJson, HasTsConfig) {
 	 * The command of this project's own script for a step, when it has one that doesn't call a
 	 * Decohere tool: forge and flux run it in the project's folder instead of doing the step.
 	 */
-	public ownScript(name: string): string | undefined {
-		return projectScripts.own(this.packageJson?.scripts, name);
+	public getOwnScript(name: string): string | undefined {
+		return projectScripts.getOwn(this.packageJson?.scripts, name);
 	}
 
 	public get isPrivate() {

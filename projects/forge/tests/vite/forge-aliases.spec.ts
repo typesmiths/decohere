@@ -4,7 +4,7 @@ import { vol } from "memfs";
 import { afterEach, describe, expect, it } from "vitest";
 import { createWorkspace } from "../../src/create-workspace.js";
 import {
-	aliasResolver,
+	createAliasResolver,
 	findWorkspaceRoot,
 	forgeAliases,
 } from "../../src/vite/forge-aliases.plugin.js";
@@ -53,9 +53,9 @@ describe("findWorkspaceRoot", () => {
 	});
 });
 
-describe("aliasResolver", () => {
+describe("createAliasResolver", () => {
 	const resolver = (fromRegistry?: string[]) =>
-		aliasResolver(() => createWorkspace({ rootDir: "/ws" }), fromRegistry);
+		createAliasResolver(() => createWorkspace({ rootDir: "/ws" }), fromRegistry);
 
 	it("resolves a workspace package by name to any file in its source", async () => {
 		vol.fromJSON(WORKSPACE);

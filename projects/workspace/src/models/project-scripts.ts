@@ -7,7 +7,7 @@ const DECOHERE_TOOL = /\b(forge|flux|decohere)\b/i;
  * tools run that script in its folder instead of doing the step themselves. A script that calls
  * `forge`, `flux` or `decohere` doesn't count: running it would only call the tool again.
  */
-function own(
+function getOwn(
 	scripts: Readonly<Record<string, string>> | undefined,
 	name: string,
 ): string | undefined {
@@ -17,4 +17,4 @@ function own(
 	return command;
 }
 
-export const projectScripts = { own };
+export const projectScripts = { getOwn };

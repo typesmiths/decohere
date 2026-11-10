@@ -14,7 +14,7 @@ export type PackageScript = {
 };
 
 /** `pnpm run build`: the package manager the workspace uses (pnpm when it can't tell). */
-export function packageScriptCommand(options: PackageScript): {
+export function getPackageScriptCommand(options: PackageScript): {
 	command: string;
 	args: string[];
 } {
@@ -28,7 +28,7 @@ export function packageScriptCommand(options: PackageScript): {
  * in the project's own `node_modules/.bin` unless it's a pnpm workspace, so a project's builder
  * (`astro`, `vite`) would otherwise not be found.
  */
-export function packageScriptPath(
+export function getPackageScriptPath(
 	options: PackageScript,
 	current = process.env.PATH ?? "",
 ): string {
@@ -46,13 +46,13 @@ export function startPackageScript(
 	options: PackageScript,
 	spawnOptions: SpawnOptions = {},
 ): ChildProcess {
-	const { command, args } = packageScriptCommand(options);
+	const { command, args } = getPackageScriptCommand(options);
 	const env = spawnOptions.env ?? process.env;
 	return spawn(command, args, {
 		stdio: "inherit",
 		shell: false,
 		...spawnOptions,
-		env: { ...env, PATH: packageScriptPath(options, env.PATH) },
+		env: { ...env, PATH: getPackageScriptPath(options, env.PATH) },
 		cwd: options.cwd,
 	});
 }

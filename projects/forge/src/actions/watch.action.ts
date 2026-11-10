@@ -23,7 +23,7 @@ export class Watch implements Action<WatchOptions> {
 		// A project with its own build script isn't forge's to rebuild; flux serve runs its dev script.
 		await this.workspace.watch(
 			options.configuration,
-			(project) => project.ownScript("build") == null,
+			(project) => project.getOwnScript("build") == null,
 		);
 		this.#logger.info(`Starting watch`);
 		return ActionResponse.Blocking(Watch.name);

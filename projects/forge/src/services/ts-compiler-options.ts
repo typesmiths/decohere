@@ -43,3 +43,20 @@ export function tsCompilerOptions(tsconfig: Tsconfig): ts.CompilerOptions {
 	}
 	return ts.parseJsonConfigFileContent(result.config, host, path.dirname(filePath)).options;
 }
+
+/**
+ * The files a tsconfig lists through `include` and `files`, as `tsc -p` reads them: a project's
+ * own tsconfig can list generated declaration files (a framework's `types.d.ts`) its code needs.
+ * Read like `tsCompilerOptions` (through `node:fs`), with TypeScript's own walk for the globs.
+ */
+export function getTsconfigFileNames(filePath: string): string[] {
+	const result = ts.parseConfigFileTextToJson(filePath, fs.readFileSync(filePath, "utf8"));
+	if (result.error) {
+		throw new ForgeError(
+			`Error parsing ${filePath}. ${ts.flattenDiagnosticMessageText(result.error.messageText, "\n")}`,
+		);
+	}
+	const filesHost: ts.ParseConfigHost = { ...host, readDirectory: ts.sys.readDirectory };
+	return ts.parseJsonConfigFileContent(result.config, filesHost, path.dirname(filePath))
+		.fileNames;
+}

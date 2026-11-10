@@ -8,7 +8,7 @@ import type { Options } from "@swc/core";
 import { SwcTranspiler } from "../services/swc-transpiler.js";
 import { BuildTargets } from "../types/build-target.type.js";
 import { createWorkspace } from "../create-workspace.js";
-import { aliasResolver } from "../vite/forge-aliases.plugin.js";
+import { createAliasResolver } from "../vite/forge-aliases.plugin.js";
 
 // Above fatal (60) so all standard levels are nooped when logLevel is "silent"
 const SILENT_LEVEL = 999;
@@ -54,7 +54,7 @@ export function forgeBuild(options?: ForgeBuildOptions) {
 
 	// Package names to their source, as `forgeAliases()` does for a site: SWC rewrites them in the
 	// TypeScript it compiles, and this resolves them everywhere else (a .css or .astro import).
-	const resolveAlias = aliasResolver(async () => {
+	const resolveAlias = createAliasResolver(async () => {
 		await initWorkspace();
 		return workspace as Workspace;
 	});
