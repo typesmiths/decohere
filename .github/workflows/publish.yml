@@ -113,25 +113,24 @@ jobs:
             echo "should_publish=true"
           } >> "$GITHUB_OUTPUT"
 
-      # workflow_run has no push `before` SHA — fetch parent and pass it
-      # explicitly so paths-filter does not fall back to a whole-tree guess.
+      # Code changes are counted since the last commit that shipped, not since the parent: the
+      # merge queue can land a code PR and a docs PR in one push, and CI runs on the tip only.
+      # Full history and tags, so the last v* tag behind the tip can be found.
       - uses: actions/checkout@v4
         if: github.event_name != 'workflow_dispatch'
         with:
           ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 2
+          fetch-depth: 0
 
-      - name: Resolve parent commit
+      - name: Find the last shipped commit
         id: parent
         if: github.event_name != 'workflow_dispatch'
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
         run: |
-          if ! parent="$(git rev-parse --verify HEAD^1)"; then
-            echo "No parent for ${{ github.event.workflow_run.head_sha }} — skip publish"
-            echo "sha=" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "Parent $parent → ${{ github.event.workflow_run.head_sha }}"
-          echo "sha=$parent" >> "$GITHUB_OUTPUT"
+          base="$(node projects/ci-tools/src/release/find-publish-base.mjs "$SHA")"
+          echo "Comparing $SHA with ${base:-nothing (first commit)}"
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
 
       - id: filter
         if: github.event_name != 'workflow_dispatch' && steps.parent.outputs.sha != ''
@@ -156,7 +155,7 @@ jobs:
           fi
 
           if [[ "${{ steps.filter.outputs.code }}" != "true" ]]; then
-            echo "Skipping: no code paths in this commit (docs/meta only)"
+            echo "Skipping: no code paths changed since the last shipped commit (docs/meta only)"
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi

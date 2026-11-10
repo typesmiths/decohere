@@ -93,7 +93,7 @@ Runs when CI succeeds on a **push** to this repository's `main`; pull request ru
 
 CI chooses a dev version once, before its release build: `0.0.1-dev.20261104.512` is the commit's UTC date and CI's run number. Publish reads that version from the build and never works it out again ([ADR 0019](../adr/0019-dev-versions-from-the-ci-run.md)).
 
-1. **guard**: skips docs-only commits, commits that are no longer the branch tip, and commits that already have a `v*` tag.
+1. **guard**: skips when nothing but docs changed since the last commit that shipped (the newest `v*` tag behind it, not just the parent: the merge queue can land a code PR and a docs PR in one push), when the commit is no longer the branch tip, or when it already has a `v*` tag.
 2. **verify**: probes npm and GHCR for this version and outputs which steps to skip. It fails if a package name isn't on npm yet, which the merge queue should already have stopped.
 3. **npm**: `forge publish --channel dev` from `main`, `--channel latest` for a stable release, over OIDC. Skipped if the version is already on npm. Runs alongside **docker**.
 4. **docker**: the only job with `packages: write`. Builds and pushes the `create` and `devcontainer` images (plus `:latest` for a stable release).

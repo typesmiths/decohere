@@ -39,6 +39,14 @@ describe("publish.yml", () => {
 		expect(guard).toContain("Give either tested_version or patch_branch");
 	});
 
+	it("looks for code changes since the last shipped commit, not the parent", () => {
+		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
+
+		expect(guard).toContain("find-publish-base.mjs");
+		expect(guard).toContain("fetch-depth: 0");
+		expect(guard).not.toContain("HEAD^1");
+	});
+
 	it("only releases a patch whose commit passed full CI", () => {
 		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
 
