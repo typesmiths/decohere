@@ -135,7 +135,7 @@ async function transaction(session: Session, id: string, work: () => Promise<voi
 }
 
 /** The migrations up to and including `to` (all of them without it), refusing an id none has. */
-function upTo(migrations: Migration[], to: string | undefined): Migration[] {
+function selectUpTo(migrations: Migration[], to: string | undefined): Migration[] {
 	if (to == null) return migrations;
 	if (!migrations.some((m) => m.id === to)) {
 		throw new DataConfigurationError(`No migration has the id ${to}`);
@@ -144,7 +144,7 @@ function upTo(migrations: Migration[], to: string | undefined): Migration[] {
 }
 
 async function migrate(source: MigrationSource, options: MigrateOptions): Promise<string[]> {
-	const migrations = upTo(inOrder(source.migrations), options.to);
+	const migrations = selectUpTo(inOrder(source.migrations), options.to);
 
 	return withSession(source, async (session) => {
 		if (options.dryRun) {
@@ -173,7 +173,7 @@ async function migrate(source: MigrationSource, options: MigrateOptions): Promis
 }
 
 async function baseline(source: MigrationSource, options: BaselineOptions): Promise<string[]> {
-	const migrations = upTo(inOrder(source.migrations), options.to);
+	const migrations = selectUpTo(inOrder(source.migrations), options.to);
 
 	return withSession(source, async (session) => {
 		if (options.dryRun) {
