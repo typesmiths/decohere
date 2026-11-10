@@ -14,7 +14,7 @@ import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { realFs } from "../../../vitest.setup.js";
 import { type App, Builder } from "@decohere/core/hosting";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { Controller, Get } from "../src/routing/index.js";
 import { startTestApp } from "../src/testing/index.js";
 

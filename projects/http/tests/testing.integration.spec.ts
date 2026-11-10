@@ -1,7 +1,7 @@
 import { Builder, type HostedService } from "@decohere/core/hosting";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { Controller, Get, http } from "@decohere/http";
-import { FastifyProvider } from "@decohere/http/providers";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { bootModule, startTestApp } from "@decohere/http/testing";
 import { describe, expect, it } from "vitest";
 
@@ -53,7 +53,10 @@ describe("@decohere/http/testing", () => {
 	});
 
 	it("boots controllers and the services they need without an app of their own", async () => {
-		await using api = await bootModule({ controllers: [PingController] });
+		await using api = await bootModule({
+			provider: FastifyProvider,
+			controllers: [PingController],
+		});
 
 		expect((await fetch(`${api.baseUrl}/ping`)).status).toBe(200);
 	});

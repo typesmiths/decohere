@@ -1,6 +1,3 @@
-import { configureHttp } from "../src/http/http.plugin.js";
-import { health } from "../src/health/health.plugin.js";
-import { auth } from "../src/auth/auth.plugin.js";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
@@ -11,12 +8,20 @@ import {
 } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { AuthConfig } from "../src/auth/auth.config.js";
-import { TokenService } from "../src/auth/token-service.js";
-import type { StaticOptions } from "../src/http/http.static.js";
-import { AllowAnonymous, Authorize, Controller, Get } from "../src/index.js";
-import type { OpenApiDocument } from "../src/openapi/openapi.types.js";
-import { bootModule } from "../src/testing/index.js";
+import {
+	AllowAnonymous,
+	AuthConfig,
+	Authorize,
+	Controller,
+	Get,
+	type OpenApiDocument,
+	type StaticOptions,
+	TokenService,
+	auth,
+	configureHttp,
+	health,
+} from "@decohere/http";
+import { bootModule } from "./helpers/boot-module.js";
 
 // The suite's fs is an in-memory fake. Static files are read by the real server from real disk.
 vi.unmock("fs");

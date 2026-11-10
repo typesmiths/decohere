@@ -22,6 +22,7 @@ export class ApiPackageJson implements KeyedModel {
 		this._dependencies = {
 			"@decohere/core": CREATE_VERSION,
 			"@decohere/http": CREATE_VERSION,
+			"@decohere/http-fastify": CREATE_VERSION,
 			"@decohere/crucible": CREATE_VERSION,
 		};
 	}

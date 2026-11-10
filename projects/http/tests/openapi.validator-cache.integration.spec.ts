@@ -4,7 +4,7 @@ import { Ajv } from "ajv";
 import axios from "axios";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { Controller, Field, Param, Post, RequestParts } from "../src/routing/index.js";
 import { startTestApp } from "../src/testing/index.js";
 

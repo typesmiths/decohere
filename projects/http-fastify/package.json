@@ -1,0 +1,46 @@
+{
+  "name": "@decohere/http-fastify",
+  "version": "0.0.1-dev.5",
+  "description": "Fastify provider for @decohere/http: the web server, with helmet, CORS, compression, rate limit and static files",
+  "keywords": [
+    "typescript",
+    "http",
+    "fastify",
+    "rest",
+    "api",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/http-fastify#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/http-fastify"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/crucible": "0.0.1-dev.5",
+    "@decohere/http": "0.0.1-dev.5",
+    "@decohere/scribe": "0.0.1-dev.5",
+    "@fastify/compress": "^9.2.1",
+    "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.0",
+    "@fastify/rate-limit": "^11.2.2",
+    "@fastify/static": "^10.1.10",
+    "fastify": "^5.12.8"
+  },
+  "devDependencies": {}
+}

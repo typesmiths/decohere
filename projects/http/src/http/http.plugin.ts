@@ -42,14 +42,14 @@ export type HttpSettings = {
 	 */
 	globalPrefix?: string;
 	cors?: CorsOptions;
-	/** Override default `@fastify/helmet` headers, or `false` to turn them off. On by default. */
+	/** Override the default security headers (helmet), or `false` to turn them off. On by default. */
 	helmet?: HelmetOptions;
-	/** Override the default `@fastify/rate-limit` (100 req / 1 minute), or `false` to turn it off. */
+	/** Override the default rate limit (100 req / 1 minute), or `false` to turn it off. */
 	rateLimit?: RateLimitOptions;
 	/**
-	 * Compress responses with `br` or `gzip` when the client accepts it, using `@fastify/compress`
+	 * Compress responses with `br` or `gzip` when the client accepts it, through the provider
 	 * with best-practice defaults (on by default, 1 KB threshold, no `deflate`). Pass `false` to
-	 * turn it off, or `{ threshold, encodings, types, providerOptions }` to override. The plugin
+	 * turn it off, or `{ threshold, encodings, types, providerOptions }` to override. The provider
 	 * does not compress `text/event-stream` by default. Compressing a response that mixes a secret
 	 * with input an attacker controls can leak the secret over HTTPS (BREACH); see ADR 0008.
 	 */

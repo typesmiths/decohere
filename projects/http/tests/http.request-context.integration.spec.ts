@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthConfig } from "../src/auth/auth.config.js";
 import { auth } from "../src/auth/auth.plugin.js";
 import { http } from "../src/http/http.plugin.js";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { Authorize, Controller, Get, REQUEST_ID_HEADER } from "../src/routing/index.js";
 import { Sse, type SseStream } from "../src/sse/index.js";
 import { bootModule } from "../src/testing/index.js";
@@ -143,7 +143,10 @@ describe("request context in log lines", () => {
 	});
 
 	it("a server-sent event stream logs with its request's id", async () => {
-		await using api = await bootModule({ controllers: [TickController] });
+		await using api = await bootModule({
+			provider: FastifyProvider,
+			controllers: [TickController],
+		});
 
 		await api.readEvents("/ticks", { count: 2, headers: { [REQUEST_ID_HEADER]: "stream-1" } });
 

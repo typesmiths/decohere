@@ -144,7 +144,7 @@ export class MainSourceFile implements KeyedModel {
 			'import { config, EnvDataSource, YamlDataSource } from "@decohere/config";',
 			'import { Builder } from "@decohere/core/hosting";',
 			'import { ServiceContainerBuilder } from "@decohere/crucible";',
-			'import { FastifyProvider } from "@decohere/http/providers";',
+			'import { FastifyProvider } from "@decohere/http-fastify";',
 			'import { scribe } from "@decohere/scribe";',
 			'import { SampleService } from "./services/sample.service.js";',
 		];

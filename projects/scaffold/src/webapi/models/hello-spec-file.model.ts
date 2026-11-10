@@ -46,6 +46,7 @@ export class HelloSpecFile implements KeyedModel {
 		const content = [
 			'import { config, EnvDataSource } from "@decohere/config";',
 			'import { bootModule } from "@decohere/http/testing";',
+			'import { FastifyProvider } from "@decohere/http-fastify";',
 			'import { afterEach, expect, it, vi } from "vitest";',
 			'import { HelloController } from "../src/controllers/hello.controller.js";',
 			'import { SampleService } from "../src/services/sample.service.js";',
@@ -62,6 +63,7 @@ export class HelloSpecFile implements KeyedModel {
 				([name, value]) => `\tvi.stubEnv(${JSON.stringify(name)}, ${JSON.stringify(value)});`,
 			),
 			"\tawait using api = await bootModule({",
+			"\t\tprovider: FastifyProvider,",
 			"\t\tcontrollers: [HelloController],",
 			"\t\tservices: (services) => {",
 			...this._services.flatMap((service) =>
