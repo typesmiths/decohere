@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get, Param, Query } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 type GroupBy = "colour" | "size";
 
@@ -55,7 +55,7 @@ describe("@Query binding over HTTP", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [TotalsController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 	}
 
 	it("binds each of many parameters by name", async () => {
@@ -103,7 +103,7 @@ describe("@Query binding over HTTP", () => {
 				}),
 			)
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const spec = await axios.get("/openapi.json");
 

@@ -14,7 +14,7 @@ import {
 	Query,
 	RequestParts,
 } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 class CreateBody {
 	@Field(RequestParts.body, "message")
@@ -83,7 +83,7 @@ describe("OpenAPI integration", () => {
 				}),
 			)
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const spec = await axios.get("/openapi.json");
 		expect(spec.status).toBe(200);
@@ -167,7 +167,7 @@ describe("OpenAPI integration", () => {
 				}),
 			)
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const missing = await axios.post(
 			"/hello",

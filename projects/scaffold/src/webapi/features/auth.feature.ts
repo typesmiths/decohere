@@ -14,6 +14,7 @@ import {
 import { AUTH_CONFIG_SECTION, AuthConfigModel } from "../models/auth-config.model.js";
 import { ControllerSourceFile } from "../models/controller-source-file.model.js";
 import { type DatabaseProvider, type Orm, ormOf } from "../database-provider.js";
+import type { HelloSpecFile } from "../models/hello-spec-file.model.js";
 import type { MainSourceFile } from "../models/main-source-file.model.js";
 import { MigrationsModel } from "../models/migrations.model.js";
 import { adminSeed, userTable } from "./orm-templates.js";
@@ -280,6 +281,15 @@ function scaffoldLocalUserProfile(workspace: WorkspaceScaffold, orm: Orm): void 
 				.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
 				?.addImport("UserEntity", "./entities/user.entity.js");
 		}
+		project
+			.getModel<HelloSpecFile>(WELL_KNOWN_FILES.HELLO_SPEC)
+			?.addImport("UserService", "../src/services/user.service.js")
+			.addService(
+				"// GET /hello reads no users: a stand-in, so the test needs no database.",
+				"services.registerSingleton(UserService, {",
+				'\tensureFromPrincipal: () => Promise.reject(new Error("No database in this test")),',
+				"});",
+			);
 		(
 			project.getModel<MigrationsModel>(WELL_KNOWN_FILES.MIGRATIONS) ??
 			project.addModel(new MigrationsModel())
@@ -404,6 +414,13 @@ function scaffold(workspace: WorkspaceScaffold, chosen: AuthOptions): void {
 		project
 			.getModel<MainSourceFile>(WELL_KNOWN_FILES.MAIN_TS)
 			?.addImport("auth", "@decohere/http");
+		// The spec checks tokens with a secret of its own, so it needs no Auth0 tenant.
+		project
+			.getModel<HelloSpecFile>(WELL_KNOWN_FILES.HELLO_SPEC)
+			?.addImport("auth", "@decohere/http")
+			.addPlugin("auth()")
+			.stubEnv("AUTH__SECRET", "a-secret-only-this-test-knows")
+			.stubEnv("AUTH__AUDIENCE", "hello-test");
 	}
 
 	if (withLocalUsers) {

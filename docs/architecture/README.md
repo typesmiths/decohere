@@ -13,7 +13,7 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 | [`@decohere/scribe`](../../projects/scribe/README.md) | `projects/scribe/scribe` | Logging facade; no dependencies, any runtime with a `console` ([ADR 0016](../adr/0016-scribe-on-any-runtime.md)) |
 | `@decohere/scribe-pino` | `projects/scribe/scribe-pino` | Pino writer |
 | `@decohere/scribe-console` | `projects/scribe/scribe-console` | JSON console writer (Workers, browsers, Deno, Bun, Node) |
-| [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: Fastify, routing, auth, OpenAPI, the app builder |
+| [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: Fastify, routing, auth, OpenAPI; the test helpers at `/testing` ([ADR 0026](../adr/0026-app-recipes-and-test-helper.md)) |
 | [`@decohere/config`](../../projects/config/README.md) | `projects/config` | Configuration from YAML and environment sources |
 | [`@decohere/data`](../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)) |
 | [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `bootstrap` |
@@ -33,7 +33,7 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 Layers, simplified:
 
 ```text
-runtime  (what a production app installs):  scribe → core → crucible → http, config, data*
+runtime  (what a production app installs):  scribe → core → crucible → config, data* · http (on config and scribe-pino)
 tooling  (never in a production app):       core → devkit → workspace → forge → flux → cli
 other:                                      testing · create (launcher) / scaffold · ci-tools
 ```
@@ -57,6 +57,14 @@ Application and domain code depend on Decohere contracts; vendor code lives in a
 
 A fact has one owner, and consumers ask it. Flux and Forge both call `workspace.getPackageAliases()` rather than deriving aliases themselves. A consumer that needs a new shape adds a method to the owner or adapts at its edge.
 
+## 4. Progressive: new apps start from a recipe the app owns
+
+A new app should run in minutes, and a grown app should use only what it needs and be able to swap any part.
+
+- **A recipe is code the scaffolder writes into the app**, not a package the app imports. A web API on Fastify gets an `app.ts` that spells out its composition: logging, `http(FastifyProvider, …)`, `config(…)`, `health()`. Swapping the HTTP provider or the logger is editing that line. More recipes (another provider, a worker without HTTP) are more scaffolder templates, not more packages.
+- **No preset hides the composition.** A plugin that wires several packages would hard-wire one vendor per part, and need one more package for each combination.
+- **Each package depends only on what its own code needs.** `@decohere/http` doesn't install config or a logging library. A package that pulls in more is a bug against this rule.
+
 ## Key patterns
 
 - **DI:** `@injectable()` with a **value** import for constructor parameter types; `@inject(Class | Token)` for interfaces, symbols, arrays or an explicit key. [Crucible](../../projects/crucible/README.md).
@@ -66,4 +74,4 @@ A fact has one owner, and consumers ask it. Flux and Forge both call `workspace.
 - **Configuration:** `@decohere/config` sources behind tokens.
 - **Data:** `@decohere/data` repositories over a request-scoped unit of work that tracks changes and writes them on `commit()`; queries in Decohere's `Query<T>`, never an ORM's options. Migrations are Decohere's own, the same with either provider; building an app changes nothing in its database, and starting it migrates (in development), synchronizes and seeds.
 - **Build and test:** Forge builds packages; tests compile through `@decohere/forge/vitest` (`forgeBuild`).
-- **Scaffolded apps:** `projects/<api>/`, with `main.ts` as the composition root.
+- **Scaffolded apps:** `projects/<api>/`: `app.ts` composes the app (`createApp()`), with every part written out, and `main.ts` starts it.

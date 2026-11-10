@@ -20,6 +20,47 @@ await Builder.create(new ServiceContainerBuilder())
 
 Everything `http(...)` takes is on `HttpSettings`. `configureHttp(settings)` adds to them from elsewhere, such as a plugin of your own that brings its controllers.
 
+## Testing an app
+
+`@decohere/http/testing` starts an app on a free loopback port, so a test calls it over HTTP the way a client would, through routing, auth, validation and the real provider. `await using` stops it at the end of the block.
+
+```ts
+import { startTestApp } from "@decohere/http/testing";
+import { createApp } from "../src/app.js";
+
+it("says hello", async () => {
+	await using api = await startTestApp(createApp());
+
+	const response = await fetch(`${api.baseUrl}/hello`);
+
+	expect(response.status).toBe(200);
+});
+```
+
+`startTestApp(app)` takes a built app, or the promise `build()` returns. It starts it on `127.0.0.1:0` with no SIGTERM or SIGINT handlers, and gives back `baseUrl`, its origin (such as `http://127.0.0.1:41233`), `app` (its services are at `app.services`), `readEvents` for [streams](#testing-a-stream) and `stop()`. If the app fails to start, it is stopped and the error is thrown.
+
+To test some controllers without the rest of the app (no database, no identity provider), `bootModule` builds an app of only those, with the services you give it:
+
+```ts
+import { config, EnvDataSource } from "@decohere/config";
+import { bootModule } from "@decohere/http/testing";
+
+it("greets with the configured greeting", async () => {
+	vi.stubEnv("SAMPLE__GREETING", "Hi");
+	await using api = await bootModule({
+		controllers: [HelloController],
+		services: (services) => services.registerSingleton(SampleService),
+		configure: (builder) => builder.use(config(EnvDataSource)),
+	});
+
+	const response = await fetch(`${api.baseUrl}/hello`);
+
+	expect(await response.json()).toEqual({ message: "Hi" });
+});
+```
+
+To stand in for a service, register an object under its class: `services.registerSingleton(UserService, { ensureFromPrincipal: async () => user })`. A scaffolded app comes with a spec like this, `tests/hello.controller.spec.ts`.
+
 ## Request context in log lines
 
 Every line a `scribe.logger(...)` handle writes while a request is being served carries that request's `requestId`, and `principalId` (the principal's `sub`) once auth has checked it. That includes lines from services the controller calls, from middleware, and from an `@Sse()` stream while it runs. The app writes no code for it:

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get, Post } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 @Controller({ prefix: "/secure" })
 class SecureController {
@@ -31,7 +31,7 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 		app = await Builder.create(new ServiceContainerBuilder())
 			.use(http(FastifyProvider, { accessLog: false, controllers: [SecureController] }))
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const res = await axios.get("/secure");
 		expect(res.status).toBe(200);
@@ -50,7 +50,7 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 				}),
 			)
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const res = await axios.get("/secure");
 		expect(res.status).toBe(200);
@@ -69,7 +69,7 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 				}),
 			)
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const res = await axios.post(
 			"/secure",
@@ -92,7 +92,7 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 				}),
 			)
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		const first = await axios.get("/secure");
 		expect(first.status).toBe(200);
@@ -111,7 +111,7 @@ describe("HTTP security defaults (helmet, rate-limit, bodyLimit)", () => {
 				}),
 			)
 			.build();
-		axios.defaults.baseURL = await listenEphemeral(app);
+		axios.defaults.baseURL = (await startTestApp(app)).baseUrl;
 
 		for (let i = 0; i < 5; i++) {
 			const res = await axios.get("/secure");

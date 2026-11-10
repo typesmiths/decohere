@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import { FastifyProvider } from "../src/providers/fastify.provider.js";
 import { Controller, Get } from "../src/routing/index.js";
-import { listenEphemeral } from "./helpers/listen-ephemeral.js";
+import { startTestApp } from "../src/testing/index.js";
 
 const cleanedUp: string[] = [];
 const WorkToken = Symbol("RequestWork");
@@ -46,7 +46,7 @@ describe("per-request cleanup", () => {
 			.use(http(FastifyProvider, { controllers: [WorkController] }))
 			.withServices((c) => c.registerRequestScoped(WorkToken, RequestWork))
 			.build();
-		const baseURL = await listenEphemeral(app);
+		const baseURL = (await startTestApp(app)).baseUrl;
 
 		const res = await axios.get("/work/fail", { baseURL, validateStatus: () => true });
 
