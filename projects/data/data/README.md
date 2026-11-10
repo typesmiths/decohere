@@ -107,12 +107,13 @@ try {
 | Command | Does |
 | --- | --- |
 | `migrate [--to <id>] [--dry-run]` | Applies pending migrations in id order |
+| `baseline <id> [--dry-run]` | Records the migrations up to `<id>` as applied without running them, for a database another tool already migrated |
 | `status` | Lists migrations: applied, pending, or in the history but not the code |
 | `revert` | Undoes the last applied migration |
 | `new <name> [--data]` | Writes an empty migration; with `--data`, one that changes rows and fails until written |
 | `generate <name>` | Writes a schema migration from the provider's diff of the mappings against the tables |
 
-`generate` connects as the migrate role, which sees only its own schema, so the diff can't touch another app's tables. It refuses while migrations are pending, since the diff would repeat them. With several data sources, name one with `--data-source`. How to run them in development and in a deploy, and how to change a schema without downtime: [Migrations](../../../docs/recipes/migrations.md).
+`generate` connects as the migrate role, which sees only its own schema, so the diff can't touch another app's tables. It refuses while migrations are pending, since the diff would repeat them. With several data sources, name one with `--data-source`. How to run them in development and in a deploy, and how to change a schema without downtime: [Migrations](../../../docs/recipes/migrations.md). An app on TypeORM's own migrations moves over with [Move from TypeORM's migrations](../../../docs/recipes/migrations.md#move-from-typeorms-migrations).
 
 ## For provider authors
 

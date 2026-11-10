@@ -1,6 +1,6 @@
 # Migrations
 
-How to change a Decohere app's database: set up the commands, change the schema in development, migrate in a deploy, and change a schema while the app keeps serving. The format and the commands are in [`@decohere/data`](../../projects/data/data/README.md#migrations); the Postgres runner is in [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md#running-migrations). A generated app comes set up.
+How to change a Decohere app's database: set up the commands, change the schema in development, migrate in a deploy, change a schema while the app keeps serving, and move an app over from TypeORM's own migrations. The format and the commands are in [`@decohere/data`](../../projects/data/data/README.md#migrations); the Postgres runner is in [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md#running-migrations). A generated app comes set up.
 
 ## Set up
 
@@ -111,3 +111,81 @@ Each migration runs in a transaction, so a statement that can't run in one, such
 ## Change provider
 
 The history is Decohere's, not the ORM's, so it stays. Map the entities with the new provider and run `db generate`: the first diff renames the indexes and keys to the new ORM's names. Review it and apply it like any other migration.
+
+## Move from TypeORM's migrations
+
+An app that runs TypeORM's own migrations has a second `DataSource` for its CLI, a `tsx` dev dependency, and scripts such as `node --import tsx node_modules/typeorm/cli.js migration:run`. Its databases keep their history in TypeORM's `migrations` table, which Decohere doesn't read. So you convert the migrations, then tell each existing database once that it already has them, with `db baseline`.
+
+1. **Set up the commands** as in [Set up](#set-up), with `typeOrm({ entities, database: postgres, migrations })`. Keep the data source where its tables are: leave `schema` unset when they are in `public`. The migrate role has to own the tables to change them, so make it the user TypeORM's scripts connected as: set `migrateUsername` to it, or leave it unset when the app uses that one user for everything.
+
+2. **Convert each migration** to a file in `src/migrations/`. Take its id from the class name's timestamp, so the migrations keep their order and sort before any you add later:
+
+   ```bash
+   node -e 'console.log(new Date(1794327166580).toISOString())'
+   # 2026-11-10T16:12:46.580Z → 20261110-161246-init
+   ```
+
+   ```ts
+   // src/migrations/20261110-161246-init.ts (TypeORM: Init1794327166580)
+   import { defineMigration } from "@decohere/data";
+
+   export default defineMigration({
+   	id: "20261110-161246-init",
+   	async up({ sql }) {
+   		await sql(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+   		await sql(`CREATE TYPE "public"."account_role_enum" AS ENUM('admin', 'member')`);
+   		await sql(`CREATE TABLE "account" (…)`);
+   		// …the rest of its up, each queryRunner.query(…) as sql(…)
+   	},
+   	async down({ sql }) {
+   		// its down, the same way
+   	},
+   });
+   ```
+
+   - `queryRunner.query(text, params)` becomes `sql(text, params)`. A migration that calls other `QueryRunner` methods (`createTable`, `addColumn`) needs the SQL they run: run the old migrations once with `logging: true` on a scratch database and copy it.
+   - TypeORM's CLI creates the `uuid-ossp` extension before it migrates when an entity has a generated `uuid` key. Decohere runs only what a migration says, so put `create extension if not exists "uuid-ossp"` at the top of the first one.
+   - Keep the TypeORM name in a comment: step 4 matches it to the database's history.
+
+   List them in `src/migrations/index.ts`, in the same form `db new` writes (`db new` and `db generate` rewrite it from the folder from then on):
+
+   ```ts
+   import type { Migration } from "@decohere/data";
+   import m20261110_161246_init from "./20261110-161246-init.js";
+   import m20261110_170000_display_names from "./20261110-170000-display-names.js";
+
+   export const migrations: Migration[] = [m20261110_161246_init, m20261110_170000_display_names];
+   ```
+
+   With many migrations, you can replace them with one instead: on an empty database, `pnpm decohere db generate baseline` writes the whole schema from the mappings. It holds tables, indexes and keys only, so add the rows and extensions the old migrations created by hand.
+
+3. **Check it on an empty database.** `pnpm decohere db migrate` should build the schema the old migrations built. Compare the two with `pg_dump --schema-only`, leaving out the history tables (`-T migrations -T migrations_id_seq -T decohere_migrations`), and `pnpm decohere db generate check` should say the tables already match the mappings.
+
+4. **Record what each existing database has**, once per environment, before the first deploy that runs `db migrate`. Find the last migration it applied, and the converted id that matches it:
+
+   ```sql
+   select name from migrations order by id desc limit 1;   -- DisplayNames1794330000000
+   ```
+
+   ```bash
+   pnpm decohere db baseline 20261110-170000-display-names --dry-run
+   # would record 20261110-161246-init
+   # would record 20261110-170000-display-names
+   pnpm decohere db baseline 20261110-170000-display-names
+   pnpm decohere db status    # both applied, nothing pending
+   pnpm decohere db migrate   # Nothing to apply
+   ```
+
+   In a packaged app it's `node es6/src/db.js baseline <id>`, with the migrate role's password in the environment, like `migrate`. `baseline` runs nothing: it records that migration and every one before it as applied. A database ahead of another (staging with a migration production hasn't had yet) gets its own last id, and `db migrate` applies the rest. If `db migrate` runs on a database before its baseline, its first migration fails on a type or table that already exists and is rolled back, so nothing changes: run `baseline`, then `migrate` again.
+
+5. **Remove TypeORM's CLI**: the scripts, the `DataSource` file they load with its `migrations` and `migrationsRun` options, and the `tsx` dev dependency if nothing else uses it.
+
+   | TypeORM script | Decohere |
+   | --- | --- |
+   | `migration:run` | `pnpm decohere db migrate` |
+   | `migration:revert` | `pnpm decohere db revert` |
+   | `migration:generate <path>` | `pnpm decohere db generate <name>` |
+   | `migration:create <path>` | `pnpm decohere db new <name>` |
+   | `migration:show` | `pnpm decohere db status` |
+
+   TypeORM's `migrations` table stays until you drop it. Once every environment has its baseline, a migration with `drop table "migrations"` removes it.

@@ -7,6 +7,7 @@ import {
 	type MigrationRow,
 	type MigrationSource,
 	type MigrationState,
+	type BaselineOptions,
 	type MigrateOptions,
 	type Migrator,
 	type RevertOptions,
@@ -133,20 +134,22 @@ async function transaction(session: Session, id: string, work: () => Promise<voi
 	}
 }
 
-async function migrate(source: MigrationSource, options: MigrateOptions): Promise<string[]> {
-	const migrations = inOrder(source.migrations);
-	if (options.to != null && !migrations.some((m) => m.id === options.to)) {
-		throw new DataConfigurationError(`No migration has the id ${options.to}`);
+/** The migrations up to and including `to` (all of them without it), refusing an id none has. */
+function selectUpTo(migrations: Migration[], to: string | undefined): Migration[] {
+	if (to == null) return migrations;
+	if (!migrations.some((m) => m.id === to)) {
+		throw new DataConfigurationError(`No migration has the id ${to}`);
 	}
-	const upTo = (all: Migration[]) =>
-		options.to == null
-			? all
-			: all.filter((m) => m.id.localeCompare(options.to as string) <= 0);
+	return migrations.filter((m) => m.id.localeCompare(to) <= 0);
+}
+
+async function migrate(source: MigrationSource, options: MigrateOptions): Promise<string[]> {
+	const migrations = selectUpTo(inOrder(source.migrations), options.to);
 
 	return withSession(source, async (session) => {
 		if (options.dryRun) {
 			const applied = await history(session);
-			const pending = upTo(migrations).filter((m) => !applied.has(m.id));
+			const pending = migrations.filter((m) => !applied.has(m.id));
 			for (const m of pending) options.log?.(`would apply ${m.id}`);
 			return pending.map((m) => m.id);
 		}
@@ -154,7 +157,7 @@ async function migrate(source: MigrationSource, options: MigrateOptions): Promis
 			// Read under the lock: a run that held it before us may have applied some.
 			const applied = await history(session);
 			const done: string[] = [];
-			for (const m of upTo(migrations)) {
+			for (const m of migrations) {
 				if (applied.has(m.id)) continue;
 				const started = performance.now();
 				await transaction(session, m.id, async () => {
@@ -165,6 +168,33 @@ async function migrate(source: MigrationSource, options: MigrateOptions): Promis
 				options.log?.(`applied ${m.id} (${Math.round(performance.now() - started)} ms)`);
 			}
 			return done;
+		});
+	});
+}
+
+async function baseline(source: MigrationSource, options: BaselineOptions): Promise<string[]> {
+	const migrations = selectUpTo(inOrder(source.migrations), options.to);
+
+	return withSession(source, async (session) => {
+		if (options.dryRun) {
+			const applied = await history(session);
+			const unrecorded = migrations.filter((m) => !applied.has(m.id));
+			for (const m of unrecorded) options.log?.(`would record ${m.id}`);
+			return unrecorded.map((m) => m.id);
+		}
+		return locked(session, async () => {
+			const applied = await history(session);
+			const unrecorded = migrations.filter((m) => !applied.has(m.id)).map((m) => m.id);
+			if (unrecorded.length === 0) return [];
+			// One transaction: the history has every one of them, or none.
+			await transaction(session, options.to, async () => {
+				await session.client.query(
+					`insert into ${session.table} (id) select unnest($1::text[])`,
+					[unrecorded],
+				);
+			});
+			for (const id of unrecorded) options.log?.(`recorded ${id}`);
+			return unrecorded;
 		});
 	});
 }
@@ -224,4 +254,4 @@ async function status(source: MigrationSource): Promise<MigrationState[]> {
  * advisory lock on that table's name keeps two runs, from two instances starting together,
  * from applying the same migration twice.
  */
-export const postgresMigrator: Migrator = { migrate, revert, status };
+export const postgresMigrator: Migrator = { migrate, baseline, revert, status };

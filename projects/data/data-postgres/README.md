@@ -34,6 +34,8 @@ A runner or script that opens its own connection can call `bootstrapDataSources(
 
 `revert` undoes the most recently applied migration. It refuses one with no `down`, or one the code no longer has.
 
+`baseline` records migrations as applied without running their `up`, all in one transaction under the same lock. It skips any the history already has.
+
 ## What else goes here
 
 Other Postgres-only code, as it's built, such as starting a development Postgres on demand. Another database would get a package of its own with the same shape.

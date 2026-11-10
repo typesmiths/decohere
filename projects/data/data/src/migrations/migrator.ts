@@ -22,6 +22,14 @@ export type MigrateOptions = {
 
 export type RevertOptions = { container: IContainer; log?: (line: string) => void };
 
+export type BaselineOptions = {
+	/** The last migration the database already has: it and every one before it are recorded. */
+	to: string;
+	/** Say what would be recorded, and record nothing. */
+	dryRun?: boolean;
+	log?: (line: string) => void;
+};
+
 export type MigrationState =
 	| { id: string; state: "applied"; appliedAt: Date }
 	| { id: string; state: "pending" }
@@ -37,6 +45,11 @@ export type MigrationState =
 export interface Migrator {
 	/** Apply what's pending, in id order. Returns the ids it applied (or would, with `dryRun`). */
 	migrate(source: MigrationSource, options: MigrateOptions): Promise<string[]>;
+	/**
+	 * Record the migrations up to `to` as applied without running them, for a database whose
+	 * schema another tool already built. Returns the ids it recorded (or would, with `dryRun`).
+	 */
+	baseline(source: MigrationSource, options: BaselineOptions): Promise<string[]>;
 	/** Undo the last applied migration. Returns its id, or `undefined` when none is applied. */
 	revert(source: MigrationSource, options: RevertOptions): Promise<string | undefined>;
 	/** Every migration in the code and the history, in id order. */
