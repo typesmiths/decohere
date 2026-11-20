@@ -17,6 +17,7 @@ import { ForgeError, formatUnknownError } from "../errors.js";
 import { DependencyPinner } from "../packaging/dependency-pinner.service.js";
 import { deployable, PACKAGE_DIR } from "../packaging/deployable.js";
 import { ImportGraph, type ReleaseProject } from "../packaging/import-graph.service.js";
+import { type PnpmPatch, pnpmPatches } from "../packaging/pnpm-patches.js";
 import { releaseExports } from "../packaging/release-exports.js";
 import { type UiAssets, uiAssets } from "../packaging/ui-assets.js";
 import { Release } from "../workspace.config.js";
@@ -150,17 +151,16 @@ export class PackageDeployable implements Action<PackageOptions> {
 				.filter((name) => name !== project.name)
 				.sort()
 				.map((name) => releaseProjects.get(name) as ReleaseProject);
+			const rootDir = path.resolve(this.workspace.rootDir);
+			const patches = await pnpmPatches.read(rootDir);
 			const dependencies = await this.pinner.pin(
 				reached.thirdParty,
 				[entry, ...libraries],
 				releaseProjects,
-				{
-					dir: path.resolve(this.workspace.rootDir),
-					pkg: await this.workspace.getPackageJson(),
-				},
+				{ dir: rootDir, pkg: await this.workspace.getPackageJson() },
 			);
 
-			await this.write(entry, libraries, dependencies, outDir, ui);
+			await this.write(entry, libraries, dependencies, outDir, ui, { rootDir, patches });
 			await this.copyConfig(project, outDir, options);
 
 			const workspacePackages = [...reached.workspace].sort();
@@ -188,8 +188,27 @@ export class PackageDeployable implements Action<PackageOptions> {
 		dependencies: Record<string, string>,
 		outDir: string,
 		ui: UiAssets | undefined,
+		pnpm: { rootDir: string; patches: readonly PnpmPatch[] },
 	): Promise<void> {
 		await fs.rm(outDir, { recursive: true, force: true });
+		try {
+			await this.writePackage(entry, libraries, dependencies, outDir, ui, pnpm);
+		} catch (reason) {
+			// A half-written package (installed but unpatched, say) must not be mistaken for one
+			// that is ready to ship.
+			await fs.rm(outDir, { recursive: true, force: true });
+			throw reason;
+		}
+	}
+
+	private async writePackage(
+		entry: ReleaseProject,
+		libraries: readonly ReleaseProject[],
+		dependencies: Record<string, string>,
+		outDir: string,
+		ui: UiAssets | undefined,
+		pnpm: { rootDir: string; patches: readonly PnpmPatch[] },
+	): Promise<void> {
 		await fs.mkdir(outDir, { recursive: true });
 		await this.writeJson(path.join(outDir, "package.json"), {
 			name: entry.name.replace(/^@/, "").replace("/", "-"),
@@ -204,6 +223,16 @@ export class PackageDeployable implements Action<PackageOptions> {
 		// so the workspace libraries are copied in only after it has run.
 		if (Object.keys(dependencies).length > 0) {
 			await this.npm.installProduction({ cwd: outDir });
+		}
+
+		// npm installs from the registry and knows nothing of pnpm's patchedDependencies, so the
+		// patches the workspace's tests ran with are applied here, before the libraries go in.
+		const patched = await pnpmPatches.apply(pnpm.patches, pnpm.rootDir, outDir, entry.name);
+		for (const { name, version, file } of patched.applied) {
+			this.#logger.info(`Patched ${name}@${version} (${file})`);
+		}
+		for (const patch of patched.skipped) {
+			this.#logger.info(`Skipped ${patch.file}: ${entry.name} doesn't ship ${patch.name}`);
 		}
 
 		await this.copyTree(path.join(entry.releaseDir, "es6"), path.join(outDir, "es6"));
