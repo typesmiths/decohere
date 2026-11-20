@@ -16,7 +16,7 @@ import {
 	type StartSteps,
 	StartStepsToken,
 } from "./const.js";
-import type { HostedServiceHost } from "./hosted-service-host.js";
+import type { HostedServiceHost, HostedServiceStartTiming } from "./hosted-service-host.js";
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_SHUTDOWN_SIGNALS: readonly NodeJS.Signals[] = ["SIGTERM", "SIGINT"];
@@ -53,6 +53,14 @@ export type StartOptions = {
 	shutdownSignals?: readonly NodeJS.Signals[] | false;
 	/** How long a signalled shutdown may take before the process exits with code 1. Default 10s. */
 	shutdownTimeoutMs?: number;
+	/**
+	 * When hosted services start. `"before-listen"` (default): `start()` resolves once every one
+	 * has started, and a failure rejects it. `"after-listen"`: the server listens first and they
+	 * start in the background, in the same order, while `GET /ready` answers 503; a failure stops
+	 * the app and rejects {@link App.hostedServicesStarted}. For a host with a start budget, such
+	 * as Cloud Run.
+	 */
+	hostedServices?: "before-listen" | "after-listen";
 };
 
 export class App {
@@ -62,6 +70,7 @@ export class App {
 	private disposingContainer = false;
 	private signalHandler: ((signal: NodeJS.Signals) => void) | undefined;
 	private shutdownSignals: readonly NodeJS.Signals[] = [];
+	private hostedStarting: Promise<readonly HostedServiceStartTiming[]> | undefined;
 
 	public constructor(
 		@inject(LifetimeScopeToken) private readonly container: LifetimeScope,
@@ -91,10 +100,33 @@ export class App {
 			await step(this.container);
 			if (this.disposing != null) return undefined;
 		}
+		if (options?.hostedServices === "after-listen") {
+			const startResponse = await this.listen(options);
+			if (this.disposing == null) this.hostedStarting = this.startHostedServicesAfterListen();
+			return startResponse;
+		}
 		// Before the server, so a request never reaches a service that has not started.
-		await this.hostedServices?.start(this.container);
+		this.hostedStarting = this.startHostedServices();
+		await this.hostedStarting;
 		// The app was stopped while a hosted service was still starting.
 		if (this.disposing != null) return undefined;
+		return this.listen(options);
+	}
+
+	/**
+	 * Resolves once every hosted service has started, with how long each one took, in start order.
+	 * With `hostedServices: "after-listen"`, await it in `main.ts` after `start()`: a failure
+	 * rejects it, after the app has stopped. Left unawaited, that rejection is unhandled and ends
+	 * the process, as a failing `await app.start()` would.
+	 */
+	public hostedServicesStarted(): Promise<readonly HostedServiceStartTiming[]> {
+		return (
+			this.hostedStarting ??
+			Promise.reject(new Error("hostedServicesStarted() before start()"))
+		);
+	}
+
+	private async listen(options?: StartOptions): Promise<AppServerStartResponse | undefined> {
 		const hasHostedServices = this.hostedServices != null && !this.hostedServices.isEmpty;
 		if (!this.server) {
 			if (hasHostedServices) this.stopOnSignals(options);
@@ -110,6 +142,37 @@ export class App {
 		this.logger.info("Listening on:", this._addresses);
 		this.stopOnSignals(options);
 		return startResponse;
+	}
+
+	private async startHostedServices(): Promise<readonly HostedServiceStartTiming[]> {
+		const host = this.hostedServices;
+		if (host == null || host.isEmpty) return [];
+		const begun = performance.now();
+		await host.start(this.container);
+		const timings = host.timings;
+		this.logger.info(
+			`Started ${timings.length} hosted services in ${Math.round(performance.now() - begun)} ms`,
+		);
+		return timings;
+	}
+
+	/** The server is already up, so a service that fails to start takes the app down with it. */
+	private async startHostedServicesAfterListen(): Promise<
+		readonly HostedServiceStartTiming[]
+	> {
+		try {
+			return await this.startHostedServices();
+		} catch (startError) {
+			try {
+				await this.dispose();
+			} catch (stopError) {
+				throw new AggregateError(
+					[startError, stopError],
+					"A hosted service failed to start, and stopping the app failed too",
+				);
+			}
+			throw startError;
+		}
 	}
 
 	public [Symbol.asyncDispose]() {
