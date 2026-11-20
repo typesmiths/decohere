@@ -13,6 +13,9 @@ const USAGE = `Usage: db <command> [--data-source <name>]
   new <name> [--data]               write an empty migration (--data: one that changes rows)
   generate <name>                   write a schema migration from the mappings' differences`;
 
+/** Every command but `new`, which only writes a file. */
+const REACHES_DATABASE = new Set(["migrate", "baseline", "status", "revert", "generate"]);
+
 export type DbCommandOptions = {
 	/** The migrations folder, ending in `/`: one for every data source, or one per data source name. */
 	directory: URL | Record<string, URL>;
@@ -84,7 +87,8 @@ function nameArgument(positionals: string[], command: string): string {
  * ```
  *
  * Builds nothing and starts nothing itself: the app is built, not started, so no migration runs on
- * start and the server never listens.
+ * start and the server never listens. Before a command that reaches the database, it bootstraps and
+ * connects the data sources, which only starting would do otherwise.
  */
 async function run(app: BuiltApp, argv: string[], options: DbCommandOptions): Promise<void> {
 	const out = options.out ?? ((line: string) => process.stdout.write(`${line}\n`));
@@ -102,6 +106,7 @@ async function run(app: BuiltApp, argv: string[], options: DbCommandOptions): Pr
 	if (command == null) throw new DbCommandError(USAGE);
 	const target = pick(app, values["data-source"]);
 	const container = app.services;
+	if (REACHES_DATABASE.has(command)) await target.open();
 
 	switch (command) {
 		case "migrate": {

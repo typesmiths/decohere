@@ -37,8 +37,11 @@ function pgInfo(overrides: Partial<ConnectionInfo> = {}): ConnectionInfo {
 
 function fakeDataSource() {
 	const repository = { find: vi.fn().mockResolvedValue([]) };
-	return {
-		initialize: vi.fn().mockResolvedValue(undefined),
+	const ds = {
+		isInitialized: false,
+		initialize: vi.fn(async () => {
+			ds.isInitialized = true;
+		}),
 		getRepository: vi.fn(() => repository),
 		query: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
 		createQueryRunner: vi.fn(() => ({
@@ -48,6 +51,7 @@ function fakeDataSource() {
 		})),
 		repository,
 	};
+	return ds;
 }
 
 describe("TypeOrmModule DataSource singleton", () => {
@@ -108,12 +112,13 @@ describe("TypeOrmModule DataSource singleton", () => {
 
 		const databaseConfig = new DatabaseConfig();
 		databaseConfig.dataSources = [pgInfo({ name: "api" })];
-		await new TypeOrmModule().configure({
+		const configured = await new TypeOrmModule().configure({
 			applicationName: "funding-fee.api",
 			databaseConfig,
 			moduleConfigurations: [{ name: "api", entities: [PositionEntity] }],
 			containerBuilder,
 		});
+		await configured.open();
 
 		const container = containerBuilder.build();
 		expect(container.resolve(TypeOrmPositionBook).source()).toBe(ds);

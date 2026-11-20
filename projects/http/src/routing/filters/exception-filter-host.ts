@@ -1,5 +1,6 @@
 import { type LifetimeScope, LifetimeScopeToken } from "@decohere/crucible";
 import { inject, injectable } from "@decohere/crucible/decorators";
+import { DependencyUnavailableError } from "@decohere/core/hosting";
 import type { Constructable } from "@decohere/core/reflection";
 import { scribe } from "@decohere/scribe";
 import { HttpOptionsToken } from "../../const.js";
@@ -42,6 +43,11 @@ export class DefaultHttpExceptionFilter implements ExceptionFilter {
 				return problemDetails.create(500);
 			}
 			return problemDetails.create(error.status, { ...error.problem, detail: error.message });
+		}
+		// The reason can name hosts and ports: logged, not sent.
+		if (error instanceof DependencyUnavailableError) {
+			this.logger.warn(error.message);
+			return problemDetails.create(503);
 		}
 		if (error instanceof Error) {
 			this.logger.error(error.message, error.stack);

@@ -180,7 +180,8 @@ Every error the API sends is an [RFC 9457](https://www.rfc-editor.org/rfc/rfc945
 
 - **`throw new HttpError(message, status)`** answers `status`, with the message as `detail`. `UnauthorizedError`, `ForbiddenError` and `ValidationError` are kinds of it.
 - **Validation** (a pipe, an OpenAPI request schema) answers `400` and lists each issue under `errors`: `{ "path", "message", "keyword" }`.
-- **Nothing leaks.** A `401` and a `500` carry no `detail`: the message is logged, not sent. Any other thrown error is a `500`.
+- **Something the request needs is down** (`DependencyUnavailableError` from `@decohere/core/hosting`, such as a data source that hasn't connected yet) answers `503`.
+- **Nothing leaks.** A `401`, a `500` and that `503` carry no `detail`: the message is logged, not sent. Any other thrown error is a `500`.
 - **Fastify's own answers** are problems too: an unknown route (`404`, `detail: "Route GET:/nope not found"`), a body that isn't valid JSON or is too large, the rate limit.
 
 A domain error names its problem with a `type` URI, and can add its own members:
@@ -361,7 +362,7 @@ const timings = await app.hostedServicesStarted(); // [{ name: "PositionFeed", m
 
 While they start, `/health` answers 200 and `/ready` answers 503 (`hosted services starting`), so a load balancer that checks readiness sends no traffic to a service that hasn't started.
 
-**A start that throws is retried.** The app doesn't stop for it: it logs the error, starts the next service, and starts the failed one again in the background, after 1 s, doubling to 60 s, each wait varied by ±20%. `/ready` answers 503 until it has started (the anonymous probe gives no detail; the log names the service and its error). A dependency that is down at start, a feed or a broker, then costs readiness, not a crash loop. A `start()` that is retried runs again on the same instance, so it must be safe to call after it threw. Tune the backoff with `startRetry: { initialMs, maxMs }`.
+**A start that throws is retried.** The app doesn't stop for it: it logs the error, starts the next service, and starts the failed one again in the background, after 1 s, doubling to 60 s, each wait varied by ±20%. `/ready` answers 503 until it has started (the anonymous probe gives no detail; the log names the service and its error). A dependency that is down at start, a feed or a broker, then costs readiness, not a crash loop. Start steps are retried the same way, and a failed one holds back every step and service after it: a data provider's step connects to the database and migrates it, so nothing starts against a database that isn't there. A `start()` that is retried runs again on the same instance, so it must be safe to call after it threw. Tune the backoff with `startRetry: { initialMs, maxMs }`.
 
 `startRetry: false` fails fast instead, for a one-shot job that should exit: a throw stops the services already started and fails `app.start()` (after-listen: it stops the app and rejects `hostedServicesStarted()`; await it in `main.ts`, since left unawaited the rejection is unhandled and ends the process). `startTestApp` starts apps this way, so a test sees the error.
 

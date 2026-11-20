@@ -1,6 +1,6 @@
 // mikroOrm() in a running app, against Postgres, the way a generated app uses it in development:
-// building it bootstraps the database and roles and connects; starting it creates the tables and
-// seeds. Each request gets its own unit of work, and it closes when the app stops. Needs Docker: `pnpm test:docker`.
+// building it touches nothing; starting it bootstraps the database and roles, connects, creates the
+// tables and seeds. Each request gets its own unit of work, and it closes when the app stops. Needs Docker: `pnpm test:docker`.
 import "reflect-metadata";
 import { Builder } from "@decohere/core/hosting";
 import {
@@ -63,7 +63,7 @@ describe("mikroOrm() in an app", () => {
 		await server?.stop();
 	});
 
-	it("bootstraps when built, creates tables and seeds when started, and gives each request its own unit of work", async () => {
+	it("bootstraps, connects, creates tables and seeds when started, not when built, and gives each request its own unit of work", async () => {
 		const connection: ConnectionInfo = {
 			name: "notes",
 			provider: "postgres",
@@ -105,7 +105,13 @@ describe("mikroOrm() in an app", () => {
 					.getConnection()
 					.execute<{ found: string | null }[]>("select to_regclass('notes.note') as found")
 			)[0].found;
-		expect(await table()).toBeNull();
+		const databases = async () =>
+			(
+				await server.superuser.query("select datname from pg_database where datname = $1", [
+					connection.database,
+				])
+			).rows;
+		expect(await databases()).toEqual([]);
 
 		await app.start({ port: 0, shutdownSignals: false });
 		expect(await table()).toBe("notes.note");

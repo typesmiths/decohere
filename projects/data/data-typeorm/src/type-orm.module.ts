@@ -11,7 +11,11 @@ import {
 	type StartingDataSource,
 	TrackingUnitOfWork,
 } from "@decohere/data";
-import { type IReadinessCheck, ReadinessCheckToken } from "@decohere/core/hosting";
+import {
+	DependencyUnavailableError,
+	type IReadinessCheck,
+	ReadinessCheckToken,
+} from "@decohere/core/hosting";
 import type { ContainerBuilder } from "@decohere/crucible";
 import { memoize } from "@decohere/core/caching";
 import type { DataSource, Logger } from "typeorm";
@@ -28,54 +32,75 @@ export type TypeOrmModuleOptions = {
 	containerBuilder: ContainerBuilder;
 };
 
-/** A data source the module opened: its container key, and what the app does with it on start. */
+/** A data source the module registered: its container key, and what the app does with it on start. */
 export type OpenedDataSource = { name: string | symbol; starting: StartingDataSource };
 
+/** What {@link TypeOrmModule.configure} registered, and how to bring it all up. */
+export type ConfiguredDataSources = {
+	sources: OpenedDataSource[];
+	/** Bootstrap, then connect each data source: `dataSources.open`. */
+	open(): Promise<void>;
+};
+
 export class TypeOrmModule {
-	/** Registers and opens a DataSource per module. */
-	public async configure(options: TypeOrmModuleOptions): Promise<OpenedDataSource[]> {
+	/**
+	 * Checks the config and registers a DataSource per module, without connecting: the app's start
+	 * step connects (`open`), and is retried while the database is down.
+	 */
+	public async configure(options: TypeOrmModuleOptions): Promise<ConfiguredDataSources> {
 		const { moduleConfigurations, databaseConfig, containerBuilder, applicationName } =
 			options;
 
 		const modules = dataSources.resolve(databaseConfig, moduleConfigurations);
-		// Once, before any DataSource opens: modules sharing a database must not race to create it.
-		await dataSources.prepare(
+		const bootstrap = moduleConfigurations.find((m) => m.database)?.database?.bootstrap;
+		dataSources.check(
 			modules.map((m) => m.connectionInfo),
-			{
-				applicationName,
-				bootstrap: moduleConfigurations.find((m) => m.database)?.database?.bootstrap,
-			},
+			{ bootstrap },
 		);
+		const sources: OpenedDataSource[] = [];
+		const open = () =>
+			dataSources.open(
+				sources.map((s) => s.starting),
+				{ applicationName, bootstrap },
+			);
 
-		return await Promise.all(
-			modules.map(async ({ name, connectionInfo, module }) => {
-				const logger = this.getLoggerFor(name, connectionInfo.dialect);
-				const dataSource = await this.open(
-					applicationName,
-					name,
-					module,
-					connectionInfo,
-					containerBuilder,
-					logger,
-				);
-				const migrations = migrationTarget(applicationName, connectionInfo, module, logger);
-				if (migrations != null) {
-					containerBuilder.registerSingleton(MigrationTargetToken, migrations);
-				}
-				return {
-					name,
-					starting: {
-						connection: connectionInfo,
-						migrations,
-						synchronize: () => dataSource.synchronize(),
-						seed: async () => module.seed?.(dataSource),
+		for (const { name, connectionInfo, module } of modules) {
+			const logger = this.getLoggerFor(name, connectionInfo.dialect);
+			const dataSource = this.register(
+				applicationName,
+				name,
+				module,
+				connectionInfo,
+				containerBuilder,
+				logger,
+			);
+			const migrations = migrationTarget(
+				applicationName,
+				connectionInfo,
+				module,
+				logger,
+				open,
+			);
+			if (migrations != null) {
+				containerBuilder.registerSingleton(MigrationTargetToken, migrations);
+			}
+			sources.push({
+				name,
+				starting: {
+					connection: connectionInfo,
+					migrations,
+					connect: async () => {
+						if (!dataSource.isInitialized) await dataSource.initialize();
 					},
-				};
-			}),
-		);
+					synchronize: () => dataSource.synchronize(),
+					seed: async () => module.seed?.(dataSource),
+				},
+			});
+		}
+		return { sources, open };
 	}
 
-	private async open(
+	private register(
 		applicationName: string,
 		name: string | symbol,
 		moduleConfig: ModuleConfig,
@@ -93,9 +118,15 @@ export class TypeOrmModule {
 			logger,
 		);
 
-		await dataSource.initialize();
-		const unitOfWork = () =>
-			new TrackingUnitOfWork(new TypeOrmRowStore(dataSource), { outbox });
+		const unitOfWork = () => {
+			if (!dataSource.isInitialized) {
+				throw new DependencyUnavailableError(
+					`data source "${String(name)}"`,
+					"not connected yet",
+				);
+			}
+			return new TrackingUnitOfWork(new TypeOrmRowStore(dataSource), { outbox });
+		};
 		builder.registerRequestScoped(name, unitOfWork);
 		builder.registerSingleton(typeOrmDataSourceToken(name), dataSource);
 		builder.registerSingleton(
@@ -121,12 +152,14 @@ function migrationTarget(
 	connection: ConnectionInfo,
 	module: ModuleConfig,
 	logger: Logger,
+	open: () => Promise<void>,
 ): MigrationTarget | undefined {
 	if (module.database == null) return undefined;
 	return {
 		dataSource: connection.name,
 		source: { connection, migrations: module.migrations ?? [], applicationName },
 		migrator: module.database.migrator,
+		open,
 		diff: () => diff(applicationName, connection, module, logger),
 	};
 }
@@ -170,6 +203,7 @@ function createTypeOrmReadinessCheck(
 	return {
 		name: `typeorm:${String(name)}`,
 		async check() {
+			if (!dataSource.isInitialized) throw new Error("not connected yet");
 			await dataSource.query("SELECT 1");
 		},
 	};
