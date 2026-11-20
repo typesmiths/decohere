@@ -352,6 +352,17 @@ Builder.create(new ServiceContainerBuilder())
 
 **Starting.** `app.start()` starts hosted services in registration order, and awaits each `start(signal)`, before the HTTP server listens. So a request never reaches a service that hasn't started, and a `start()` that throws fails `app.start()` (the ones already started are stopped). Keep `start()` short: set up what must be ready before traffic, then run long work in the background and return.
 
+**Starting after the server listens.** A host with a start budget (Cloud Run's startup check, a probe) counts every service's `start()` against it. `hostedServices: "after-listen"` makes the server listen first, then starts the services in the background, in the same order and one at a time, since registration order carries real dependencies (a seed before the feed that reads it):
+
+```ts
+await app.start({ port, hostedServices: "after-listen" });
+const timings = await app.hostedServicesStarted(); // [{ name: "PositionFeed", ms: 45 }, ...]
+```
+
+While they start, `/health` answers 200 and `/ready` answers 503 (`hosted services starting`), so a load balancer that checks readiness sends no traffic to a service that hasn't started. A `start()` that throws stops the app (the server too) and rejects `hostedServicesStarted()`. Await it in `main.ts` as above: left unawaited, the rejection is unhandled and ends the process, as a failing `await app.start()` does.
+
+`hostedServicesStarted()` works in the default mode too, resolving at once after `start()`. Each service's time covers building it from the container and its `start()`; the app logs the total at info level and each service at debug.
+
 **Warming up.** A service that is started but can't serve yet implements `check()`: it throws until the service is ready, and `GET /ready` (`health()`) answers 503 until then. `/health` is unaffected.
 
 **Stopping.** `app.dispose()` runs on `SIGTERM`/`SIGINT` and on every Flux reboot. It:

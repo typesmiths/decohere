@@ -3,12 +3,13 @@
  * Register it with `builder.withHostedService(Type)`; it is a singleton, so other services can
  * inject it by its class.
  *
- * The app starts hosted services in registration order before the HTTP server listens, and stops
- * them in reverse order when it stops (`app.dispose()`, SIGTERM or SIGINT, a Flux reboot).
+ * The app starts hosted services in registration order before the HTTP server listens (or after,
+ * with `app.start({ hostedServices: "after-listen" })`), and stops them in reverse order when it stops (`app.dispose()`, SIGTERM or SIGINT, a Flux reboot).
  */
 export interface HostedService {
 	/**
-	 * Called once when the app starts, and awaited: a throw fails `app.start()`. Do what must be
+	 * Called once when the app starts, and awaited: a throw fails `app.start()` (after-listen: it
+	 * stops the app and rejects `app.hostedServicesStarted()`). Do what must be
 	 * ready before traffic, then start long work (a first load that takes minutes, a timer) in
 	 * the background and return. Waiting for it here keeps the HTTP server dark.
 	 *

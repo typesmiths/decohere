@@ -291,4 +291,121 @@ describe("hosted services", () => {
 		expect((await fetch(url)).status).toBe(200);
 		expect((await fetch(`${app.addresses[0]}/health`)).status).toBe(200);
 	});
+
+	it("reports how long each service took to start, by name, in start order", async () => {
+		@injectable()
+		class SlowStart implements HostedService {
+			public async start() {
+				await sleep(30);
+			}
+		}
+		app = await builder().withHostedService(First, SlowStart).build();
+		await app.start({ port: 0, shutdownSignals: false });
+
+		const timings = await app.hostedServicesStarted();
+
+		expect(timings.map((t) => t.name)).toEqual(["First", "SlowStart"]);
+		expect(timings[1]?.ms).toBeGreaterThanOrEqual(25);
+		expect(timings.every((t) => Number.isInteger(t.ms) && t.ms >= 0)).toBe(true);
+	});
+
+	describe('hostedServices: "after-listen"', () => {
+		const afterListen = {
+			port: 0,
+			host: "127.0.0.1",
+			shutdownSignals: false,
+			hostedServices: "after-listen",
+		} as const;
+
+		it("listens before services start, then starts them in registration order", async () => {
+			let release: () => void = () => {};
+			@injectable()
+			class Gate implements HostedService {
+				public async start() {
+					events.push("gate start begun");
+					await new Promise<void>((resolve) => {
+						release = resolve;
+					});
+					events.push("gate start finished");
+				}
+			}
+			app = await builder()
+				.use(http(FastifyProvider))
+				.use(health())
+				.withHostedService(First, Gate, Second)
+				.build();
+
+			await app.start(afterListen);
+			const base = app.addresses[0];
+
+			expect((await fetch(`${base}/health`)).status).toBe(200);
+			// Not ready until every service has started: a request may need one that hasn't.
+			expect((await fetch(`${base}/ready`)).status).toBe(503);
+			expect(events).toEqual(["first started (db ready)", "gate start begun"]);
+
+			release();
+			const timings = await app.hostedServicesStarted();
+
+			expect(events).toEqual([
+				"first started (db ready)",
+				"gate start begun",
+				"gate start finished",
+				"second started (db ready)",
+			]);
+			expect(timings.map((t) => t.name)).toEqual(["First", "Gate", "Second"]);
+			expect((await fetch(`${base}/ready`)).status).toBe(200);
+		});
+
+		it("stops the app when a service fails to start, and hostedServicesStarted rejects", async () => {
+			@injectable()
+			class Broken implements HostedService {
+				public async start() {
+					await sleep(5);
+					throw new Error("feed unreachable");
+				}
+			}
+			app = await builder()
+				.use(http(FastifyProvider))
+				.withHostedService(First, Broken, Second)
+				.build();
+			await app.start(afterListen);
+			const base = app.addresses[0];
+
+			await expect(app.hostedServicesStarted()).rejects.toThrow("feed unreachable");
+
+			expect(events).toEqual([
+				"first started (db ready)",
+				"first signal aborted",
+				"first stopped",
+				"db closed",
+			]);
+			await expect(fetch(`${base}/health`)).rejects.toThrow();
+			app = undefined; // already stopped
+		});
+
+		it("stops cleanly while a service is still starting", async () => {
+			let release: () => void = () => {};
+			@injectable()
+			class Gate implements HostedService {
+				public async start(signal: AbortSignal) {
+					signal.addEventListener("abort", () => events.push("gate signal aborted"));
+					await new Promise<void>((resolve) => {
+						release = resolve;
+					});
+				}
+				public stop() {
+					events.push("gate stopped");
+				}
+			}
+			app = await builder().use(http(FastifyProvider)).withHostedService(Gate, Second).build();
+			await app.start(afterListen);
+
+			const stopping = app.dispose();
+			release();
+			await stopping;
+
+			expect(events).toEqual(["gate signal aborted", "gate stopped"]);
+			app = undefined;
+		});
+	});
 });
