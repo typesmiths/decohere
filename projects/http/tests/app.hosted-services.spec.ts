@@ -5,7 +5,7 @@ import { inject, injectable } from "@decohere/crucible/decorators";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
 import type { HostedService } from "@decohere/core/hosting";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 
 /** What happened, in order, across every service and the app in one test. */
 let events: string[] = [];

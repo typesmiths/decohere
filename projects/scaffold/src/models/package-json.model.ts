@@ -74,6 +74,7 @@ export class PackageJson implements KeyedModel {
 		}
 		this._dependencies = {
 			"@decohere/http": CREATE_VERSION,
+			"@decohere/http-fastify": CREATE_VERSION,
 			"@decohere/crucible": CREATE_VERSION,
 			"@decohere/core": CREATE_VERSION,
 			"@decohere/config": CREATE_VERSION,

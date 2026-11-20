@@ -3,7 +3,7 @@ import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios, { type AxiosResponse } from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import {
 	Controller,
 	Get,
