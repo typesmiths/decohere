@@ -63,9 +63,11 @@ export class OrderRepository extends Repository<Order> {
 
 A provider is given the package for its database as `database`: `postgres` from [`@decohere/data-postgres`](../data-postgres/README.md), which supplies a bootstrap and a migrator.
 
-When the app is **built**, before it connects, a provider runs `dataSources.prepare`. It checks each data source's `auth`, `synchronize` and `migrateOnStart` for the environment ([ADR 0011](../../../docs/adr/0011-database-bootstrap.md)), then runs the bootstrap, which creates the database, roles and schema. A data source that asks to be set up (`bootstrap: true`, or an admin user in development) when the provider has no `database` stops startup with an error that says what to install.
+When the app is **built**, a provider runs `dataSources.check`: each data source's `auth`, `synchronize` and `migrateOnStart` for the environment ([ADR 0011](../../../docs/adr/0011-database-bootstrap.md)). A data source that asks to be set up (`bootstrap: true`, or an admin user in development) when the provider has no `database` stops the build with an error that says what to install. Building connects to nothing.
 
-When the app **starts**, before hosted services and the server, each data source applies pending migrations if `migrateOnStart` is on, brings its tables to the mappings if `synchronize` is on, and then seeds if `seed` is on. An app that is only built, by a tool or a test, changes nothing in the database. `migrateOnStart` and `synchronize` are for development, and can't both be on.
+When the app **starts**, before hosted services and the server, the provider's start step runs `dataSources.open`: the bootstrap, which creates the database, roles and schema, then a connection per data source. Then each data source applies pending migrations if `migrateOnStart` is on, brings its tables to the mappings if `synchronize` is on, and then seeds if `seed` is on. An app that is only built, by a tool or a test, changes nothing in the database. `migrateOnStart` and `synchronize` are for development, and can't both be on.
+
+**A database that is down at start doesn't stop the app.** The start step is retried with backoff ([`startRetry`](../../http/README.md)), and the hosted services wait for it. Meanwhile `GET /ready` answers 503, and a request that resolves the data source's unit of work gets `DependencyUnavailableError`, a 503 problem. Once the database answers, the step bootstraps, connects and migrates, and the app serves. `startTestApp` and `startRetry: false` fail the start instead.
 
 ## Migrations
 
@@ -89,7 +91,7 @@ export default defineMigration({
 
 Each migration runs in its own transaction, as the data source's migrate role, in its schema. The history is one `decohere_migrations` table in that schema, whichever provider maps the entities. A lock keeps two runs from applying the same migration.
 
-The commands run from the app's own `db.ts`, which builds the app without starting it. In a workspace, `decohere db <command> [--api <name>]` finds and runs it; in a packaged app, `node es6/src/db.js <command>`.
+The commands run from the app's own `db.ts`, which builds the app without starting it. Every command but `new` first bootstraps and connects the data source, which starting would otherwise do, so `db migrate` works against a database nothing has set up yet. In a workspace, `decohere db <command> [--api <name>]` finds and runs it; in a packaged app, `node es6/src/db.js <command>`.
 
 ```ts
 // src/db.ts
@@ -117,7 +119,7 @@ try {
 
 ## For provider authors
 
-A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.prepare` with the bootstrap from the `database` its caller passed, and registers `dataSources.start` as a start step. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
+A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
 
 MikroORM's unit of work is the reference. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome.
 

@@ -2,7 +2,7 @@ import { http } from "../src/http/http.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import axios, { type AxiosResponse } from "axios";
 import { afterEach, describe, expect, it } from "vitest";
-import { type App, Builder } from "@decohere/core/hosting";
+import { type App, Builder, DependencyUnavailableError } from "@decohere/core/hosting";
 import { FastifyProvider } from "@decohere/http-fastify";
 import {
 	Controller,
@@ -44,6 +44,14 @@ class OrderController {
 	@Get("/boom")
 	public boom() {
 		throw new Error("connection string postgres://secret@db");
+	}
+
+	@Get("/unavailable")
+	public unavailable() {
+		throw new DependencyUnavailableError(
+			"data source orders",
+			"connect ECONNREFUSED 10.0.0.5:5432",
+		);
 	}
 
 	@Get("/private")
@@ -132,6 +140,18 @@ describe("problem details error responses", () => {
 		expect(denied.status).toBe(401);
 		expectProblem(denied);
 		expect(denied.data).toEqual({ type: "about:blank", title: "Unauthorized", status: 401 });
+	});
+
+	it("answers 503 when a service the request needs is unavailable, without saying why", async () => {
+		await start();
+		const res = await get("/orders/unavailable");
+		expect(res.status).toBe(503);
+		expectProblem(res);
+		expect(res.data).toEqual({
+			type: "about:blank",
+			title: "Service Unavailable",
+			status: 503,
+		});
 	});
 
 	it("answers an unknown route with a 404 problem", async () => {

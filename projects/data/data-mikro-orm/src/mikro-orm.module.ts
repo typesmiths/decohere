@@ -1,5 +1,9 @@
 import type { BuilderPlugin } from "@decohere/core/hosting";
-import { type IReadinessCheck, ReadinessCheckToken } from "@decohere/core/hosting";
+import {
+	DependencyUnavailableError,
+	type IReadinessCheck,
+	ReadinessCheckToken,
+} from "@decohere/core/hosting";
 import type { Constructable } from "@decohere/core/reflection";
 import type { ContainerBuilder } from "@decohere/crucible";
 import {
@@ -48,53 +52,80 @@ export type MikroOrmModuleOptions = {
 	containerBuilder: ContainerBuilder;
 };
 
-/** A data source the module opened: its container key, and what the app does with it on start. */
+/** A data source the module registered: its container key, and what the app does with it on start. */
 export type OpenedMikroOrm = { name: string | symbol; starting: StartingDataSource };
 
+/** What {@link MikroOrmModule.configure} registered, and how to bring it all up. */
+export type ConfiguredMikroOrm = {
+	sources: OpenedMikroOrm[];
+	/** Bootstrap, then connect each data source: `dataSources.open`. */
+	open(): Promise<void>;
+};
+
 export class MikroOrmModule {
-	/** Bootstraps and opens a MikroORM instance per data source, and registers what each one serves. */
-	public async configure(options: MikroOrmModuleOptions): Promise<OpenedMikroOrm[]> {
+	/**
+	 * Checks the config and registers a MikroORM instance per data source, and what each one serves,
+	 * without connecting: the app's start step connects (`open`), and is retried while the
+	 * database is down.
+	 */
+	public async configure(options: MikroOrmModuleOptions): Promise<ConfiguredMikroOrm> {
 		const { applicationName, databaseConfig, moduleConfigurations, containerBuilder } =
 			options;
 		const resolved = dataSources.resolve(databaseConfig, moduleConfigurations);
-		// Once, before any instance connects: data sources sharing a database must not race to create it.
-		await dataSources.prepare(
+		const bootstrap = moduleConfigurations.find((m) => m.database)?.database?.bootstrap;
+		dataSources.check(
 			resolved.map((r) => r.connectionInfo),
-			{
-				applicationName,
-				bootstrap: moduleConfigurations.find((m) => m.database)?.database?.bootstrap,
-			},
+			{ bootstrap },
 		);
-		return Promise.all(
-			resolved.map(async ({ name, connectionInfo, module }) => {
-				const orm = await this.open(applicationName, name, connectionInfo, module);
-				containerBuilder.registerSingleton(mikroOrmToken(name), orm);
-				containerBuilder.registerRequestScoped(
-					name,
-					() => new MikroOrmUnitOfWork(orm.em, { outbox: module.outbox }),
-				);
-				containerBuilder.registerSingleton(ReadinessCheckToken, readinessCheck(name, orm));
-				for (const repository of module.repositories ?? []) {
-					containerBuilder.registerRequestScoped(repository);
+		const sources: OpenedMikroOrm[] = [];
+		const open = () =>
+			dataSources.open(
+				sources.map((s) => s.starting),
+				{ applicationName, bootstrap },
+			);
+		for (const { name, connectionInfo, module } of resolved) {
+			const orm = await this.create(applicationName, name, connectionInfo, module);
+			let connected = false;
+			containerBuilder.registerSingleton(mikroOrmToken(name), orm);
+			containerBuilder.registerRequestScoped(name, () => {
+				if (!connected) {
+					throw new DependencyUnavailableError(
+						`data source "${String(name)}"`,
+						"not connected yet",
+					);
 				}
-				const migrations = migrationTarget(applicationName, connectionInfo, module);
-				if (migrations != null) {
-					containerBuilder.registerSingleton(MigrationTargetToken, migrations);
-				}
-				return {
-					name,
-					starting: {
-						connection: connectionInfo,
-						migrations,
-						synchronize: () => synchronize(orm),
-						seed: async () => module.seed?.(orm),
+				return new MikroOrmUnitOfWork(orm.em, { outbox: module.outbox });
+			});
+			containerBuilder.registerSingleton(ReadinessCheckToken, readinessCheck(name, orm));
+			for (const repository of module.repositories ?? []) {
+				containerBuilder.registerRequestScoped(repository);
+			}
+			const migrations = migrationTarget(applicationName, connectionInfo, module, open);
+			if (migrations != null) {
+				containerBuilder.registerSingleton(MigrationTargetToken, migrations);
+			}
+			sources.push({
+				name,
+				starting: {
+					connection: connectionInfo,
+					migrations,
+					connect: async () => {
+						if (connected) return;
+						await orm.connect();
+						const status = await orm.checkConnection();
+						if ("reason" in status) throw new Error(status.reason, { cause: status.error });
+						connected = true;
 					},
-				};
-			}),
-		);
+					synchronize: () => synchronize(orm),
+					seed: async () => module.seed?.(orm),
+				},
+			});
+		}
+		return { sources, open };
 	}
 
-	private async open(
+	/** Builds the instance and reads the mappings; MikroORM connects only on `connect()`. */
+	private async create(
 		applicationName: string,
 		name: string | symbol,
 		connection: ConnectionInfo,
@@ -115,6 +146,8 @@ export class MikroOrmModule {
 			schema: connection.schema,
 			entities: module.entities,
 			driverOptions: { application_name: applicationName },
+			// The bootstrap creates the database, as a role allowed to; the app's role may not.
+			ensureDatabase: false,
 			debug: ["query", "query-params"],
 			logger: (message) => log.debug(message),
 		});
@@ -125,12 +158,14 @@ function migrationTarget(
 	applicationName: string,
 	connection: ConnectionInfo,
 	module: MikroOrmModuleConfig,
+	open: () => Promise<void>,
 ): MigrationTarget | undefined {
 	if (module.database == null) return undefined;
 	return {
 		dataSource: connection.name,
 		source: { connection, migrations: module.migrations ?? [], applicationName },
 		migrator: module.database.migrator,
+		open,
 		diff: () => diff(applicationName, connection, module.entities),
 	};
 }
@@ -203,29 +238,30 @@ export function mikroOrm(
 	config: MikroOrmModuleConfig[] | MikroOrmModuleConfig,
 ): BuilderPlugin {
 	return (builder) => {
-		const opened: OpenedMikroOrm[] = [];
+		let configured: ConfiguredMikroOrm = { sources: [], open: async () => {} };
 		builder.registerPreBuildStep(async (configService, containerBuilder) => {
 			const databaseConfig = await configService.get(DatabaseConfig);
-			opened.push(
-				...(await new MikroOrmModule().configure({
-					applicationName: builder.applicationName,
-					databaseConfig,
-					moduleConfigurations: Array.isArray(config) ? config : [config],
-					containerBuilder,
-				})),
-			);
+			configured = await new MikroOrmModule().configure({
+				applicationName: builder.applicationName,
+				databaseConfig,
+				moduleConfigurations: Array.isArray(config) ? config : [config],
+				containerBuilder,
+			});
 		});
 		// The container disposes only what it handed out. Resolving each instance here makes the
 		// root container own it, as one of its first, so it closes last: after hosted services
 		// and the services that use it.
 		builder.registerPostBuildStep((container) => {
-			for (const { name } of opened) container.resolve(mikroOrmToken(name));
+			for (const { name } of configured.sources) container.resolve(mikroOrmToken(name));
 		});
+		// Connecting, and what changes the database, wait for the app to start: building connects
+		// nothing. The step is retried while the database is down, and holds back the hosted services.
 		builder.registerStartStep(async (container) => {
+			await configured.open();
 			const log = scribe.logger("migrations");
-			for (const { starting } of opened) {
+			for (const { starting } of configured.sources) {
 				await dataSources.start(starting, container, (line) => log.info(line));
 			}
-		});
+		}, "mikro-orm data sources");
 	};
 }

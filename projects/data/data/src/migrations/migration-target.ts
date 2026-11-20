@@ -10,6 +10,11 @@ export type MigrationTarget = {
 	source: MigrationSource;
 	migrator: Migrator;
 	/**
+	 * Bootstrap and connect the provider's data sources, as the app's start step does: an app the
+	 * db commands build is never started. The commands that reach the database call it first.
+	 */
+	open(): Promise<void>;
+	/**
 	 * The statements that take the database's tables to the provider's mappings, from the
 	 * provider's own schema diff, connected as the migrate role so it sees only its own schema.
 	 * Leaves the history table alone.

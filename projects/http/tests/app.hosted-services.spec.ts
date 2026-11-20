@@ -3,7 +3,12 @@ import { health } from "../src/health/health.plugin.js";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { inject, injectable } from "@decohere/crucible/decorators";
 import { afterEach, describe, expect, it } from "vitest";
-import { type App, Builder } from "@decohere/core/hosting";
+import {
+	type App,
+	Builder,
+	type HostedServiceHost,
+	HostedServiceHostToken,
+} from "@decohere/core/hosting";
 import type { HostedService } from "@decohere/core/hosting";
 import { FastifyProvider } from "@decohere/http-fastify";
 
@@ -218,7 +223,7 @@ describe("hosted services", () => {
 		expect(events).toEqual(["start begun", "signal aborted", "start finished", "stopped"]);
 	});
 
-	it("stops the services already started when a later start() fails, and fails app.start", async () => {
+	it("with startRetry: false, stops the services already started when a later start() fails, and fails app.start", async () => {
 		@injectable()
 		class Broken implements HostedService {
 			public start() {
@@ -235,7 +240,7 @@ describe("hosted services", () => {
 			.build();
 
 		await expect(
-			app.start({ port: 0, host: "127.0.0.1", shutdownSignals: false }),
+			app.start({ port: 0, host: "127.0.0.1", shutdownSignals: false, startRetry: false }),
 		).rejects.toThrow("feed unreachable");
 
 		expect(events).toEqual([
@@ -309,6 +314,130 @@ describe("hosted services", () => {
 		expect(timings.every((t) => Number.isInteger(t.ms) && t.ms >= 0)).toBe(true);
 	});
 
+	describe("a start() that throws", () => {
+		const fastRetry = { initialMs: 10, maxMs: 40 };
+
+		/** Throws on its first `failures` starts, then starts. */
+		function flaky(failures: number) {
+			@injectable()
+			class Flaky implements HostedService {
+				public attempts = 0;
+				public async start() {
+					this.attempts += 1;
+					events.push(`flaky attempt ${this.attempts}`);
+					if (this.attempts <= failures) throw new Error("feed unreachable");
+				}
+				public stop() {
+					events.push("flaky stopped");
+				}
+			}
+			return Flaky;
+		}
+
+		async function until(condition: () => Promise<boolean> | boolean, timeoutMs = 2_000) {
+			const deadline = Date.now() + timeoutMs;
+			while (!(await condition())) {
+				if (Date.now() > deadline) throw new Error("condition not met in time");
+				await sleep(5);
+			}
+		}
+
+		it("is retried with backoff while the app serves, and /ready names it until it starts", async () => {
+			const Flaky = flaky(2);
+			app = await builder()
+				.use(http(FastifyProvider))
+				.use(health())
+				.withHostedService(First, Flaky, Second)
+				.build();
+
+			await app.start({
+				port: 0,
+				host: "127.0.0.1",
+				shutdownSignals: false,
+				startRetry: fastRetry,
+			});
+			const base = app.addresses[0];
+			const timings = await app.hostedServicesStarted();
+
+			expect(timings.map((t) => [t.name, t.started])).toEqual([
+				["First", true],
+				["Flaky", false],
+				["Second", true],
+			]);
+			expect((await fetch(`${base}/health`)).status).toBe(200);
+			expect((await fetch(`${base}/ready`)).status).toBe(503);
+			const host = app.services.resolve<HostedServiceHost>(HostedServiceHostToken);
+			expect(host.readinessChecks().map((c) => c.name)).toEqual(["Flaky"]);
+
+			await until(async () => (await fetch(`${base}/ready`)).status === 200);
+
+			expect(events).toEqual([
+				"first started (db ready)",
+				"flaky attempt 1",
+				"second started (db ready)",
+				"flaky attempt 2",
+				"flaky attempt 3",
+			]);
+		});
+
+		it("is stopped with the others once a retry has started it", async () => {
+			const Flaky = flaky(1);
+			app = await builder().withHostedService(First, Flaky).build();
+			await app.start({ port: 0, shutdownSignals: false, startRetry: fastRetry });
+			await until(() => events.includes("flaky attempt 2"));
+			events = [];
+
+			await app.dispose();
+
+			expect(events).toEqual([
+				"first signal aborted",
+				"flaky stopped",
+				"first stopped",
+				"db closed",
+			]);
+		});
+
+		it("stops retrying when the app stops", async () => {
+			const Flaky = flaky(Number.POSITIVE_INFINITY);
+			app = await builder().withHostedService(Flaky).build();
+			await app.start({ port: 0, shutdownSignals: false, startRetry: fastRetry });
+			await until(() => events.includes("flaky attempt 2"));
+
+			await app.dispose();
+			const attempts = events.filter((e) => e.startsWith("flaky attempt")).length;
+			await sleep(120);
+
+			expect(events.filter((e) => e.startsWith("flaky attempt"))).toHaveLength(attempts);
+			expect(events).not.toContain("flaky stopped");
+			app = undefined;
+		});
+
+		it("waits longer after each failure, up to maxMs", async () => {
+			const Flaky = flaky(Number.POSITIVE_INFINITY);
+			const times: number[] = [];
+			const recordTimes = () => times.push(performance.now());
+			app = await builder().withHostedService(Flaky).build();
+			const original = events.push.bind(events);
+			events.push = (...items: string[]) => {
+				recordTimes();
+				return original(...items);
+			};
+			await app.start({
+				port: 0,
+				shutdownSignals: false,
+				startRetry: { initialMs: 20, maxMs: 80 },
+			});
+			await until(() => times.length >= 6, 3_000);
+
+			const waits = times.slice(1).map((t, i) => t - (times[i] ?? t));
+			// 20, 40, 80, 80, 80 ms, each ±20%.
+			expect(waits[0]).toBeGreaterThanOrEqual(15);
+			expect(waits[1]).toBeGreaterThanOrEqual(31);
+			expect(waits[2]).toBeGreaterThanOrEqual(63);
+			expect(waits[4]).toBeLessThan(80 * 1.2 + 40);
+		});
+	});
+
 	describe('hostedServices: "after-listen"', () => {
 		const afterListen = {
 			port: 0,
@@ -356,7 +485,7 @@ describe("hosted services", () => {
 			expect((await fetch(`${base}/ready`)).status).toBe(200);
 		});
 
-		it("stops the app when a service fails to start, and hostedServicesStarted rejects", async () => {
+		it("with startRetry: false, stops the app when a service fails to start, and hostedServicesStarted rejects", async () => {
 			@injectable()
 			class Broken implements HostedService {
 				public async start() {
@@ -368,7 +497,7 @@ describe("hosted services", () => {
 				.use(http(FastifyProvider))
 				.withHostedService(First, Broken, Second)
 				.build();
-			await app.start(afterListen);
+			await app.start({ ...afterListen, startRetry: false });
 			const base = app.addresses[0];
 
 			await expect(app.hostedServicesStarted()).rejects.toThrow("feed unreachable");

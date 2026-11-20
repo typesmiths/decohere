@@ -1,6 +1,7 @@
 // Decohere migrations with each provider, in an app on a real Postgres: the provider's schema diff,
 // taken as the migrate role, holds only the data source's own tables; applied through the
-// migrator it leaves nothing to diff; and migrateOnStart applies it when the app starts.
+// migrator it leaves nothing to diff; and migrateOnStart applies it when the app starts, while
+// building the app touches nothing.
 // Needs Docker: `pnpm test:docker`.
 import "reflect-metadata";
 import {
@@ -191,9 +192,11 @@ describe.each(providers)("migrations with $name", ({ name, plugin }) => {
 	it("diffs only its own schema, as the migrate role, and has nothing left to diff once applied", async () => {
 		const info = connection();
 		await using app = await build(info);
+		const [target] = app.services.resolveMany<MigrationTarget>(MigrationTargetToken);
+		// As the db commands do: an app built for them is never started.
+		await target.open();
 		// Another app's table in the same database, out of the migrate role's reach.
 		await superuser(info, "create schema billing; create table billing.invoice (id int)");
-		const [target] = app.services.resolveMany<MigrationTarget>(MigrationTargetToken);
 
 		const diff = await target.diff();
 
@@ -230,14 +233,17 @@ describe.each(providers)("migrations with $name", ({ name, plugin }) => {
 		{
 			await using app = await build(generated);
 			const [target] = app.services.resolveMany<MigrationTarget>(MigrationTargetToken);
+			await target.open();
 			diff = await target.diff();
 		}
 		const info = connection({ migrateOnStart: true });
 		const migrations = [schemaMigration("20261110-090000-create-notes", diff), greetings];
 		await using app = await build(info, migrations);
-		expect(await superuser(info, "select to_regclass('notes.note') as found")).toEqual([
-			{ found: null },
-		]);
+		const found = await server.superuser.query(
+			"select datname from pg_database where datname = $1",
+			[info.database],
+		);
+		expect(found.rows).toEqual([]);
 
 		await app.start({ port: 0, shutdownSignals: false });
 
