@@ -18,7 +18,8 @@
       "Bash(gh pr checks:*)",
       "Bash(gh run view:*)",
       "Bash(gh run list:*)",
-      "Bash(gh issue edit:*)"
+      "Bash(gh issue edit:*)",
+      "Bash(gh issue create:*)"
     ]
   }
 }
