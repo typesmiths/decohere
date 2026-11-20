@@ -29,7 +29,7 @@ Rejected:
 ## Consequences
 
 - A support library's import says what it does (`@decohere/http`, `@decohere/data`).
-- A new package name on npm needs a first publish and a Trusted Publisher before CI can publish it.
+- A new package name on npm needs a first publish and two Trusted Publishers, one to publish (`publish.yml`) and one to move `latest` (`promote-latest.yml`), before CI can release it. An owner sets up all three with one `pnpm npm:bootstrap` ([CI](../ci/README.md#adding-a-new-npm-package)).
 - A glossary, if any, only needs the products.
 
 ## History
@@ -40,3 +40,4 @@ Rejected:
 - 2026-11-06: The builder's features are plugins, `builder.use(http(...))`, in place of methods added to `Builder` by side-effect imports. A plugin is a plain function, so forgetting one is a compile error, and nothing runs on import.
 - 2026-11-06: Hosting moved, to `@decohere/core/hosting`. `inject`, `optional` and `LifetimeScopeToken` moved to `core/composition` with it, because `App` needs them and `core` can't import Crucible. Crucible re-exports them, so its API is unchanged.
 - 2026-11-10: `FastifyProvider` moved out of `http` into its own package, `@decohere/http-fastify`, like `data` and `data-typeorm`, so `http` holds no vendor code. A vendor adapter is a `<library>-<vendor>` package. Not chosen: keeping it at `@decohere/http/providers`, which made every app install Fastify. The `/providers` subpath is gone, and `bootModule` in `@decohere/http/testing` takes the provider rather than defaulting to Fastify, so installing `http` installs no web server.
+- 2026-11-20: A new package also needs the Trusted Publisher for `promote-latest.yml`; `pnpm npm:bootstrap` now sets up both, with the first publish, in one run.

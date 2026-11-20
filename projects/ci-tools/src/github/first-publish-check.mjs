@@ -3,12 +3,28 @@
  * Finds packages in this workspace that aren't on npm yet. A first publish needs an owner's npm
  * login, so CI can't do it. On a PR that's only a notice, so a contributor can propose a package
  * with no npm access. In the merge queue it fails, because Publish could not upload that package.
+ *
+ * A name on npm that Publish has never published may lack its Trusted Publishers, which only a
+ * logged-in owner can see. That gets a warning, not a failure: a package an owner has just set up
+ * has no version from Publish either, until it merges.
  */
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { listPublishablePackages } from "./publish-verify.mjs";
 
 const REGISTRY = "https://registry.npmjs.org";
+
+/**
+ * Publish runs on GitHub Actions with provenance, so npm keeps an attestation for each version it
+ * publishes; a version an owner published by hand has none.
+ *
+ * @param {{ versions?: Record<string, { dist?: { attestations?: unknown } }> }} packument
+ */
+function publishedFromCi(packument) {
+	return Object.values(packument.versions ?? {}).some(
+		(version) => version.dist?.attestations != null,
+	);
+}
 
 /**
  * @param {{
@@ -32,9 +48,21 @@ export async function checkFirstPublish(options) {
 			if (!response.ok && response.status !== 404) {
 				throw new Error(`Could not check ${name} on npm: ${response.status}`);
 			}
-			return { name, missing: response.status === 404 };
+			if (response.status === 404) return { name, missing: true, fromCi: false };
+			return { name, missing: false, fromCi: publishedFromCi(await response.json()) };
 		}),
 	);
+
+	const neverFromCi = results
+		.filter((result) => !result.missing && !result.fromCi)
+		.map((result) => result.name);
+	if (neverFromCi.length > 0) {
+		const names = neverFromCi.join(" ");
+		log(
+			`::warning::On npm, but never published by Publish: ${names}. Unless an owner has run ` +
+				`\`pnpm npm:bootstrap --otp <code> ${names}\`, it may have no Trusted Publisher, and Publish will fail on it.`,
+		);
+	}
 
 	const missing = results.filter((result) => result.missing).map((result) => result.name);
 	if (missing.length === 0) {

@@ -1,29 +1,44 @@
 /**
- * First-publish a new package name (public) and give it its Trusted Publisher,
- * so `publish.yml` can release it over OIDC from then on.
+ * Sets up npm so CI can publish and promote every package: the name exists, `publish.yml` is a
+ * Trusted Publisher (to publish), and `promote-latest.yml` is one (to move `latest`, with only the
+ * dist-tag permission). Run it after adding a package, or any time: each step is skipped when it is
+ * already done, so with nothing to do it changes nothing.
  *
- *   pnpm npm:bootstrap [--otp <code>] [--dry-run] [--channel dev] [<package-name>...]
+ *   npm login
+ *   pnpm npm:bootstrap --otp <code> [--dry-run] [--channel dev] [<package-name>...]
  *
- * Without names: every publishable package whose name is not on npm yet.
- * Run from the repo root after `npm login` to the org. Each step is skipped when
- * it is already done (the name exists, the Trusted Publisher is set).
+ * Without names: every publishable package. Everything is read first, in parallel, and then only
+ * the missing steps run, so one OTP code (about 30 seconds) can cover them. npm wants the code even
+ * to read a package's Trusted Publishers, so it is required, also for `--dry-run`.
  *
- * npm runs on this terminal, so it does its own 2FA: it asks for a code, or
- * opens the browser for web authentication. `--otp` hands it a code up front
- * through `NPM_CONFIG_OTP`; `npm trust` takes no `--otp` flag of its own.
+ * The first publish and the `publish.yml` publisher go through npm's CLI. The `promote-latest.yml`
+ * publisher is copied from a package that has it, through the registry endpoint `npm trust` uses,
+ * because `npm trust` has no flag for the dist-tag permission (`manageDistTags`). npm doesn't
+ * document that endpoint. The calls use the npm login in the user's npmrc, which is never printed.
  */
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
-import { listPublishablePackages, npmNameExists } from "./publish-verify.mjs";
+import { listPublishablePackages } from "./publish-verify.mjs";
 
-/** The Trusted Publisher every package gets: `publish.yml`'s npm job. */
-export const TRUSTED_PUBLISHER = {
-	repo: "typesmiths/decohere",
-	file: "publish.yml",
-	environment: "npm-publish",
-};
+const REGISTRY = "https://registry.npmjs.org";
+const REPOSITORY = "typesmiths/decohere";
+
+/** The Trusted Publisher that publishes: `publish.yml`'s npm job. */
+export const PUBLISH_WORKFLOW = "publish.yml";
+const PUBLISH_ENVIRONMENT = "npm-publish";
+/** The Trusted Publisher that moves `latest`: `promote-latest.yml`, dist-tags only. */
+export const PROMOTE_WORKFLOW = "promote-latest.yml";
+
+/**
+ * @typedef {{ type?: string, claims?: { repository?: string, workflow_ref?: { file?: string } }, permissions?: string[] }} TrustEntry
+ * @typedef {{ name: string, dir: string, version?: string }} Package
+ * @typedef {{ capture?: boolean, otp?: string }} NpmOptions
+ * `capture` keeps stdout to read it (npm can then not prompt for 2FA); otherwise npm owns the terminal.
+ * @typedef {(args: string[], options?: NpmOptions) => { status: number, output: string }} Npm
+ */
 
 /** @param {string | undefined} version */
 export function needsPrereleaseTag(version) {
@@ -34,7 +49,7 @@ export function needsPrereleaseTag(version) {
  * npm arguments for a name-only first publish. Scoped names default to restricted,
  * so `--access public`. `./` stops npm reading the path as a GitHub `owner/repo`.
  *
- * @param {{ dir: string, version?: string }} pkg
+ * @param {Package} pkg
  * @param {string} channel
  */
 export function publishArgs(pkg, channel) {
@@ -49,32 +64,77 @@ export function trustArgs(name) {
 		"github",
 		name,
 		"--file",
-		TRUSTED_PUBLISHER.file,
+		PUBLISH_WORKFLOW,
 		"--repo",
-		TRUSTED_PUBLISHER.repo,
+		REPOSITORY,
 		"--env",
-		TRUSTED_PUBLISHER.environment,
+		PUBLISH_ENVIRONMENT,
 		"--allow-publish",
 		"--yes",
 	];
 }
 
-/** @param {string} output `npm trust list <name> --json` */
-export function hasTrustedPublisher(output) {
-	return output.includes(TRUSTED_PUBLISHER.file) && output.includes(TRUSTED_PUBLISHER.repo);
+/**
+ * @param {TrustEntry[]} entries
+ * @param {string} workflow
+ */
+function findEntry(entries, workflow) {
+	return entries.find(
+		(entry) =>
+			entry.claims?.workflow_ref?.file === workflow && entry.claims?.repository === REPOSITORY,
+	);
 }
 
-/**
- * @typedef {{ capture?: boolean, otp?: string }} NpmOptions
- * `capture` keeps stdout to read it (npm can then not prompt for 2FA);
- * otherwise npm owns the terminal.
- */
+/** @param {string} name */
+const encoded = (name) => name.replace("/", "%2f");
 
 /**
- * @param {string[]} args
- * @param {NpmOptions} [options]
- * @returns {{ status: number, output: string }}
+ * The registry calls, as the logged-in owner.
+ *
+ * @param {{ token: string, otp?: string, fetch: typeof globalThis.fetch }} options
  */
+function registry({ token, otp, fetch }) {
+	const headers = {
+		authorization: `Bearer ${token}`,
+		"content-type": "application/json",
+		...(otp ? { "npm-otp": otp } : {}),
+	};
+	const trustUrl = (/** @type {string} */ name) =>
+		`${REGISTRY}/-/package/${encoded(name)}/trust`;
+	return {
+		/** @param {string} name */
+		async exists(name) {
+			const response = await fetch(`${REGISTRY}/${encoded(name)}`, { headers });
+			if (response.status === 404) return false;
+			if (!response.ok) throw new Error(`reading ${name}: ${response.status}`);
+			return true;
+		},
+		/** @param {string} name @returns {Promise<TrustEntry[]>} */
+		async trust(name) {
+			const response = await fetch(trustUrl(name), { headers });
+			if (!response.ok) {
+				throw new Error(
+					`reading ${name}'s Trusted Publishers: ${response.status} ${await response.text()}`,
+				);
+			}
+			return response.json();
+		},
+		/** @param {string} name @param {TrustEntry} entry */
+		async addTrust(name, entry) {
+			const body = [
+				{ type: entry.type, claims: entry.claims, permissions: entry.permissions },
+			];
+			const response = await fetch(trustUrl(name), {
+				method: "POST",
+				headers,
+				body: JSON.stringify(body),
+			});
+			return response.ok ? null : `${response.status} ${await response.text()}`;
+		},
+	};
+}
+
+/** @param {string[]} args @param {NpmOptions} [options] */
 function runNpm(args, { capture = false, otp } = {}) {
 	const result = spawnSync("npm", args, {
 		encoding: "utf8",
@@ -85,12 +145,27 @@ function runNpm(args, { capture = false, otp } = {}) {
 }
 
 /**
+ * The login `npm login` saved. npm won't print it (`npm config get` refuses), so it is read from
+ * the user's npmrc.
+ *
+ * @param {Npm} npm
+ * @returns {string | undefined}
+ */
+function readLoginToken(npm) {
+	const userconfig = npm(["config", "get", "userconfig"], { capture: true }).output.trim();
+	if (userconfig.length === 0) return undefined;
+	const npmrc = readFileSync(userconfig, "utf8");
+	return /^\/\/registry\.npmjs\.org\/:_authToken=(.+)$/m.exec(npmrc)?.[1]?.trim();
+}
+
+/**
  * @param {{
  *   argv?: string[],
  *   root?: string,
  *   io?: {
- *     npm?: (args: string[], options?: NpmOptions) => { status: number, output: string },
- *     nameExists?: (name: string) => boolean,
+ *     npm?: Npm,
+ *     fetch?: typeof globalThis.fetch,
+ *     token?: () => string | undefined,
  *     log?: (line: string) => void,
  *   },
  * }} [options]
@@ -108,14 +183,23 @@ export async function runBootstrap(options = {}) {
 	});
 	const io = options.io ?? {};
 	const npm = io.npm ?? runNpm;
-	const nameExists = io.nameExists ?? ((name) => npmNameExists(name));
 	const log = io.log ?? ((line) => process.stdout.write(`${line}\n`));
 	const dryRun = values["dry-run"];
+	const otp = values.otp;
 
-	// Even on a dry run: the names are private, so `npm view` 404s without a login
-	// and every package would look unpublished.
-	if (npm(["whoami"]).status !== 0) {
+	const token =
+		npm(["whoami"], { capture: true }).status === 0
+			? (io.token ?? (() => readLoginToken(npm)))()
+			: undefined;
+	if (token == null) {
 		log("Not logged in to npm: run `npm login` first.");
+		return 1;
+	}
+
+	if (otp == null) {
+		log(
+			"Pass a code from your authenticator: pnpm npm:bootstrap --otp <code>. npm wants one even to read Trusted Publishers.",
+		);
 		return 1;
 	}
 
@@ -125,51 +209,104 @@ export async function runBootstrap(options = {}) {
 		log(`Not a publishable package in projects/: ${unknown.join(", ")}`);
 		return 1;
 	}
-	const packages =
+	const chosen =
 		positionals.length > 0
 			? publishable.filter((pkg) => positionals.includes(pkg.name))
-			: publishable.filter((pkg) => !nameExists(pkg.name));
-	if (packages.length === 0) {
-		log("Every package name is on npm already. Name one to check its Trusted Publisher.");
+			: publishable;
+
+	// Every package is read, not only the chosen ones: the promote publisher is copied from one that has it.
+	const npmRegistry = registry({ token, otp, fetch: io.fetch ?? globalThis.fetch });
+	let state;
+	try {
+		state = await Promise.all(
+			publishable.map(async (pkg) => {
+				const exists = await npmRegistry.exists(pkg.name);
+				return { pkg, exists, trust: exists ? await npmRegistry.trust(pkg.name) : [] };
+			}),
+		);
+	} catch (error) {
+		log(`Nothing changed. ${String(error)}`);
+		return 1;
+	}
+
+	const plans = state
+		.filter(({ pkg }) => chosen.includes(pkg))
+		.map(({ pkg, exists, trust }) => ({
+			pkg,
+			publish: !exists,
+			publishTrust: findEntry(trust, PUBLISH_WORKFLOW) == null,
+			promoteTrust: findEntry(trust, PROMOTE_WORKFLOW) == null,
+		}))
+		.filter((plan) => plan.publish || plan.publishTrust || plan.promoteTrust);
+	if (plans.length === 0) {
+		log(`Nothing to do: ${chosen.length} packages can be published and promoted from CI.`);
 		return 0;
 	}
 
-	// A code npm rejects (they last about 30 seconds) makes npm ask for a new one.
+	const promoteSource = state
+		.map(({ trust }) => findEntry(trust, PROMOTE_WORKFLOW))
+		.find((entry) => entry != null);
+	if (promoteSource == null && plans.some((plan) => plan.promoteTrust)) {
+		log(
+			`No package has a Trusted Publisher for ${PROMOTE_WORKFLOW} to copy. On npmjs.com, in the settings of ` +
+				`@decohere/cli, add one: GitHub Actions, organization typesmiths, repository decohere, workflow ` +
+				`${PROMOTE_WORKFLOW}, no environment, Allow npm publish off, Allow npm dist-tag on. Then run this again. ` +
+				"Nothing changed.",
+		);
+		return 1;
+	}
+
 	/** @param {string[]} args */
-	const change = (args) => {
+	const runChange = (args) => {
 		if (dryRun) {
-			log(`[dry run] npm ${args.join(" ")}`);
+			log(`  [dry run] npm ${args.join(" ")}`);
 			return true;
 		}
-		return npm(args, { otp: values.otp }).status === 0;
+		return npm(args, { otp }).status === 0;
 	};
 
-	for (const pkg of packages) {
+	for (const plan of plans) {
+		const { pkg } = plan;
 		log(`\n${pkg.name} (projects/${pkg.dir}, ${pkg.version})`);
 
-		if (nameExists(pkg.name)) {
+		if (!plan.publish) {
 			log("  name is on npm: skip the first publish");
-		} else if (!change(publishArgs(pkg, values.channel))) {
-			log(`  first publish failed: stopping`);
+		} else if (!runChange(publishArgs(pkg, values.channel))) {
+			log("  first publish failed: stopping");
 			return 1;
 		}
 
-		const listed = dryRun
-			? { status: 1, output: "" }
-			: npm(["trust", "list", pkg.name, "--json"], { capture: true, otp: values.otp });
-		if (listed.status === 0 && hasTrustedPublisher(listed.output)) {
-			log("  Trusted Publisher is set: skip");
-		} else if (!change(trustArgs(pkg.name))) {
-			log("  Trusted Publisher failed: stopping");
+		if (!plan.publishTrust) {
+			log(`  Trusted Publisher for ${PUBLISH_WORKFLOW} is set: skip`);
+		} else if (!runChange(trustArgs(pkg.name))) {
+			log(`  Trusted Publisher for ${PUBLISH_WORKFLOW} failed: stopping`);
 			return 1;
+		}
+
+		if (!plan.promoteTrust) {
+			log(`  Trusted Publisher for ${PROMOTE_WORKFLOW} is set: skip`);
+		} else if (dryRun) {
+			log(`  [dry run] copy the Trusted Publisher for ${PROMOTE_WORKFLOW} to ${pkg.name}`);
+		} else {
+			// Checked above: some package has it.
+			const failure = await npmRegistry.addTrust(
+				pkg.name,
+				/** @type {TrustEntry} */ (promoteSource),
+			);
+			if (failure != null) {
+				log(
+					`  Trusted Publisher for ${PROMOTE_WORKFLOW} failed: ${failure}. Run this again with a new code.`,
+				);
+				return 1;
+			}
+			log(`  Trusted Publisher for ${PROMOTE_WORKFLOW}: set`);
 		}
 	}
 
+	if (dryRun) return 0;
 	log(
-		"\nFor each new package, also run `pnpm npm:trust-promote --otp <code>`, so Promote to latest can move its tag.",
-	);
-	log(
-		"\nDone. Add the PR to the merge queue. If Publish already failed on this, rerun it: `gh run rerun --failed <run-id>`.",
+		"\nDone: these packages can be published and promoted from CI. If Publish already failed on one, " +
+			"rerun it: `gh run rerun --failed <run-id>`. Otherwise add the PR to the merge queue.",
 	);
 	return 0;
 }
