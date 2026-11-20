@@ -22,8 +22,13 @@
   ],
   // Volumes are created root-owned; hand them to `node`, then install; pnpm switches itself to the version pinned in package.json.
   "postCreateCommand": "sudo chown node node_modules /home/node/.claude && pnpm install",
+  // A real init as pid 1, to reap processes whose parent died, so none pile up as zombies.
+  "init": true,
   // A name to find it by in claude.ai/code; otherwise it's a random ID that changes on each rebuild.
-  "runArgs": ["--hostname=decohere-container"],
+  // Then caps, so a test run here slows itself down instead of pushing the whole machine into swap
+  // while other repos' dev containers run beside it. Over the memory cap the container swaps its
+  // own pages (up to as much again), not the desktop's.
+  "runArgs": ["--hostname=decohere-container", "--memory=6g", "--cpus=8"],
   // Every start: Claude Remote Control, so this container is reachable from claude.ai/code.
   "postStartCommand": "bash .devcontainer/post-start.sh",
   // Claude's settings file goes in the mounted folder above, so it survives a rebuild.
