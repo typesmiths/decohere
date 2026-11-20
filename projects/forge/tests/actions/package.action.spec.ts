@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import { PackageJson, Project, type UiConfig, type Workspace } from "@decohere/workspace";
 import { Npm } from "@decohere/devkit/interop";
+import { scribe } from "@decohere/scribe";
+import { CaptureAdapter } from "@decohere/scribe/testing";
 import { resetMemfs } from "@decohere/testing";
 import { vol } from "memfs";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -425,6 +427,149 @@ describe("PackageDeployable", () => {
 
 			expect(response.succeeded).toBe(false);
 			expect(response.message).toContain("can't name a config file");
+		});
+	});
+
+	describe("pnpm patches", () => {
+		const installed = "/ws/projects/api/.package/node_modules/ms";
+		const original = "module.exports = function ms(value) {\n\treturn value;\n};\n";
+		const patch = [
+			"diff --git a/index.js b/index.js",
+			"index 3354048..52b025c 100644",
+			"--- a/index.js",
+			"+++ b/index.js",
+			"@@ -1,3 +1,4 @@",
+			" module.exports = function ms(value) {",
+			"+\t// patched",
+			" \treturn value;",
+			" };",
+			"",
+		].join("\n");
+
+		function seedPatched(
+			patchedDependencies: Record<string, string>,
+			files: Record<string, string> = {},
+		) {
+			seed({
+				"/ws/package.json": JSON.stringify({
+					name: "root",
+					version: "1.0.0",
+					pnpm: { patchedDependencies },
+				}),
+				"/ws/patches/ms.patch": patch,
+				...files,
+			});
+		}
+
+		function installMs(content: string) {
+			vi.spyOn(Npm.prototype, "installProduction").mockImplementation(async () => {
+				fs.mkdirSync(installed, { recursive: true });
+				fs.writeFileSync(
+					`${installed}/package.json`,
+					JSON.stringify({ name: "ms", version: "2.1.3" }),
+				);
+				fs.writeFileSync(`${installed}/index.js`, content);
+				return { message: "installed", data: [] };
+			});
+		}
+
+		const capture = new CaptureAdapter();
+		const infoLines = () => capture.at("info").map((entry) => entry.msg);
+
+		beforeEach(() => {
+			capture.clear();
+			scribe.configure({ adapter: capture, options: { logLevel: "info" } });
+			installMs(original);
+		});
+
+		it("applies the workspace's patch to the shipped package and says so", async () => {
+			seedPatched({ "ms@2.1.3": "patches/ms.patch" });
+
+			const response = await action().run({ project: "@app/api" });
+
+			expect(response.succeeded).toBe(true);
+			expect(fs.readFileSync(`${installed}/index.js`, "utf8")).toBe(
+				"module.exports = function ms(value) {\n\t// patched\n\treturn value;\n};\n",
+			);
+			expect(infoLines()).toContain("Patched ms@2.1.3 (patches/ms.patch)");
+		});
+
+		it("reads top-level patchedDependencies too", async () => {
+			seed({
+				"/ws/package.json": JSON.stringify({
+					name: "root",
+					version: "1.0.0",
+					patchedDependencies: { "ms@2.1.3": "patches/ms.patch" },
+				}),
+				"/ws/patches/ms.patch": patch,
+			});
+
+			const response = await action().run({ project: "@app/api" });
+
+			expect(response.succeeded).toBe(true);
+			expect(fs.readFileSync(`${installed}/index.js`, "utf8")).toContain("// patched");
+		});
+
+		it("reads patchedDependencies from pnpm-workspace.yaml", async () => {
+			seed({
+				"/ws/pnpm-workspace.yaml": "patchedDependencies:\n  ms@2.1.3: patches/ms.patch\n",
+				"/ws/patches/ms.patch": patch,
+			});
+
+			const response = await action().run({ project: "@app/api" });
+
+			expect(response.succeeded).toBe(true);
+			expect(fs.readFileSync(`${installed}/index.js`, "utf8")).toContain("// patched");
+		});
+
+		it.each(["ms", "ms@^2.0.0"])(
+			"applies a patch keyed %s to the version it matches",
+			async (key) => {
+				seedPatched({ [key]: "patches/ms.patch" });
+
+				const response = await action().run({ project: "@app/api" });
+
+				expect(response.succeeded).toBe(true);
+				expect(fs.readFileSync(`${installed}/index.js`, "utf8")).toContain("// patched");
+			},
+		);
+
+		it.each(["ms@2.1.2", "ms@^3.0.0"])(
+			"fails when the patch is keyed %s, naming both versions",
+			async (key) => {
+				seedPatched({ [key]: "patches/ms.patch" });
+
+				const response = await action().run({ project: "@app/api" });
+
+				expect(response.succeeded).toBe(false);
+				expect(response.message).toContain("patches/ms.patch");
+				expect(response.message).toContain(key);
+				expect(response.message).toContain("ms@2.1.3");
+				expect(fs.existsSync("/ws/projects/api/.package")).toBe(false);
+			},
+		);
+
+		it("fails, naming the patch and the file, when a hunk doesn't apply", async () => {
+			installMs("module.exports = () => 1;\n");
+			seedPatched({ "ms@2.1.3": "patches/ms.patch" });
+
+			const response = await action().run({ project: "@app/api" });
+
+			expect(response.succeeded).toBe(false);
+			expect(response.message).toContain("patches/ms.patch");
+			expect(response.message).toContain("index.js");
+			expect(fs.existsSync("/ws/projects/api/.package")).toBe(false);
+		});
+
+		it("skips a patch for a package the deployable doesn't ship, and says so", async () => {
+			seedPatched({ "left-pad@1.3.0": "patches/left-pad.patch" });
+
+			const response = await action().run({ project: "@app/api" });
+
+			expect(response.succeeded).toBe(true);
+			expect(infoLines()).toContain(
+				"Skipped patches/left-pad.patch: @app/api doesn't ship left-pad",
+			);
 		});
 	});
 });
