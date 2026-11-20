@@ -16,7 +16,11 @@ import {
 	type StartSteps,
 	StartStepsToken,
 } from "./const.js";
-import type { HostedServiceHost, HostedServiceStartTiming } from "./hosted-service-host.js";
+import type {
+	HostedServiceHost,
+	HostedServiceStartTiming,
+	StartRetry,
+} from "./hosted-service-host.js";
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_SHUTDOWN_SIGNALS: readonly NodeJS.Signals[] = ["SIGTERM", "SIGINT"];
@@ -54,13 +58,20 @@ export type StartOptions = {
 	/** How long a signalled shutdown may take before the process exits with code 1. Default 10s. */
 	shutdownTimeoutMs?: number;
 	/**
-	 * When hosted services start. `"before-listen"` (default): `start()` resolves once every one
-	 * has started, and a failure rejects it. `"after-listen"`: the server listens first and they
-	 * start in the background, in the same order, while `GET /ready` answers 503; a failure stops
-	 * the app and rejects {@link App.hostedServicesStarted}. For a host with a start budget, such
-	 * as Cloud Run.
+	 * When hosted services start. `"before-listen"` (default): `start()` resolves once each one
+	 * has started or is being retried. `"after-listen"`: the server listens first and they start
+	 * in the background, in the same order, while `GET /ready` answers 503. For a host with a
+	 * start budget, such as Cloud Run.
 	 */
 	hostedServices?: "before-listen" | "after-listen";
+	/**
+	 * A hosted service whose `start()` throws is started again with this backoff (default 1 s
+	 * doubling to 60 s) while the app runs, and `GET /ready` names it until it starts. `false` to
+	 * fail fast instead, for a one-shot job: the services already started are stopped, and the
+	 * error rejects `start()` (after-listen: it stops the app and rejects
+	 * {@link App.hostedServicesStarted}).
+	 */
+	startRetry?: StartRetry | false;
 };
 
 export class App {
@@ -100,13 +111,16 @@ export class App {
 			await step(this.container);
 			if (this.disposing != null) return undefined;
 		}
+		const retry = options?.startRetry ?? {};
 		if (options?.hostedServices === "after-listen") {
 			const startResponse = await this.listen(options);
-			if (this.disposing == null) this.hostedStarting = this.startHostedServicesAfterListen();
+			if (this.disposing == null) {
+				this.hostedStarting = this.startHostedServicesAfterListen(retry);
+			}
 			return startResponse;
 		}
 		// Before the server, so a request never reaches a service that has not started.
-		this.hostedStarting = this.startHostedServices();
+		this.hostedStarting = this.startHostedServices(retry);
 		await this.hostedStarting;
 		// The app was stopped while a hosted service was still starting.
 		if (this.disposing != null) return undefined;
@@ -114,10 +128,11 @@ export class App {
 	}
 
 	/**
-	 * Resolves once every hosted service has started, with how long each one took, in start order.
-	 * With `hostedServices: "after-listen"`, await it in `main.ts` after `start()`: a failure
-	 * rejects it, after the app has stopped. Left unawaited, that rejection is unhandled and ends
-	 * the process, as a failing `await app.start()` would.
+	 * Resolves once every hosted service has started or is being retried, with how long each
+	 * first start took, in start order. With `startRetry: false` and `hostedServices:
+	 * "after-listen"`, await it in `main.ts` after `start()`: a failure rejects it, after the app
+	 * has stopped. Left unawaited, that rejection is unhandled and ends the process, as a failing
+	 * `await app.start()` would.
 	 */
 	public hostedServicesStarted(): Promise<readonly HostedServiceStartTiming[]> {
 		return (
@@ -144,24 +159,31 @@ export class App {
 		return startResponse;
 	}
 
-	private async startHostedServices(): Promise<readonly HostedServiceStartTiming[]> {
+	private async startHostedServices(
+		retry: StartRetry | false,
+	): Promise<readonly HostedServiceStartTiming[]> {
 		const host = this.hostedServices;
 		if (host == null || host.isEmpty) return [];
 		const begun = performance.now();
-		await host.start(this.container);
+		await host.start(this.container, retry);
 		const timings = host.timings;
+		const ms = Math.round(performance.now() - begun);
+		const retrying = timings.filter((t) => !t.started).length;
 		this.logger.info(
-			`Started ${timings.length} hosted services in ${Math.round(performance.now() - begun)} ms`,
+			`Started ${timings.length - retrying} hosted services in ${ms} ms${retrying > 0 ? `; ${retrying} failed and are being retried` : ""}`,
 		);
 		return timings;
 	}
 
-	/** The server is already up, so a service that fails to start takes the app down with it. */
-	private async startHostedServicesAfterListen(): Promise<
-		readonly HostedServiceStartTiming[]
-	> {
+	/**
+	 * The server is already up. Without retries, a service that fails to start takes the app down
+	 * with it.
+	 */
+	private async startHostedServicesAfterListen(
+		retry: StartRetry | false,
+	): Promise<readonly HostedServiceStartTiming[]> {
 		try {
-			return await this.startHostedServices();
+			return await this.startHostedServices(retry);
 		} catch (startError) {
 			try {
 				await this.dispose();

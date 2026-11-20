@@ -37,7 +37,7 @@ it("says hello", async () => {
 });
 ```
 
-`startTestApp(app)` takes a built app, or the promise `build()` returns. It starts it on `127.0.0.1:0` with no SIGTERM or SIGINT handlers, and gives back `baseUrl`, its origin (such as `http://127.0.0.1:41233`), `app` (its services are at `app.services`), `readEvents` for [streams](#testing-a-stream) and `stop()`. If the app fails to start, it is stopped and the error is thrown.
+`startTestApp(app)` takes a built app, or the promise `build()` returns. It starts it on `127.0.0.1:0` with no SIGTERM or SIGINT handlers, and gives back `baseUrl`, its origin (such as `http://127.0.0.1:41233`), `app` (its services are at `app.services`), `readEvents` for [streams](#testing-a-stream) and `stop()`. If the app fails to start, it is stopped and the error is thrown; that includes a hosted service whose `start()` throws, which isn't retried here (`startRetry: false`).
 
 To test some controllers without the rest of the app (no database, no identity provider), `bootModule` builds an app of only those, with the services you give it:
 
@@ -350,18 +350,22 @@ Builder.create(new ServiceContainerBuilder())
 	.withHostedService(PositionFeed);
 ```
 
-**Starting.** `app.start()` starts hosted services in registration order, and awaits each `start(signal)`, before the HTTP server listens. So a request never reaches a service that hasn't started, and a `start()` that throws fails `app.start()` (the ones already started are stopped). Keep `start()` short: set up what must be ready before traffic, then run long work in the background and return.
+**Starting.** `app.start()` starts hosted services in registration order, and awaits each `start(signal)`, before the HTTP server listens. So a request never reaches a service that hasn't started. Keep `start()` short: set up what must be ready before traffic, then run long work in the background and return.
 
 **Starting after the server listens.** A host with a start budget (Cloud Run's startup check, a probe) counts every service's `start()` against it. `hostedServices: "after-listen"` makes the server listen first, then starts the services in the background, in the same order and one at a time, since registration order carries real dependencies (a seed before the feed that reads it):
 
 ```ts
 await app.start({ port, hostedServices: "after-listen" });
-const timings = await app.hostedServicesStarted(); // [{ name: "PositionFeed", ms: 45 }, ...]
+const timings = await app.hostedServicesStarted(); // [{ name: "PositionFeed", ms: 45, started: true }, ...]
 ```
 
-While they start, `/health` answers 200 and `/ready` answers 503 (`hosted services starting`), so a load balancer that checks readiness sends no traffic to a service that hasn't started. A `start()` that throws stops the app (the server too) and rejects `hostedServicesStarted()`. Await it in `main.ts` as above: left unawaited, the rejection is unhandled and ends the process, as a failing `await app.start()` does.
+While they start, `/health` answers 200 and `/ready` answers 503 (`hosted services starting`), so a load balancer that checks readiness sends no traffic to a service that hasn't started.
 
-`hostedServicesStarted()` works in the default mode too, resolving at once after `start()`. Each service's time covers building it from the container and its `start()`; the app logs the total at info level and each service at debug.
+**A start that throws is retried.** The app doesn't stop for it: it logs the error, starts the next service, and starts the failed one again in the background, after 1 s, doubling to 60 s, each wait varied by ±20%. `/ready` answers 503 until it has started (the anonymous probe gives no detail; the log names the service and its error). A dependency that is down at start, a feed or a broker, then costs readiness, not a crash loop. A `start()` that is retried runs again on the same instance, so it must be safe to call after it threw. Tune the backoff with `startRetry: { initialMs, maxMs }`.
+
+`startRetry: false` fails fast instead, for a one-shot job that should exit: a throw stops the services already started and fails `app.start()` (after-listen: it stops the app and rejects `hostedServicesStarted()`; await it in `main.ts`, since left unawaited the rejection is unhandled and ends the process). `startTestApp` starts apps this way, so a test sees the error.
+
+`hostedServicesStarted()` works in the default mode too, resolving at once after `start()`. It resolves once each service has started or is being retried: `started: false` marks the second. Each service's time covers building it from the container and its `start()`; the app logs the total at info level and each service at debug.
 
 **Warming up.** A service that is started but can't serve yet implements `check()`: it throws until the service is ready, and `GET /ready` (`health()`) answers 503 until then. `/health` is unaffected.
 

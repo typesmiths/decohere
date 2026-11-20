@@ -8,8 +8,9 @@
  */
 export interface HostedService {
 	/**
-	 * Called once when the app starts, and awaited: a throw fails `app.start()` (after-listen: it
-	 * stops the app and rejects `app.hostedServicesStarted()`). Do what must be
+	 * Called when the app starts, and awaited. A throw is logged and `start()` is called again on
+	 * the same instance with backoff, while `GET /ready` fails (with `startRetry: false`, a throw
+	 * fails `app.start()` instead), so it must be safe to call again after it threw. Do what must be
 	 * ready before traffic, then start long work (a first load that takes minutes, a timer) in
 	 * the background and return. Waiting for it here keeps the HTTP server dark.
 	 *
