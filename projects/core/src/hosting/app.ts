@@ -10,12 +10,7 @@ import {
 	ConfigurationServiceToken,
 	type IConfigurationService,
 } from "../configuration/index.js";
-import {
-	AppServerToken,
-	HostedServiceHostToken,
-	type StartSteps,
-	StartStepsToken,
-} from "./const.js";
+import { AppServerToken, HostedServiceHostToken } from "./const.js";
 import type {
 	HostedServiceHost,
 	HostedServiceStartTiming,
@@ -90,7 +85,6 @@ export class App {
 		private configurationService?: IConfigurationService,
 		@inject(AppServerToken) @optional() private server?: AppServer,
 		@inject(HostedServiceHostToken) @optional() private hostedServices?: HostedServiceHost,
-		@inject(StartStepsToken) @optional() private startSteps?: StartSteps,
 	) {}
 
 	/**
@@ -107,10 +101,6 @@ export class App {
 
 	public async start(options?: StartOptions): Promise<AppServerStartResponse | undefined> {
 		this.logger.info("Starting app");
-		for (const step of this.startSteps?.steps ?? []) {
-			await step(this.container);
-			if (this.disposing != null) return undefined;
-		}
 		const retry = options?.startRetry ?? {};
 		if (options?.hostedServices === "after-listen") {
 			const startResponse = await this.listen(options);
@@ -169,8 +159,10 @@ export class App {
 		const timings = host.timings;
 		const ms = Math.round(performance.now() - begun);
 		const retrying = timings.filter((t) => !t.started).length;
+		const waiting =
+			timings.length < host.size ? `; ${host.size - timings.length} waiting` : "";
 		this.logger.info(
-			`Started ${timings.length - retrying} hosted services in ${ms} ms${retrying > 0 ? `; ${retrying} failed and are being retried` : ""}`,
+			`Started ${timings.length - retrying} start steps and hosted services in ${ms} ms${retrying > 0 ? `; ${retrying} failed and are being retried` : ""}${waiting}`,
 		);
 		return timings;
 	}
