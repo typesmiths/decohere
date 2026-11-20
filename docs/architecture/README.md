@@ -13,7 +13,8 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 | [`@decohere/scribe`](../../projects/scribe/README.md) | `projects/scribe/scribe` | Logging facade; no dependencies, any runtime with a `console` ([ADR 0016](../adr/0016-scribe-on-any-runtime.md)) |
 | `@decohere/scribe-pino` | `projects/scribe/scribe-pino` | Pino writer |
 | `@decohere/scribe-console` | `projects/scribe/scribe-console` | JSON console writer (Workers, browsers, Deno, Bun, Node) |
-| [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: Fastify, routing, auth, OpenAPI; the test helpers at `/testing` ([ADR 0026](../adr/0026-app-recipes-and-test-helper.md)) |
+| [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: controllers, routing, auth, OpenAPI, health, problem details and the `HttpProvider` contract, with no web server of its own ([ADR 0014](../adr/0014-package-names.md)); the test helpers at `/testing` ([ADR 0026](../adr/0026-app-recipes-and-test-helper.md)) |
+| [`@decohere/http-fastify`](../../projects/http-fastify/README.md) | `projects/http-fastify` | Fastify provider: `FastifyProvider`, with helmet, CORS, compression, rate limit and static files |
 | [`@decohere/config`](../../projects/config/README.md) | `projects/config` | Configuration from YAML and environment sources |
 | [`@decohere/data`](../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)) |
 | [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `bootstrap` |
@@ -33,7 +34,7 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 Layers, simplified:
 
 ```text
-runtime  (what a production app installs):  scribe → core → crucible → config, data* · http (on config and scribe-pino)
+runtime  (what a production app installs):  scribe → core → crucible → http → http-fastify, config, data*
 tooling  (never in a production app):       core → devkit → workspace → forge → flux → cli
 other:                                      testing · create (launcher) / scaffold · ci-tools
 ```
@@ -51,7 +52,7 @@ How we test without those: [testing](../testing/).
 
 ## 2. Vendors stay at the composition edge
 
-Application and domain code depend on Decohere contracts; vendor code lives in an adapter chosen at the app's composition root. Fastify, Pino, MikroORM/Postgres and Auth0 are today's defaults, not requirements. Switching one should be a provider and config change, not a rewrite. Examples: Scribe's facade and its writers, `data` and its providers (`data-mikro-orm`, `data-typeorm`), `config`'s replaceable sources.
+Application and domain code depend on Decohere contracts; vendor code lives in an adapter chosen at the app's composition root. Fastify, Pino, MikroORM/Postgres and Auth0 are today's defaults, not requirements. Switching one should be a provider and config change, not a rewrite. Examples: `http` and its provider (`http-fastify`), Scribe's facade and its writers, `data` and its providers (`data-mikro-orm`, `data-typeorm`), `config`'s replaceable sources.
 
 ## 3. One owner per fact
 
@@ -63,7 +64,7 @@ A new app should run in minutes, and a grown app should use only what it needs a
 
 - **A recipe is code the scaffolder writes into the app**, not a package the app imports. A web API on Fastify gets an `app.ts` that spells out its composition: logging, `http(FastifyProvider, …)`, `config(…)`, `health()`. Swapping the HTTP provider or the logger is editing that line. More recipes (another provider, a worker without HTTP) are more scaffolder templates, not more packages.
 - **No preset hides the composition.** A plugin that wires several packages would hard-wire one vendor per part, and need one more package for each combination.
-- **Each package depends only on what its own code needs.** `@decohere/http` doesn't install config or a logging library. A package that pulls in more is a bug against this rule.
+- **Each package depends only on what its own code needs.** `@decohere/http` doesn't install config, a logging library or a web server. A package that pulls in more is a bug against this rule.
 
 ## Key patterns
 

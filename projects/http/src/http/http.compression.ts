@@ -30,7 +30,8 @@ export type CompressionOptions =
 			 */
 			types?: RegExp | ((contentType: string) => boolean);
 			/**
-			 * Fastify-specific. Any other `@fastify/compress` option (`brotliOptions`, `zlibOptions`,
+			 * Provider-specific. Any other option of the provider's compression plugin (on Fastify,
+			 * `@fastify/compress`: `brotliOptions`, `zlibOptions`,
 			 * `onUnsupportedEncoding`, `inflateIfDeflated`, ...), merged last so it overrides the
 			 * values above. Not portable to another HTTP provider.
 			 */

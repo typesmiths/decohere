@@ -1,3 +1,4 @@
+import { FastifyProvider } from "@decohere/http-fastify";
 import { configureHttp } from "../src/http/http.plugin.js";
 import { auth } from "../src/auth/auth.plugin.js";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -131,6 +132,7 @@ class FeedController {
 describe("server-sent events from a controller route", () => {
 	it("writes the handler's events as text/event-stream", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -150,6 +152,7 @@ describe("server-sent events from a controller route", () => {
 
 	it("ends the response when the handler finishes", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -162,6 +165,7 @@ describe("server-sent events from a controller route", () => {
 
 	it("gives the handler the Last-Event-ID the browser sends when it reconnects", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -180,6 +184,7 @@ describe("server-sent events from a controller route", () => {
 
 	it("writes a heartbeat comment while the producer is quiet", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -192,6 +197,7 @@ describe("server-sent events from a controller route", () => {
 
 	it("ends the stream without sending a half-built event when the producer throws", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -204,6 +210,7 @@ describe("server-sent events from a controller route", () => {
 
 	it("answers 500 for an @Sse() method that does not return a stream", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -216,6 +223,7 @@ describe("server-sent events from a controller route", () => {
 
 	it("leaves ordinary routes alone", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -230,6 +238,7 @@ describe("server-sent events from a controller route", () => {
 describe("SSE: client disconnect and app stop", () => {
 	it("stops the producer, its timer and the request scope when the client disconnects", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -246,6 +255,7 @@ describe("SSE: client disconnect and app stop", () => {
 
 	it("keeps request-scoped services alive while the stream is running", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 		});
@@ -260,7 +270,11 @@ describe("SSE: client disconnect and app stop", () => {
 	});
 
 	it("closes open streams when the app stops, so stopping does not hang", async () => {
-		const api = await bootModule({ controllers: [FeedController], services: services() });
+		const api = await bootModule({
+			provider: FastifyProvider,
+			controllers: [FeedController],
+			services: services(),
+		});
 		const timersBefore = probe.timersRunning;
 
 		const reading = api.readEvents("/feed/live", { count: Infinity, timeoutMs: 4000 });
@@ -275,7 +289,11 @@ describe("SSE: client disconnect and app stop", () => {
 	});
 
 	it("closes open streams on the dispose path Flux uses for a reboot", async () => {
-		const api = await bootModule({ controllers: [FeedController], services: services() });
+		const api = await bootModule({
+			provider: FastifyProvider,
+			controllers: [FeedController],
+			services: services(),
+		});
 		const timersBefore = probe.timersRunning;
 		const reading = api.readEvents("/feed/live", { count: Infinity, timeoutMs: 4000 });
 		await waitFor(() => probe.timersRunning > timersBefore);
@@ -327,6 +345,7 @@ class SecureFeedController {
 describe("SSE: auth runs before any event is sent", () => {
 	const boot = () =>
 		bootModule({
+			provider: FastifyProvider,
 			controllers: [SecureFeedController],
 			services: (c) =>
 				c.registerSingleton(ConfigurationServiceToken, new SecretConfigService()),
@@ -384,6 +403,7 @@ describe("SSE: auth runs before any event is sent", () => {
 describe("SSE: OpenAPI", () => {
 	it("documents a stream route as text/event-stream, with the Last-Event-ID header", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [FeedController],
 			services: services(),
 			configure: (builder) =>

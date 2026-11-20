@@ -125,11 +125,14 @@
       "@decohere/http": [
         "./projects/http/src/index.ts"
       ],
+      "@decohere/http-fastify": [
+        "./projects/http-fastify/src/index.ts"
+      ],
+      "@decohere/http-fastify/*": [
+        "./projects/http-fastify/src/*"
+      ],
       "@decohere/http/*": [
         "./projects/http/src/*"
-      ],
-      "@decohere/http/providers": [
-        "./projects/http/src/providers/index.ts"
       ],
       "@decohere/http/testing": [
         "./projects/http/src/testing/index.ts"

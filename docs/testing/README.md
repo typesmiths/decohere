@@ -32,7 +32,8 @@ Test what the program does for its users (files written, HTTP responses, exit co
 | product CLI shape | `projects/cli/tests/product.integration.spec.ts` | per-module forge, flux and create suites |
 | forge CLI | `projects/cli/tests/forge.integration.spec.ts` | action edges the CLI cannot see |
 | flux CLI | `projects/cli/tests/flux.integration.spec.ts` | HotReloadServer edges in `projects/flux/tests/hmr.server.spec.ts` |
-| HTTP | `projects/http/tests/*.integration.spec.ts` | crypto, SSRF and `*.pentest.spec.ts` edges |
+| HTTP | `projects/http/tests/*.integration.spec.ts`, on `FastifyProvider` | crypto, SSRF and `*.pentest.spec.ts` edges |
+| HTTP on Fastify (compression, static files) | `projects/http-fastify/tests/*.integration.spec.ts` | none |
 | data's unit of work, on every provider | `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, against Postgres, MikroORM's writes snapshotted as the reference | the query types in `projects/data/data/tests/query.types.spec.ts`; configuration checks in `projects/data/data/tests/data-sources.spec.ts`; database setup and roles in `projects/data/data-postgres/tests/` |
 | scribe facade | `projects/scribe/scribe/tests/scribe.integration.spec.ts` | env helpers, console edge cases |
 | scribe + pino | `projects/scribe/scribe-pino/tests/scribe-pino.integration.spec.ts` | `pinoRecipe.transport` plan shapes, transport guard |

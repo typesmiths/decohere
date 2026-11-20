@@ -1,5 +1,3 @@
-import { configureHttp } from "../src/http/http.plugin.js";
-import { auth } from "../src/auth/auth.plugin.js";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { tmpdir } from "node:os";
@@ -12,19 +10,21 @@ import {
 } from "@decohere/core/configuration";
 import type { Constructable } from "@decohere/core/reflection";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { AuthConfig } from "../src/auth/auth.config.js";
+import type { Builder } from "@decohere/core/hosting";
 import {
+	AuthConfig,
 	Authorize,
 	Controller,
 	Get,
 	Header,
+	HttpError,
 	Signal,
 	Sse,
 	type SseStream,
-} from "../src/index.js";
-import { HttpError } from "../src/routing/http.types.js";
-import { bootModule } from "../src/testing/index.js";
-import type { Builder } from "@decohere/core/hosting";
+	auth,
+	configureHttp,
+} from "@decohere/http";
+import { bootModule } from "./helpers/boot-module.js";
 
 // Static files are read by the real server from real disk (the suite's fs is an in-memory fake).
 vi.unmock("fs");

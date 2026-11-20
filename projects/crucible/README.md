@@ -272,7 +272,7 @@ export class App {
 import { Builder } from "@decohere/core/hosting";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { http } from "@decohere/http";
-import { FastifyProvider } from "@decohere/http/providers";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { SampleService } from "./services/sample.service.js";
 import { HelloController } from "./controllers/hello.controller.js";
 

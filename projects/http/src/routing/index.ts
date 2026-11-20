@@ -8,3 +8,6 @@ export * from "./middleware/middleware.js";
 export * from "./middleware/request-id.js";
 export * from "./pipes/index.js";
 export * from "./request-context.js";
+export { normalizePrefix } from "./path.util.js";
+export type { RouteRegistry } from "./services/route-registry.js";
+export type { Router } from "./services/router.js";

@@ -5,7 +5,7 @@ import { inject, injectable } from "@decohere/crucible/decorators";
 import axios from "axios";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type App, Builder } from "@decohere/core/hosting";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { Controller, Get } from "../src/routing/index.js";
 
 const DbToken = Symbol("Db");

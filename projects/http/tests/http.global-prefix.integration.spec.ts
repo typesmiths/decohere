@@ -1,3 +1,4 @@
+import { FastifyProvider } from "@decohere/http-fastify";
 import { configureHttp } from "../src/http/http.plugin.js";
 import { health } from "../src/health/health.plugin.js";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
@@ -65,7 +66,11 @@ type Configure = NonNullable<Parameters<typeof bootModule>[0]["configure"]>;
 type TestBuilder = Parameters<Configure>[0];
 
 function boot(configure: Configure) {
-	return bootModule({ controllers: [PortfolioController, PingController], configure });
+	return bootModule({
+		provider: FastifyProvider,
+		controllers: [PortfolioController, PingController],
+		configure,
+	});
 }
 
 /** Status of a GET. The body is read so a streamed file never holds up stopping the app. */
@@ -106,6 +111,7 @@ describe("the global prefix and the probes", () => {
 
 	it("leaves a controller that opts out unprefixed, parameters included", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [PortfolioController, WebhookController],
 			configure: (b) => b.use(configureHttp({ globalPrefix: "/api" })),
 		});
@@ -117,6 +123,7 @@ describe("the global prefix and the probes", () => {
 
 	it("prefixes a controller that declares /health itself: the path alone moves nothing", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [OwnHealthController],
 			configure: (b) => b.use(configureHttp({ globalPrefix: "/api" })),
 		});
@@ -194,6 +201,7 @@ describe("the static fallback with a global prefix", () => {
 
 	it("keeps the JSON 404 at and below a route outside the prefix, even to a browser", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [PortfolioController, WebhookController],
 			configure: (b) =>
 				b
@@ -239,6 +247,7 @@ describe("the static fallback with a global prefix", () => {
 
 	it("keeps the JSON 404 under the prefix when no controller is under it", async () => {
 		await using api = await bootModule({
+			provider: FastifyProvider,
 			controllers: [],
 			configure: (b) =>
 				b.use(

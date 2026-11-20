@@ -55,6 +55,7 @@ describe("ApiPackageJson dependency order", () => {
 			"@decohere/data",
 			"@decohere/data-typeorm",
 			"@decohere/http",
+			"@decohere/http-fastify",
 		]);
 	});
 });
