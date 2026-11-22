@@ -67,14 +67,14 @@ A new app should run in minutes, and a grown app should use only what it needs a
 - **No preset hides the composition.** A plugin that wires several packages would hard-wire one vendor per part, and need one more package for each combination.
 - **Each package depends only on what its own code needs.** `@decohere/http` doesn't install config, a logging library or a web server. A package that pulls in more is a bug against this rule.
 
-## 5. An app is modules by role, each domain cut by subdomain
+## 5. Packages are modules, one class per job
 
-How an app's own code is shaped ([ADR 0027](../adr/0027-app-design.md), and the picture: [app design](app-design.svg)):
+How Decohere's own code is shaped ([ADR 0027](../adr/0027-code-design.md); the picture: [code design](code-design.svg)):
 
-- **A module is a bounded context**, up to four projects by role: `<module>.contracts` (interfaces, tokens, event shapes, values; no dependencies), `<module>.domain` (everything that decides), `<module>.api` (HTTP, the database, streams, processes) and `<module>.tools`. Dependencies run contracts ← domain ← api, and another module imports only `*.contracts`. `app.ts` binds each contract. A new app starts as one module, with `src/domain/` and `src/api/`.
-- **A domain is cut by subdomain, then kind** (`entities/`, `values/`, `services/`, `strategies/`, `factories/`, `repositories/`, `events/`, `errors/`, `testing/`); an api by kind (`controllers/`, `mappings/`, `migrations/`, `handlers/`, `publishers/`, `processes/`, `testing/`).
-- **One class per concept, one owner**, private state, behaviour on the thing it's about; kinds share an abstract base class; services are an interface and a token; no `container.resolve` in the domain. Crucible's decorators are fine in the domain.
-- **One repository per aggregate root, on `Repository<T>`**, tested on `@decohere/data-memory` and the real provider with the same cases.
+- **A base package holds the contracts, its providers implement them**: `data` ← `data-mikro-orm`, `data-typeorm`, `data-memory`; `http` ← `http-fastify`; `scribe` ← `scribe-pino`, `scribe-console`. A base package never imports a provider, and only an app's composition root names one.
+- **Inside a package, folders are subdomains** (`routing/`, `auth/`, `openapi/`), then a folder per kind once a subdomain has several of one kind.
+- **One class per job**, private state, abstract base classes over shared helpers, interfaces behind tokens, constructor injection. Loose exported functions only for plugin factories, decorators, `define…` helpers and mechanics ([style](../style/README.md#one-class-per-job)).
+- **Files are named for their thing and role, and specs sit beside them.** CI measures how far the code is from these rules and fails if any count rises.
 
 ## Key patterns
 
