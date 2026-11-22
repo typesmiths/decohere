@@ -8,6 +8,7 @@ import pg from "pg";
 import { DataSource } from "typeorm";
 import { mikroOrmEntities } from "./mikro-orm.mapping.js";
 import { defineModel, type Model } from "./model.js";
+import { reads } from "./sql-shape.js";
 import { typeOrmEntities } from "./typeorm.mapping.js";
 
 export type Connection = {
@@ -28,18 +29,26 @@ pg.Client.prototype.query = function (this: pg.Client, ...args: Parameters<typeo
 	return query.apply(this, args);
 } as typeof query;
 const take = () => sent.splice(0);
+const countReads = () => reads(take());
 
+/** A provider opened for the contract cases, on its own copy of the model. */
 export type OpenProvider = {
 	name: string;
 	/** This provider's own copy of the model classes. */
 	model: Model;
 	begin(): IUnitOfWork;
-	/** Every statement sent since the last call, then cleared. */
-	take(): string[];
+	/** How many plain reads it made since the last call. */
+	reads(): number;
 	close(): Promise<void>;
 };
 
-export async function openMikroOrm(c: Connection): Promise<OpenProvider> {
+/** A provider on Postgres, whose statements the contract compares. */
+export type SqlProvider = OpenProvider & {
+	/** Every statement sent since the last call, then cleared. */
+	take(): string[];
+};
+
+export async function openMikroOrm(c: Connection): Promise<SqlProvider> {
 	const model = defineModel();
 	const orm = await MikroORM.init({
 		...c,
@@ -51,11 +60,12 @@ export async function openMikroOrm(c: Connection): Promise<OpenProvider> {
 		model,
 		begin: () => new MikroOrmUnitOfWork(orm.em, { outbox: model.toOutbox }),
 		take,
+		reads: countReads,
 		close: () => orm.close(),
 	};
 }
 
-export async function openTypeOrm(c: Connection): Promise<OpenProvider> {
+export async function openTypeOrm(c: Connection): Promise<SqlProvider> {
 	const model = defineModel();
 	const dataSource = await new DataSource({
 		type: "postgres",
@@ -69,6 +79,7 @@ export async function openTypeOrm(c: Connection): Promise<OpenProvider> {
 		begin: () =>
 			new TrackingUnitOfWork(new TypeOrmRowStore(dataSource), { outbox: model.toOutbox }),
 		take,
+		reads: countReads,
 		close: () => dataSource.destroy(),
 	};
 }

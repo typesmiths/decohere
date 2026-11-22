@@ -65,6 +65,12 @@
       "@decohere/data": [
         "./projects/data/data/src/index.ts"
       ],
+      "@decohere/data-memory": [
+        "./projects/data/data-memory/src/index.ts"
+      ],
+      "@decohere/data-memory/*": [
+        "./projects/data/data-memory/src/*"
+      ],
       "@decohere/data-mikro-orm": [
         "./projects/data/data-mikro-orm/src/index.ts"
       ],
