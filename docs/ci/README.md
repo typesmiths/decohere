@@ -187,14 +187,14 @@ CI publishes and promotes over Trusted Publishing, with no npm token. For that, 
 
 Missing one shows up only after merge: Publish fails partway through a release, or Promote to latest can't move the package. Contributors need no npm access: on their PR, **lint/typecheck** leaves a notice naming a package not on npm yet and stays green. In the merge queue the same check fails until the name exists, and warns about a name on npm that Publish has never published, since that one may lack its Trusted Publishers (only a logged-in owner can see them).
 
-When the PR is ready to merge, an owner runs from the repo root:
+When the PR is ready to merge, an owner runs the command the check prints, from the repo root of any checkout (`main` is fine, since a named package needn't be in it):
 
 ```bash
 npm login
-pnpm npm:bootstrap --otp <code>   # or name packages: pnpm npm:bootstrap --otp <code> @decohere/<name>
+pnpm npm:bootstrap --otp <code> @decohere/<name>   # without names: every package in this checkout
 ```
 
-[`npm-bootstrap.mjs`](../../projects/ci-tools/src/github/npm-bootstrap.mjs) checks every package (or the ones named) and does only what is missing: the first publish of the name (public, on the `dev` tag for a prerelease version), the `publish.yml` Trusted Publisher (`npm trust github`), and the `promote-latest.yml` one, copied from a package that has it. It reads everything first, so one code covers the changes. npm wants the code even to read Trusted Publishers, so `--otp` is required, also with `--dry-run`, which prints what it would do. With nothing missing it changes nothing, so it is safe to run any time. Then add the PR to the merge queue. Doing this only when it's ready avoids leaving an unused name on npm if the PR is abandoned.
+[`npm-bootstrap.mjs`](../../projects/ci-tools/src/github/npm-bootstrap.mjs) checks every package (or the ones named) and does only what is missing: the first publish of the name, the `publish.yml` Trusted Publisher (`npm trust github`), and the `promote-latest.yml` one, copied from a package that has it. The first publish is a stub, `0.0.0-bootstrap.0` with a package.json and a README, on the `bootstrap` tag: it only claims the name, and CI publishes the package built. npm points `latest` at a name's first version, so `latest` is the stub until [Promote to latest](#promote-to-latest) moves it. A name that isn't on npm must be in a `package.json` on some branch of the repo, so a typo can't claim one. It reads everything first, so one code covers the changes. npm wants the code even to read Trusted Publishers, so `--otp` is required, also with `--dry-run`, which prints what it would do. With nothing missing it changes nothing, so it is safe to run any time. Then add the PR to the merge queue. Doing this only when it's ready avoids leaving an unused name on npm if the PR is abandoned.
 
 `npm trust` has no flag for the dist-tag permission, so the promote publisher goes through the registry endpoint `npm trust` itself uses, which npm doesn't document. The script reads the login `npm login` saved in your npmrc and never prints it. If no package has a promote publisher to copy, it says how to add one on npmjs.com, and changes nothing.
 
