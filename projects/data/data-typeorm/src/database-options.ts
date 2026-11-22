@@ -1,6 +1,6 @@
 import type { Constructable } from "@decohere/core/reflection";
 import type { DatabaseSupport, Migration, OutboxMapper } from "@decohere/data";
-import type { DataSource } from "typeorm";
+import type { DataSource, DataSourceOptions } from "typeorm";
 
 export type ModuleConfig = {
 	/** The unique identifier for the data source. Required when multiple data sources are configured. */
@@ -16,6 +16,12 @@ export type ModuleConfig = {
 	migrations?: readonly Migration[];
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
 	outbox?: OutboxMapper;
+	/**
+	 * TypeORM options given in code, for what config can't hold because it isn't plain data, such as
+	 * a `driver` (one pg pool shared by every data source). Spread over the options config gives, so
+	 * code wins only for what it sets. Used for the app's data source, not `db generate`'s.
+	 */
+	dataSourceOptions?: Partial<DataSourceOptions>;
 	/** Runs when the app starts, after migrations, when the data source's `seed` is on. */
 	seed?: (dataSource: DataSource) => Promise<void>;
 };

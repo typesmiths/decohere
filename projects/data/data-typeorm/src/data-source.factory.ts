@@ -1,6 +1,6 @@
 import type { ConnectionInfo } from "@decohere/data";
 import type { Constructable } from "@decohere/core/reflection";
-import { DataSource, type Logger } from "typeorm";
+import { DataSource, type DataSourceOptions, type Logger } from "typeorm";
 import { ProviderMap } from "./dialect-map.js";
 
 export type ConnectionOptions = ConnectionInfo & {
@@ -39,7 +39,12 @@ export class ManagedDataSource extends DataSource {
 }
 
 export class DataSourceFactory {
-	public static create(options: ConnectionOptions, logger: Logger): DataSource {
+	/** @param inCode TypeORM options the app gave in code, spread over those from config. */
+	public static create(
+		options: ConnectionOptions,
+		logger: Logger,
+		inCode: Partial<DataSourceOptions> = {},
+	): DataSource {
 		const { applicationName } = options;
 		const { provider } = options;
 		const type = ProviderMap[provider];
@@ -49,6 +54,7 @@ export class DataSourceFactory {
 			logger,
 			applicationName,
 			...omitProvisionFields(options),
-		});
+			...inCode,
+		} as DataSourceOptions);
 	}
 }
