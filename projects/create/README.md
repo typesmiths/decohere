@@ -259,7 +259,7 @@ While the API is running, `http://localhost:3000/openapi.json` describes every r
 | `--name <slug>` | `webapi` | API directory under `projects/` (repeatable; default `api`) |
 | `add api <name>` | `decohere add api` | Add an API to an existing Decohere workspace |
 | `add auth0` | `decohere add auth0` | Add Auth0 to an existing workspace |
-| `auth0 login` | `decohere auth0` | Device/URL login; keeps tokens in `~/.config/auth0` |
+| `auth0 login` | `decohere auth0` | Device/URL login; keeps the login in the project's own folder on your machine (see [`auth0`](#auth0)) |
 | `auth0 configure` | `decohere auth0` | Update the Auth0 API, login app and token app for an existing workspace |
 | `auth0 token` | `decohere auth0` | Print an access token for calling the API in development |
 | `--database <provider>` | `webapi` / `add` | `none` \| `postgres/mikro-orm` \| `postgres/typeorm` |
@@ -308,3 +308,13 @@ gh auth status -t
 ```
 
 If you still get `403` after adding `read:packages`, ask an org admin to grant your user/team access to the `typesmiths/decohere/create` package.
+
+## Layout and tests
+
+`@decohere/create` is the launcher: its `create-decohere` bin (`npm create @decohere`) works out where a command runs and starts it there. The scaffolder itself is [`@decohere/scaffold`](../scaffold/README.md). `src/` is flat:
+
+- `resolve-launch.ts`: maps what the user typed onto the product CLI's command line (`create webapi`, `add api`).
+- `runner.ts`: `launch` runs the command here when this container has Decohere's tools (`tools.ts`, `DECOHERE_TOOLS`), otherwise `runInBuilder` runs it in the scaffolder image, `ghcr.io/typesmiths/decohere/create:<version>`, and copies the project out.
+- `cli.ts` is the bin, and `version.ts` the version the image and scaffold package are pinned to. The image is built from `Dockerfile`, with `pack-builder-tgz.mjs` packing the scaffolder into it.
+
+The canonical suite for what a user installs is `e2e/real-install.e2e.spec.ts`, against a temporary registry, in CI's `verify-release` job on `main`; `runInBuilder` and its argv are covered in `tests/runner.spec.ts` ([testing](../../docs/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).

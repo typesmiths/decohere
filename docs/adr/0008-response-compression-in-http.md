@@ -1,6 +1,6 @@
 # 0008. `@decohere/http` compresses responses by default: the `compression` setting, a thin wrapper around `@fastify/compress`
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-12
 
 ## Context

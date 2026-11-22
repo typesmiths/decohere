@@ -47,16 +47,18 @@ Projects are defined in the root `vitest.config.ts`.
 
 | File | Place | Run by |
 |---|---|---|
-| `*.spec.ts` | beside the file it tests: `src/routing/router.spec.ts` next to `src/routing/router.ts` ([ADR 0027](../adr/0027-code-design.md)). A suite that spans a package sits by its `index.ts` or the subdomain it exercises. Packages that still have a `tests/` folder move package by package | `pnpm test` (project `unit`) |
-| `*.integration.spec.ts` | `tests/`; a behavior suite, same runner | `pnpm test` |
-| `*.docker.spec.ts` | `tests/`; needs a Docker daemon (for example real Postgres) | `pnpm test:docker` (project `docker`), and CI |
+| `*.spec.ts` | beside the file it tests: `src/routing/router.service.spec.ts` next to `src/routing/router.service.ts` ([ADR 0027](../adr/0027-code-design.md); a [sample](../style/README.md#samples)). Specs still in a package's `tests/` folder move package by package | `pnpm test` (project `unit`) |
+| `*.integration.spec.ts` | a behavior suite, beside the package's `index.ts` or the subdomain it exercises (still in `tests/` until its package moves) | `pnpm test` |
+| `*.docker.spec.ts` | the same, and needs a Docker daemon (for example real Postgres) | `pnpm test:docker` (project `docker`), and CI |
 | `*.spec.ts` under `e2e/` | `e2e/` beside `src/`; drives built CLIs or images, real disk | `pnpm run test:e2e` (project `e2e`), and CI |
-| fixtures | `tests/__fixtures__/` (or `e2e/__fixtures__/`) | |
+| fixtures and test-only helpers | `tests/__fixtures__/` and `tests/` (or `e2e/__fixtures__/`) until forge's release build leaves them out of `src/` | |
 
 - `pnpm test` must pass on a fresh clone with no Docker, network or tokens. Use loopback servers, memfs or IP literals, not real hosts.
 - `unit` and `docker` load `vitest.setup.ts`, so `fs`, `glob` and `import()` read memfs. Tests stay in memory; the real disk is for what a test can't keep in memory, such as a child process or worker thread ([when, and how](how-tos/module-load-hooks-with-memfs.md)). `e2e` uses the real disk.
 
 ## How-tos
+
+The how-tos quote real specs, which still sit in `tests/` and import `../../src/…`. Beside the code, the same import is `./x.js`.
 
 | Article | Use it to |
 |---|---|

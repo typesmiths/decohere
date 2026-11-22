@@ -19,7 +19,7 @@ Find the page that answers your question. The [README](../README.md) is the prod
 | How does a change get from an issue to `main`? | [Contributing: how work flows](contributing/#how-work-flows) |
 | Where does a file go? | [Repo map](#repo-map), below |
 | How are the packages layered, and what must every package respect? | [Architecture](architecture/) |
-| What's the code style? | [Code style](style/): classes with DI, namespace objects for helpers, file suffixes |
+| What's the code style? | [Code style](style/): one class per job with Crucible DI, files named `<thing>.<role>.ts`, errors ending in `Error`, with samples to copy |
 | How do I test, and where do tests go? | [Testing](testing/), with [how-tos](testing/how-tos/) for memfs, mocks and DI spies |
 | What runs in CI, and how is a release published? | [CI and release](ci/) |
 | Why was something decided this way? | [Decisions (ADRs)](adr/), one record per topic |
@@ -33,10 +33,15 @@ projects/                 every package (no top-level packages/); groups: scribe
     package.json          dependencies are generated from imports: pnpm forge dependencies sync
     README.md             usage, options and API: the package's reference
     src/
-      index.ts            public barrel; src/ root holds only index.ts, const.ts (DI tokens),
-                          and for CLIs cli.ts / *.module.ts
-      <concern>/          one folder per concern: commands/, actions/, models/, <feature>/
-    tests/                *.spec.ts beside src/, never inside it; fixtures in tests/__fixtures__/
+      index.ts            public barrel; the src/ root holds little else (a CLI's bin and module)
+      <subdomain>/        routing/, auth/, caching/: one folder per subdomain, with its own
+                          index.ts; a folder per kind inside (errors/, decorators/) once it
+                          holds several
+        router.service.ts       one thing per file, named <thing>.<role>.ts
+        router.service.spec.ts  the spec beside the file it tests
+    tests/                legacy: specs still here move beside their code, package by package;
+                          fixtures and test-only helpers stay here until the release build
+                          leaves them out of src/
     e2e/                  end-to-end suites against built output (cli, create, forge)
 docs/                     this handbook
 tools/register.mjs        runs the repo's own TypeScript from source (Flux can't load itself)
@@ -62,11 +67,11 @@ Where to put what:
 | Adding | Goes in |
 |---|---|
 | A package | `projects/<name>/`, or `projects/<group>/<name>/` beside its siblings; a row in [architecture](architecture/#packages) |
-| Code | Its package's `src/<concern>/`; not loose at the `src/` root |
-| A test | Its package's `tests/` ([naming](testing/#where-tests-go-and-where-they-run)) |
+| Code | Its package's `src/<subdomain>/`, in a file named `<thing>.<role>.ts` ([ADR 0027](adr/0027-code-design.md#names)) |
+| A test | Beside the file it tests: `router.service.spec.ts` next to `router.service.ts` ([testing](testing/#where-tests-go-and-where-they-run)) |
 | A how-to for tests | [testing/how-tos/](testing/how-tos/) |
 | A recipe for users | [recipes/](recipes/) |
 | A lasting decision | Its topic's record in [adr/](adr/), or a new one ([when](adr/#when-to-write-one)) |
 | A root file | Only if a tool requires it there; add it to the map above |
 
-Follow `http`, `crucible`, `workspace` and `forge` for layout. `scaffold/src/` and `flux/src/` still keep commands and actions at the `src/` root: don't copy that.
+No package fully follows [ADR 0027](adr/0027-code-design.md) yet, so copy the samples in [style](style/#samples), not the nearest file. For folders, `http`'s subdomains (`routing/`, `auth/`, `openapi/`) are the model, but not its `.types.ts` and `.store.ts` files. `crucible`, `forge`, `scaffold` and `flux` are laid out by kind (`services/`, `models/`, `commands/`): don't copy that.

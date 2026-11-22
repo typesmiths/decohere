@@ -1,7 +1,7 @@
 # 0010. Background work runs as hosted services, stopped before the container
 
-- **Status:** Proposed
-- **Date:** 2026-10-14 · updated 2026-11-20
+- **Status:** Accepted
+- **Date:** 2026-10-14
 
 ## Context
 

@@ -1,6 +1,6 @@
 # 0012. Workspace packages resolve to source from one map, generated for tsc
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-20
 
 ## Context

@@ -17,7 +17,7 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 | [`@decohere/http-fastify`](../../projects/http-fastify/README.md) | `projects/http-fastify` | Fastify provider: `FastifyProvider`, with helmet, CORS, compression, rate limit and static files |
 | [`@decohere/config`](../../projects/config/README.md) | `projects/config` | Configuration from YAML and environment sources |
 | [`@decohere/data`](../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)) |
-| [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `bootstrap` |
+| [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `database` |
 | [`@decohere/data-mikro-orm`](../../projects/data/data-mikro-orm/README.md) | `projects/data/data-mikro-orm` | MikroORM provider: the `mikroOrm()` plugin, over MikroORM's own unit of work |
 | [`@decohere/data-typeorm`](../../projects/data/data-typeorm/README.md) | `projects/data/data-typeorm` | TypeORM provider: the `typeOrm()` plugin, on data's change tracker |
 | [`@decohere/data-memory`](../../projects/data/data-memory/README.md) | `projects/data/data-memory` | In-memory provider: the `memory()` plugin, on data's change tracker, for tests and local runs with no database |
@@ -81,7 +81,7 @@ How Decohere's own code is shaped ([ADR 0027](../adr/0027-code-design.md); the p
 - **DI:** `@injectable()` with a **value** import for constructor parameter types; `@inject(Class | Token)` for interfaces, symbols, arrays or an explicit key. [Crucible](../../projects/crucible/README.md).
 - **HTTP:** `@Controller()` from `@decohere/http`; handlers orchestrate, services hold the logic.
 - **Dispose and reload:** Flux calls `Symbol.asyncDispose` on the entry's default export, so `export default app` is enough at the composition root. `App.dispose` stops hosted services (`withHostedService`, [ADR 0010](../adr/0010-hosted-services.md)), then disposes the container, then Scribe. Long-lived services implement `Symbol.asyncDispose`.
-- **Logging:** libraries log through Scribe, never a concrete logger.
+- **Logging:** libraries log through Scribe, never a concrete logger or `console`: `private readonly log = scribe.logger("http.router")`.
 - **Configuration:** `@decohere/config` sources behind tokens.
 - **Data:** `@decohere/data` repositories over a request-scoped unit of work that tracks changes and writes them on `commit()`; queries in Decohere's `Query<T>`, never an ORM's options. Migrations are Decohere's own, the same with either provider; building an app changes nothing in its database, and starting it migrates (in development), synchronizes and seeds.
 - **Build and test:** Forge builds packages; tests compile through `@decohere/forge/vitest` (`forgeBuild`).

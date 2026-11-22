@@ -24,7 +24,7 @@ Tests and the CLIs run straight from the TypeScript in `projects/` ([`tools/regi
 | Command | What it does |
 |---|---|
 | `pnpm test` | Unit tests. No build, Docker, network or tokens |
-| `pnpm test:file <path>` | One test file, e.g. `pnpm test:file projects/crucible/tests/registration.spec.ts` (no `--`) |
+| `pnpm test:file <path>` | One test file, e.g. `pnpm test:file projects/<package>/src/<subdomain>/<file>.spec.ts` (no `--`) |
 | `pnpm test:watch` | Re-run tests on save |
 | `pnpm test:docker` | Tests that need Docker (`*.docker.spec.ts`), e.g. a real Postgres |
 | `pnpm run test:coverage` | Unit tests with coverage |
@@ -46,10 +46,10 @@ GitHub is the only tracker; the plan is the milestones.
 3. **Change.**
    - Bugs: a failing test first, then the fix, then the same test again.
    - Test behaviour, not wiring ([testing](../testing/)).
-   - A lasting design choice updates its [ADR](../adr/), and [architecture](../architecture/) or [style](../style/), in the same PR.
+   - A lasting design choice updates its [ADR](../adr/), and [architecture](../architecture/) or [style](../style/), in the same PR. New code follows [style](../style/) and adds no break of [ADR 0027](../adr/0027-code-design.md); a PR that fixes some lowers the baseline with `pnpm design:check --update`.
    - Changed a `package.json`? Run `pnpm install` and commit `pnpm-lock.yaml`.
    - No changesets for now ([ADR 0003](../adr/0003-no-changesets-until-public-release.md)).
-   - Before pushing: `pnpm run lint && pnpm run typecheck && pnpm test`.
+   - Before pushing: `pnpm qa` (lint:check, typecheck, unit tests; `pnpm run lint` fixes what it can). Changed data code? Also `pnpm test:docker`.
 4. **Pull request.** Push and open one early (`gh pr create --fill --draft`). The template asks for the problem, what changed and how we know it works: write it for someone new to the code, and end with `Closes #<issue>`. Mark it ready when CI is green.
 5. **Merge.** Click merge. Once `ci` passes, the PR joins `main`'s merge queue: GitHub tests it on top of `main` and the PRs ahead of it, then squash-merges it. If that run fails, the PR leaves the queue and `main` is untouched. No need to update branches by hand.
 6. **Clean up.** `git switch main && git pull`, then `git branch -D <branch>` (squash merges don't look merged to git) and `git worktree remove ../decohere-<issue>` if you used one.

@@ -1,7 +1,7 @@
 # NNNN. The decision as it stands, in a few words
 
 - **Status:** Proposed | Accepted
-- **Date:** YYYY-MM-DD (first decided) · updated YYYY-MM-DD
+- **Date:** YYYY-MM-DD (first decided)
 - **Merges:** NNNN, NNNN (only when other records were merged into this one)
 
 ## Context

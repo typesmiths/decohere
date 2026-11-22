@@ -1,7 +1,7 @@
 # 0009. Agent instructions live in AGENTS.md, for any agent
 
-- **Status:** Proposed
-- **Date:** 2026-10-14 · updated 2026-11-03
+- **Status:** Accepted
+- **Date:** 2026-10-14
 
 ## Context
 

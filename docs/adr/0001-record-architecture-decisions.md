@@ -1,7 +1,7 @@
 # 0001. Record architecture decisions in `docs/adr/`, one record per topic
 
 - **Status:** Accepted
-- **Date:** 2026-08-22 · updated 2026-11-03
+- **Date:** 2026-08-22
 
 ## Context
 
@@ -14,7 +14,7 @@ One record per decision, with each change a new record superseding an old one, g
 Keep Architecture Decision Records in `docs/adr/`, **one record per topic**, from [template.md](template.md), indexed by area in [README.md](README.md).
 
 - A record says **what holds today**: Context, Decision, Consequences. It ends with a dated **History**, one line per change saying what changed and why.
-- **Changing a decision means updating its record** in the same PR as the code: rewrite what no longer holds, add a History line, bump _updated_. Never a quiet edit.
+- **Changing a decision means updating its record** in the same PR as the code: rewrite what no longer holds, add a History line. Never a quiet edit.
 - **A new topic gets a new record** with the next unused number. Numbers are never reused.
 - When topics drift together, merge them. The earliest record still in force keeps its number, the others are deleted, and its **Merges** line lists the old numbers.
 - When a decision changes a standing rule, update `docs/architecture/` or `docs/style/` in the same PR. Those hold the rule; an ADR is the why, not a second spec.

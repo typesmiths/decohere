@@ -1,7 +1,7 @@
 # 0002. Secrets come from the environment; Bitwarden supplies them
 
 - **Status:** Accepted
-- **Date:** 2026-10-03 · updated 2026-11-06
+- **Date:** 2026-10-03
 
 ## Context
 

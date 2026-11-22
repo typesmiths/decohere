@@ -130,7 +130,7 @@ npx flux run main.ts
 # stopped
 ```
 
-The app stops its hosted services on SIGTERM or SIGINT. See [hosted services](../../projects/http/README.md#hosted-services) for the full contract.
+The app stops its hosted services on SIGTERM or SIGINT. See [hosted services](../../projects/core/README.md#hosted-services) for the full contract.
 
 ## Shut down without dropping requests
 

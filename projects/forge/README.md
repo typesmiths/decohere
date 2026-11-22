@@ -156,7 +156,7 @@ projects/shop.api/.package/
 ```
 
 - **Which libraries.** Forge walks the compiled import graph from the deployable's `main`, following relative imports and bare imports that the workspace package resolves to a workspace project (including subpath `exports` such as `@app/kernel/testing`, and transitively through copied libraries). Only those libraries are copied. A library nothing reaches, and its dependencies, stay out.
-- **Which third-party packages.** What is **declared** ships: the union of `dependencies` (never `devDependencies`) of the deployable, every copied library and the workspace root `package.json`. They do not have to be imported, so a module loaded by name at run time (a pino transport `target: "pino-roll"`) ships as long as it is declared. Removing dependencies nothing uses is the author's job; a warning-only unused-dependency analysis is planned.
+- **Which third-party packages.** What is **declared** ships: the union of `dependencies` (never `devDependencies`) of the deployable, every copied library and the workspace root `package.json`. They do not have to be imported, so a module loaded by name at run time (a pino transport `target: "pino-roll"`) ships as long as it is declared. Removing dependencies nothing uses is the author's job.
 - **Versions.** Each shipped package is pinned to the exact version installed in the workspace (so the image runs what the tests ran). A declared package that is not installed fails the command.
 - **Patches.** The patches you made with `pnpm patch` ship too. npm doesn't know about them, so after the install forge applies each `patchedDependencies` entry, from the root `package.json` (`pnpm.patchedDependencies` or top-level) or `pnpm-workspace.yaml`, to every installed copy of its package, and logs `Patched @decohere/http@0.0.1-dev.123 (patches/@decohere__http@0.0.1-dev.123.patch)`. A key may be `name@1.2.3`, a range (`name@^1.2.0`) or the bare `name`; the most specific match wins, as in pnpm. The command fails, naming the patch, when a hunk doesn't apply, or when the key's version or range isn't what the deployable ships (it names both). It then removes `.package/`, so nothing half patched is left to ship. A patch for a package the deployable doesn't ship is skipped, with a log line.
 - **Imports that would crash.** If packaged code imports a third-party package that is only a `devDependency`, or declared nowhere, the command fails and names the package and who imports it.
@@ -191,7 +191,7 @@ export default {
 };
 ```
 
-`forge package @app/shop.api` then copies `projects/shop.web/dist/` to `projects/shop.api/.package/ui/` (real files, never links). The API calls `.statics("/ui/", "ui")` and the Dockerfile stays `COPY .package/ ./`. `forge package` doesn't build the UI itself: `forge build` does, [with the UI's own build script](#projects-with-a-builder-of-their-own), so `forge build && forge package @app/shop.api` is the whole release. If the folder is missing, packaging fails and tells you to build the UI first. `to` must be a new folder inside `.package/` (not `es6`, `node_modules` or `config`). See [ADR 0007](../../docs/adr/0007-serving-a-built-ui-from-http.md).
+`forge package @app/shop.api` then copies `projects/shop.web/dist/` to `projects/shop.api/.package/ui/` (real files, never links). The API sets `statics: [{ prefix: "/ui/", directory: "ui" }]` and the Dockerfile stays `COPY .package/ ./`. `forge package` doesn't build the UI itself: `forge build` does, [with the UI's own build script](#projects-with-a-builder-of-their-own), so `forge build && forge package @app/shop.api` is the whole release. If the folder is missing, packaging fails and tells you to build the UI first. `to` must be a new folder inside `.package/` (not `es6`, `node_modules` or `config`). See [ADR 0007](../../docs/adr/0007-serving-a-built-ui-from-http.md).
 
 Design record: [ADR 0006](../../docs/adr/0006-forge-package-deployables.md).
 
@@ -207,3 +207,14 @@ Design record: [ADR 0017](../../docs/adr/0017-dependency-manifests-from-imports.
 ## `forge link` clears `dist`
 
 `forge link` is a development tool: it symlinks build output into a consumer's `node_modules`. Like `forge build`, it cleans `dist` first. Without `--build` it then links an output folder holding only `package.json` files, so run it with `--build` (or build again afterwards). It is not a way to make a release build runnable; use `forge package` for that.
+
+## Layout and tests
+
+Forge is a CLI module: the `decohere` and `forge` bins in [`@decohere/cli`](../cli/README.md) load `ForgeModule` (`forge.module.ts`). Folders in `src/`:
+
+- `commands/`: one command class per `forge` subcommand (build, package, docker, dependencies, link, publish, tag, version, typecheck, paths). `actions/`: the work each command does, one action per file.
+- `transpile/`, `factories/` and `services/`: SWC transpiling, the SWC config, watching and writing output.
+- `packaging/`: `forge package` (the import graph, pinned dependencies, pnpm patches, the UI copy). `semver/`: versions for `version` and `publish`.
+- `vite/` and `vitest/`: plugins that resolve workspace aliases and build before tests (`@decohere/forge/vite`, `@decohere/forge/vitest`). `types/`: config and build types.
+
+The canonical suite is the forge CLI's, `projects/cli/tests/forge.integration.spec.ts`, run in memory against memfs ([testing](../../docs/testing/README.md#canonical-suite-ownership)). Specs here cover action edges the CLI can't see; they are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)). `e2e/package.e2e.spec.ts` runs `forge package` on the real disk.

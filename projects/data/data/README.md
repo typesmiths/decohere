@@ -67,7 +67,7 @@ When the app is **built**, a provider runs `dataSources.check`: each data source
 
 When the app **starts**, before hosted services and the server, the provider's start step runs `dataSources.open`: the bootstrap, which creates the database, roles and schema, then a connection per data source. Then each data source applies pending migrations if `migrateOnStart` is on, brings its tables to the mappings if `synchronize` is on, and then seeds if `seed` is on. An app that is only built, by a tool or a test, changes nothing in the database. `migrateOnStart` and `synchronize` are for development, and can't both be on.
 
-**A database that is down at start doesn't stop the app.** The start step is retried with backoff ([`startRetry`](../../http/README.md)), and the hosted services wait for it. Meanwhile `GET /ready` answers 503, and a request that resolves the data source's unit of work gets `DependencyUnavailableError`, a 503 problem. Once the database answers, the step bootstraps, connects and migrates, and the app serves. `startTestApp` and `startRetry: false` fail the start instead.
+**A database that is down at start doesn't stop the app.** The start step is retried with backoff ([`startRetry`](../../core/README.md#app)), and the hosted services wait for it. Meanwhile `GET /ready` answers 503, and a request that resolves the data source's unit of work gets `DependencyUnavailableError`, a 503 problem. Once the database answers, the step bootstraps, connects and migrates, and the app serves. `startTestApp` and `startRetry: false` fail the start instead.
 
 ## Migrations
 
@@ -128,3 +128,13 @@ MikroORM's unit of work is the reference. The cases are in `tests/contract/cases
 1. Bump `@mikro-orm/*` in the root `package.json` and install.
 2. Run `pnpm test:docker projects/data/data/tests/unit-of-work.contract.docker.spec.ts`.
 3. If a snapshot changed, MikroORM's behaviour changed. Either make the tracker follow it, so both providers pass with the new snapshot (`-u`), or keep the old behaviour and record the difference in that case, with the reason.
+
+## Layout and tests
+
+`data` is the base package: it holds the contracts (`IUnitOfWork`, `Repository<T>`, `RowStore`, `Migrator`, `MigrationTarget`, the `Query<T>` types) and installs no ORM. `data-mikro-orm`, `data-typeorm` and `data-memory` implement them, and `data-postgres` sets up the database. Folders in `src/`:
+
+- the top level: the unit of work contract and `@injectUnitOfWork()`, `Repository`, queries, children, domain events, the `database` config section, and `dataSources` (`check`, `open`, `resolve`, `start`, a namespace object today) with the policy each data source follows;
+- `tracking/`: `TrackingUnitOfWork` and the `RowStore` contract it writes through;
+- `migrations/`: migrations, the `Migrator` contract, migration files, `MigrationTarget`, and the db commands (`db.run`, a namespace object today, behind `DbCommandError`).
+
+The canonical suite is the unit-of-work contract, the cases in `tests/contract/cases.ts`: on the SQL providers in `tests/unit-of-work.contract.docker.spec.ts`, against Postgres, with MikroORM's writes snapshotted as the reference, and on the memory provider in `tests/unit-of-work.contract.spec.ts`. Units cover the query types (`tests/query.types.spec.ts`) and configuration checks (`tests/data-sources.spec.ts`) ([testing](../../../docs/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/adr/0027-code-design.md)).

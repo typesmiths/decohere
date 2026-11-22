@@ -1,11 +1,11 @@
 # 0024. Data keeps its own contracts, with MikroORM and TypeORM providers under them
 
 - **Status:** Accepted
-- **Date:** 2026-11-07 · updated 2026-11-08
+- **Date:** 2026-11-07
 
 ## Context
 
-`@decohere/data` defines the contracts: `IUnitOfWork` (`beginTransaction`, `commit`, dispose), `IDataProvider` (`findById`, `save`, `delete`, `all`) and an abstract `Repository`, with no ORM import. `@decohere/data-typeorm` is the only provider, on TypeORM 0.3. What the contracts lack shows in apps:
+Before this decision, `@decohere/data` defined the contracts: `IUnitOfWork` (`beginTransaction`, `commit`, dispose), `IDataProvider` (`findById`, `save`, `delete`, `all`) and an abstract `Repository`, with no ORM import. `@decohere/data-typeorm` was the only provider, on TypeORM 0.3. What the contracts lacked showed in apps (the list below describes that time):
 
 - **Queries.** Past `findById` and `all` there is nothing, so `data-typeorm`'s `TypeOrmRepository.firstOrDefault(FindOneOptions)` hands out TypeORM's own options type, and the scaffolded auth feature calls it with them.
 - **Keys.** `Entity` requires a single `id`. A child keyed by its parent and an owner can't be one.
@@ -51,7 +51,6 @@ Running as the superuser, MikroORM's generated initial migration dropped five ot
 A migration history can change provider: the prototype applied a migration generated from the TypeORM mapping, then one generated from the MikroORM mapping, on the same database. The cost was one migration's worth of renames, from TypeORM's hashed index and key names to MikroORM's.
 
 ## Decision
-
 
 1. **`@decohere/data` owns the contracts; ORMs are providers.** `data-typeorm` stays, and a `data-mikro-orm` provider is added beside it.
 2. **The unit of work promises change tracking**, not explicit saves: an identity map, changes to anything loaded written on `commit` and nothing before it, one transaction, rollback on dispose, a version column checked on update, and an outbox for events the aggregates raise. Removing an aggregate deletes the children it loaded; children it didn't load are the database's to cascade, as with MikroORM, so a remove never loads more rows.

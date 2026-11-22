@@ -1,6 +1,6 @@
 # 0013. The DI container keys services by identity and checks the graph when it resolves
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-21
 
 ## Context

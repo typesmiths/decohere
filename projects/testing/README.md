@@ -32,3 +32,9 @@ beforeEach(() => {
 ```
 
 `vitest` and `memfs` are peer dependencies: install them in the project that runs the tests ([ADR 0017](../../docs/adr/0017-dependency-manifests-from-imports.md)).
+
+## Layout and tests
+
+`src/` is flat, one file per helper: `memfs.ts`, `glob-with-memfs.ts`, `mock-logger.ts`, `spy-on-constructor.ts` and `flush-promises.ts`. ADR 0027 names a `.cases.ts` suite, for an interface several implementations must pass, as a role that lives in `testing/`; none lives here yet (data's unit-of-work cases are in `projects/data/data/tests/contract/cases.ts`).
+
+The package has no specs of its own and no canonical suite in the [testing table](../../docs/testing/README.md#canonical-suite-ownership). Every `pnpm test` and `pnpm test:docker` run uses its memfs helpers through `vitest.setup.ts`, so a break here shows up across the repo's suites.

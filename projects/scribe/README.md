@@ -1,14 +1,14 @@
 # Scribe
 
-Logger facade and Pino binding for Decohere.
+Scribe is Decohere's logging. Code logs through a facade, `scribe.logger(name)`, and a provider package writes the lines: Pino on Node, or JSON lines through `console` anywhere. This README covers all three packages.
 
-| Package | Path | Role |
+| Package | Source | Role |
 |---|---|---|
-| [`@decohere/scribe`](./scribe) | `projects/scribe/scribe` | Zero-dep facade — `scribe.logger(name)` |
-| [`@decohere/scribe-pino`](./scribe-pino) | `projects/scribe/scribe-pino` | Pino adapter + pretty/roll recipes (Node) |
-| [`@decohere/scribe-console`](./scribe-console) | `projects/scribe/scribe-console` | JSON console adapter (Workers, browsers, Deno, Bun, Node) |
+| [`@decohere/scribe`](./scribe) | `projects/scribe/scribe/src` | The facade, with no dependencies: `scribe.logger(name)`, the `LogAdapter` base providers extend, the default `ConsoleAdapter`, and `CaptureAdapter` for tests (`@decohere/scribe/testing`) |
+| [`@decohere/scribe-pino`](./scribe-pino) | `projects/scribe/scribe-pino/src` | The Pino provider (`PinoAdapter`), with the pretty and rolling-file recipes (Node) |
+| [`@decohere/scribe-console`](./scribe-console) | `projects/scribe/scribe-console/src` | The JSON console provider (`JsonConsoleAdapter`), for Workers, browsers, Deno, Bun and Node |
 
-Application and library code call `scribe.logger(name)`; a separate adapter owns the concrete writer (console by default, Pino via `@decohere/scribe-pino`, JSON lines via `@decohere/scribe-console`, or your own). Configuration of transports, pretty printers, and file rotation lives in the adapter (or in the app composition root) — not in domain packages.
+Application and library code call `scribe.logger(name)`. The app's composition root picks the provider: the console by default, Pino through `@decohere/scribe-pino`, JSON lines through `@decohere/scribe-console`, or your own. Transports, pretty printers and file rotation are set up there, not in domain packages.
 
 ## Why a facade?
 
@@ -523,33 +523,9 @@ So you get either:
 | `scribe.withPinoPretty()` / `withPinoRoll` / `PinoAdapter` | App → your Pino; Decohere libs → **another** Pino root (duplicate workers / files / levels) |
 | Drop direct Pino; only use Scribe recipes | One writer — but you give up your existing `pino` handle |
 
-There is **no** API yet to hand Scribe an existing logger (`scribe.configure({ logger: appLog })` or `PinoAdapter.from(appLog)`).
+There is no way yet to hand Scribe an existing Pino logger.
 
-### Coming soon — adopt the host logger
-
-The straightforward fix is to let the host pass its root logger into Scribe so `scribe.logger("X")` becomes a child of that root (same destination, levels, and process lifecycle). Planned shape (not implemented):
-
-```ts
-import pino from "pino";
-import { scribe } from "@decohere/scribe";
-// import { PinoAdapter } from "@decohere/scribe-pino"; // when shipped
-
-const appLog = pino({
-  level: process.env.LOG_LEVEL ?? "info",
-  transport: process.env.NODE_ENV === "production"
-    ? undefined
-    : { target: "pino-pretty", options: { colorize: true } },
-});
-
-// Planned — do not call yet:
-// scribe.configure({ adapter: PinoAdapter.from(appLog) });
-// or: scribe.use(appLog);
-
-appLog.info("app boot");
-// decohere lib: scribe.logger("Http").info("request") → appLog.child({ name: "Http" })
-```
-
-Until that lands, prefer **one** owner of logging in the composition root: either configure Scribe with `@decohere/scribe-pino` and stop importing Pino directly in app code, or accept that Decohere packages log through the console adapter.
+Prefer one owner of logging in the composition root: either configure Scribe with `@decohere/scribe-pino` and stop importing Pino directly in app code, or accept that Decohere packages log through the console adapter.
 
 ## Non-goals
 
@@ -567,3 +543,13 @@ Until that lands, prefer **one** owner of logging in the composition root: eithe
 | [`@decohere/core`](../core) | `@extension` used by adapter packages |
 | [Spying on Scribe loggers](../../docs/testing/how-tos/spying-on-scribe-loggers.md) | Test doubles without fighting Pino |
 | [ADR 0016](../../docs/adr/0016-scribe-on-any-runtime.md) | Why the facade runs anywhere and writers are adapter packages |
+
+## Layout and tests
+
+`@decohere/scribe` holds the facade and the contract providers implement (`LogAdapter` and `LogEntryAdapter`); `scribe-pino` and `scribe-console` implement it, and import only the facade. Each `src/` is flat today:
+
+- `scribe/src`: the facade (`logger.factory.ts`), the adapter base classes (`logger.adapter.ts`, `log-entry.adapter.ts`), `ConsoleAdapter`, redaction, the log-level environment helpers (`env.ts`: `LOG_LEVEL`, `SCRIBE_LOG_LEVEL`, `LOGGING_LEVEL`), and `testing/` with `CaptureAdapter`.
+- `scribe-pino/src`: `PinoAdapter`, the `withPino*` extensions (`scribe-pino.ts`), the recipes (`pino.recipe.ts`) and the transport guard.
+- `scribe-console/src`: `JsonConsoleAdapter`.
+
+The canonical suites ([testing](../../docs/testing/README.md#canonical-suite-ownership)) are `scribe/tests/scribe.integration.spec.ts` for the facade, `scribe-pino/tests/scribe-pino.integration.spec.ts` for Pino, and `scribe-console/tests/json-console.adapter.integration.spec.ts` for the JSON console. Units cover the env helpers, console edge cases, recipe plan shapes and the transport guard. Specs are in each package's `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).

@@ -97,7 +97,7 @@ Builder.create(new ServiceContainerBuilder()).use(
 );
 ```
 
-`directory` is resolved from the folder the app runs in (the process working directory), like `./config`. For a deployable that is `.package/`, where [`forge package`](../forge/README.md#forge-package-one-folder-a-plain-node-can-run) puts the UI (the `ui` declaration there). Call `statics` again to serve more than one UI.
+`directory` is resolved from the folder the app runs in (the process working directory), like `./config`. For a deployable that is `.package/`, where [`forge package`](../forge/README.md#forge-package-one-folder-a-plain-node-can-run) puts the UI (the `ui` declaration there). Add another entry to `statics` to serve more than one UI.
 
 ```ts
 {
@@ -210,12 +210,15 @@ Responses are compressed with `br` or `gzip`, whichever the client accepts (`Acc
 Defaults: on, a 1024-byte threshold, `encodings: ["br", "gzip"]` (no `deflate`), and the provider's own list of compressible types. `text/event-stream` is never compressed by default, because compression buffers output and events would arrive late. A client that sends no `Accept-Encoding` gets the plain body.
 
 ```ts
-compression: {
-	threshold: 2048,                  // bytes, default 1024; not applied to streamed bodies
-	encodings: ["br", "gzip"],        // in order of preference; "deflate" is allowed
-	types: /^application\/vnd\.acme/, // content types to compress as well; don't match text/event-stream
-	providerOptions: {},              // the provider's own options, merged last; not portable
-} }))
+http(FastifyProvider, {
+	controllers: [HelloController],
+	compression: {
+		threshold: 2048,                  // bytes, default 1024; not applied to streamed bodies
+		encodings: ["br", "gzip"],        // in order of preference; "deflate" is allowed
+		types: /^application\/vnd\.acme/, // content types to compress as well; don't match text/event-stream
+		providerOptions: {},              // the provider's own options, merged last; not portable
+	},
+});
 ```
 
 - **BREACH.** Compressing a response served over HTTPS that contains both a secret and input an attacker controls can leak the secret to someone who can watch response sizes. It mostly concerns HTML that reflects input next to a CSRF token. A JSON API that authenticates with a bearer token in a header is low risk, because the token is not in the body. If you render such pages, mask per-response secrets, do not reflect input beside them, or turn compression off for them.
@@ -304,65 +307,16 @@ it("streams the first three prices", async () => {
 
 ## Hosted services
 
-Work that runs for the life of the app, outside any request: a feed that refreshes on a timer, a poller, a queue consumer. Implement `HostedService` and register it:
+Hosted services, start steps and how the app starts and stops are in [`@decohere/core`: hosting](../core/README.md#hosting). `health()` adds the `/ready` probe that reports them.
 
-```ts
-@injectable()
-export class PositionFeed implements HostedService {
-	private warm = false;
-	private loading?: Promise<void>;
+## Layout and tests
 
-	public constructor(@inject(PositionBook) private readonly book: PositionBook) {}
+`http` holds the contracts a web server implements (`HttpProvider` in `routing/http.types.ts`, registered under core's `AppServerToken`); [`@decohere/http-fastify`](../http-fastify/README.md) is the provider. Folders in `src/`:
 
-	public start(signal: AbortSignal) {
-		// Don't wait here: a first load that takes minutes would keep the HTTP server dark.
-		this.loading = this.book.loadAll(signal).then(() => {
-			this.warm = true;
-		});
-		const timer = setInterval(() => void this.book.refreshOpen(signal), 60_000);
-		signal.addEventListener("abort", () => clearInterval(timer));
-	}
+- `http/`: the `http(...)` plugin and its settings, security headers, compression and static-file options.
+- `routing/`: controllers, route decorators, pipes, middleware, exception filters, problem details and request context.
+- `auth/`: the `auth()` plugin, token checks, principals and CASL authorization.
+- `openapi/`: the OpenAPI document and request validation. `sse/`: server-sent events. `health/`: `health()`, `/health` and `/ready`.
+- `app/`: the `Module` base class. `testing/`: `startTestApp`, `bootModule` and the event reader (`@decohere/http/testing`).
 
-	public async stop() {
-		await this.loading; // the signal already told it to stop; wait for it to wind down
-	}
-
-	public async check() {
-		if (!this.warm) throw new Error("positions still loading"); // GET /ready answers 503
-	}
-}
-
-Builder.create(new ServiceContainerBuilder())
-	.use(http(FastifyProvider))
-	.use(health())
-	.use(typeOrm(lp))
-	.withHostedService(PositionFeed);
-```
-
-**Starting.** `app.start()` starts hosted services in registration order, and awaits each `start(signal)`, before the HTTP server listens. So a request never reaches a service that hasn't started. Keep `start()` short: set up what must be ready before traffic, then run long work in the background and return.
-
-**Starting after the server listens.** A host with a start budget (Cloud Run's startup check, a probe) counts every service's `start()` against it. `hostedServices: "after-listen"` makes the server listen first, then starts the services in the background, in the same order and one at a time, since registration order carries real dependencies (a seed before the feed that reads it):
-
-```ts
-await app.start({ port, hostedServices: "after-listen" });
-const timings = await app.hostedServicesStarted(); // [{ name: "PositionFeed", ms: 45, started: true }, ...]
-```
-
-While they start, `/health` answers 200 and `/ready` answers 503 (`hosted services starting`), so a load balancer that checks readiness sends no traffic to a service that hasn't started.
-
-**A start that throws is retried.** The app doesn't stop for it: it logs the error, starts the next service, and starts the failed one again in the background, after 1 s, doubling to 60 s, each wait varied by ±20%. `/ready` answers 503 until it has started (the anonymous probe gives no detail; the log names the service and its error). A dependency that is down at start, a feed or a broker, then costs readiness, not a crash loop. Start steps are retried the same way, and a failed one holds back every step and service after it: a data provider's step connects to the database and migrates it, so nothing starts against a database that isn't there. A `start()` that is retried runs again on the same instance, so it must be safe to call after it threw. Tune the backoff with `startRetry: { initialMs, maxMs }`.
-
-`startRetry: false` fails fast instead, for a one-shot job that should exit: a throw stops the services already started and fails `app.start()` (after-listen: it stops the app and rejects `hostedServicesStarted()`; await it in `main.ts`, since left unawaited the rejection is unhandled and ends the process). `startTestApp` starts apps this way, so a test sees the error.
-
-`hostedServicesStarted()` works in the default mode too, resolving at once after `start()`. It resolves once each service has started or is being retried: `started: false` marks the second. Each service's time covers building it from the container and its `start()`; the app logs the total at info level and each service at debug.
-
-**Warming up.** A service that is started but can't serve yet implements `check()`: it throws until the service is ready, and `GET /ready` (`health()`) answers 503 until then. `/health` is unaffected.
-
-**Stopping.** `app.dispose()` runs on `SIGTERM`/`SIGINT` and on every Flux reboot. It:
-
-1. aborts `signal`, at once, also while a `start()` is still running. Clear timers and cancel work on it.
-2. lets in-flight HTTP requests finish.
-3. awaits each `stop()` in reverse order. If a `start()` was still running, it waits for it first. Every `stop()` runs even if one throws.
-4. disposes the container, which closes what the services used (DataSources from `typeOrm()`, anything with `Symbol.asyncDispose`).
-
-`stop()` is optional: a service with nothing to wait for can rely on the signal, or implement `Symbol.asyncDispose`, which step 4 calls. A hosted service is a singleton, so other services and controllers can inject it by its class. Why this shape: [ADR 0010](../../docs/adr/0010-hosted-services.md).
+The canonical suites are `tests/*.integration.spec.ts`, run on `FastifyProvider`; `*.pentest.spec.ts` and units cover crypto and SSRF edges ([testing](../../docs/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).

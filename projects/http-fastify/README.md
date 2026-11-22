@@ -73,3 +73,9 @@ Why this shape: [ADR 0008](../../docs/adr/0008-response-compression-in-http.md).
 ## Testing
 
 `bootModule({ controllers, provider: FastifyProvider })`, from `@decohere/http/testing`, runs controllers as a real app on this provider, on a free loopback port. This package's own suites, `tests/*.integration.spec.ts`, cover what only the wire shows: compression and static files.
+
+## Layout and tests
+
+`http-fastify` implements `HttpProvider` from [`@decohere/http`](../http/README.md) (which extends core's `AppServer`) on Fastify. `src/` holds one file, `fastify.provider.ts` (`FastifyProvider`): routing, compression, static files, server-sent events and stopping.
+
+Its canonical suites are `tests/*.integration.spec.ts` (`compression.integration.spec.ts`, `static.integration.spec.ts`), for what only the wire shows ([testing](../../docs/testing/README.md#canonical-suite-ownership)). Everything else about HTTP is tested in `projects/http/tests/`, on this provider. Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).

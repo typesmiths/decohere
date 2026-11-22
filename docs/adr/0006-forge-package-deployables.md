@@ -1,6 +1,6 @@
 # 0006. `forge package`: a deployable and the libraries it reaches in one folder, installed with npm, no symlinks
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-12
 
 ## Context

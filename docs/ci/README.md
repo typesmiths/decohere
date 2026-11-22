@@ -77,7 +77,7 @@ The run's summary page says which step failed and why, with the step's last line
 
 `changes` decides whether to run the suite; these jobs run and `ci` fails if any that ran didn't pass:
 
-- **lint/typecheck**: `lint:check`, `typecheck`, actionlint, a check for packages not on npm yet, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
+- **lint/typecheck**: `lint:check` (oxlint, Prettier, `forge paths --check` and `design:check`), `typecheck`, actionlint, a check for packages not on npm yet, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
 - **test (1/3, 2/3, 3/3)**: unit tests split across three jobs, on everything except `main`.
 - **coverage** (`main`): the unit tests with coverage thresholds. It uploads coverage for Pages.
 - **test-docker**: Docker-backed tests. On `main` and manual runs, and on a PR that changes data code.

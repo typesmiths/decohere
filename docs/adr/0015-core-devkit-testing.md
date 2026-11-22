@@ -1,7 +1,7 @@
 # 0015. `core` is the runtime base; CLI tooling is `devkit`, test helpers are `testing`
 
-- **Status:** Proposed
-- **Date:** 2026-10-22 · updated 2026-11-04
+- **Status:** Accepted
+- **Date:** 2026-10-22
 
 ## Context
 
@@ -25,7 +25,7 @@ Two more problems sat in `core`: `diagnostics` reconfigured scribe on import whe
 - **`@decohere/testing` holds the Vitest helpers**: memfs file systems, the mock logger, `spyOnConstructor`, `flushPromises`. It declares `vitest` and `memfs` as peers ([ADR 0017](0017-dependency-manifests-from-imports.md)).
 - **The `semver` module lives in forge** (`src/semver`), its only user.
 - **Caching is a plain `Map`** (`MapCache`). `@cache` returns a `structuredClone`, so callers cannot change the cached value; `@memoize` returns the stored reference.
-- **Trace mode is read when a method is decorated**, not when the module loads. Raising the log level so timings show is the bins' job: `cliLogLevel` takes `--log-level`, then the environment's level, then `trace` when `FORGE_TRACE` is set, then scribe's default.
+- **Trace mode is passed in by the bins**, which read `FORGE_TRACE`; devkit reads no environment variable ([ADR 0027](0027-code-design.md)). Until devkit moves, it still reads `FORGE_TRACE` when a method is decorated. Raising the log level so timings show is the bins' job: `cliLogLevel` takes `--log-level`, then the environment's level, then `trace` when `FORGE_TRACE` is set, then scribe's default.
 - **Dependencies point one way:** `devkit` and `testing` depend on `core`; `core` imports neither.
 
 Rejected:
@@ -45,3 +45,4 @@ Rejected:
 - 2026-10-23: `@decohere/testing` declares `vitest` and `memfs` as peers now that the dependency sync writes peers ([ADR 0017](0017-dependency-manifests-from-imports.md)).
 - 2026-11-04: Hosting is planned to move into `core` from `http` ([ADR 0014](0014-package-names.md)).
 - 2026-11-06: Hosting moved.
+- 2026-11-22: Trace mode is to be passed in by the bins rather than read by devkit, following ADR 0027.

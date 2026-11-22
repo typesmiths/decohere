@@ -2,15 +2,41 @@
 
 Application configuration for Decohere: data sources that feed the configuration service, starting with YAML files read from the environment.
 
+The contract is in [`@decohere/core/configuration`](../core/README.md): `IConfigurationService`, registered under `ConfigurationServiceToken`, and `IConfigurationDataSource`. This package implements it with `ConfigurationService`, and gives the `config(...)` and `configSection(...)` plugins and the `YamlDataSource` and `EnvDataSource` sources.
+
+The config sources are where the environment is read: `YamlDataSource` reads `CONFIG_DIR`, `NODE_ENV` and the variables its `${NAME}` placeholders name, and `EnvDataSource` reads every variable. The rest of an app gets its settings from the configuration service, not from `process.env`. (The `devOnly` check below also reads `NODE_ENV`, through `isDevelopmentEnv` from `@decohere/core/system`.)
+
+## Reading config
+
+Inject a section's class once `configSection(Section)` is on the builder:
+
+```ts
+builder.use(config(YamlDataSource, EnvDataSource)).use(configSection(PaymentsConfig));
+
+@injectable()
+export class PaymentService {
+	public constructor(private readonly settings: PaymentsConfig) {}
+}
+```
+
+Or inject the service and ask for the section:
+
+```ts
+public constructor(
+	@inject(ConfigurationServiceToken) private readonly configuration: IConfigurationService,
+) {}
+
+const payments = await this.configuration.get(PaymentsConfig);
+```
+
 ## YAML files
 
 Config files are named `config.{optional app}.{optional env}.yaml`. `YamlDataSource` reads these from `CONFIG_DIR` (default `config`), each if it exists, later ones winning:
 
 1. `config.yaml`: production, and the base for every environment.
-1. `config.<app>.yaml`, if the app is named: one app's settings, in a project with several.
-2. `config.<NODE_ENV>.yaml`, if it exists, such as `config.dev.yaml`. An unset `NODE_ENV` means `production`, so a missing variable never loads development settings.
-
-3. `config.<app>.<NODE_ENV>.yaml`: that app in that environment.
+2. `config.<app>.yaml`, if the app is named: one app's settings, in a project with several.
+3. `config.<NODE_ENV>.yaml`, if it exists, such as `config.dev.yaml`. An unset `NODE_ENV` means `production`, so a missing variable never loads development settings.
+4. `config.<app>.<NODE_ENV>.yaml`: that app in that environment.
 
 The app is a const in your code:
 
@@ -116,3 +142,9 @@ A `devOnly` key with a value stops the app unless `NODE_ENV` is `development` or
 **`__proto__`, `constructor` and `prototype`** are refused as keys, from any source.
 
 **What these can't catch:** an ordinary value such as `host: localhost` in the base file, because nothing says it's wrong; use `${VAR}` with no default for values that differ by environment, so a missing one stops the app. A section read by name, or with no schema, skips the schema checks.
+
+## Layout and tests
+
+`src/` is flat today, one subdomain: the plugins (`configuration.plugin.ts`), the service that implements core's `IConfigurationService` (`configuration.service.ts`), the `ConfigurationDataSource` base and its two sources (`yaml-data-source.ts`, `env-data-source.ts`), and the merge of layers (`tree-merge.ts`).
+
+There is no canonical suite for config in the [testing table](../../docs/testing/README.md#canonical-suite-ownership). Its behaviour is covered by `tests/layers.spec.ts` (layers, sections, guards through a built app), `tests/yaml-config.spec.ts` and `tests/env-only.spec.ts`, with `tests/yaml-data-source.pentest.spec.ts` for unsafe input. Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).

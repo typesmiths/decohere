@@ -1,7 +1,7 @@
 # 0011. Database bootstrap: trust is declared, schemas are bootstrapped, each database once
 
-- **Status:** Proposed
-- **Date:** 2026-10-15 · updated 2026-11-08
+- **Status:** Accepted
+- **Date:** 2026-10-15
 
 ## Context
 

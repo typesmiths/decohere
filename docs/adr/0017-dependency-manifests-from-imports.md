@@ -1,6 +1,6 @@
 # 0017. Package manifests are generated from imports; the root owns every version; peers are declared by name
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-10-23
 
 ## Context

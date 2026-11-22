@@ -1,6 +1,6 @@
 # 0025. `@decohere/http` answers every error as an RFC 9457 problem
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-10
 
 ## Context
@@ -13,7 +13,7 @@ Error bodies had three shapes: `{ statusCode, error, message, errors }` for vali
 - **Domain errors subclass `HttpError`** and pass `{ type, title, extensions }` as its third argument. Extensions can't replace the standard members.
 - **Validation keeps `errors`** as an extension member: `[{ path, message, keyword }]`.
 - **Nothing leaks.** A `401` and a `500` send no `detail` and no extensions; the message is logged. Any error that isn't an `HttpError` is a `500`. Fastify's 4xx messages (bad JSON, body too large, rate limit) are sent as `detail`; its 5xx are logged and hidden.
-- **`problemDetails.create` and `problemDetails.toResult`** are exported so a custom exception filter answers in the same shape.
+- **A custom exception filter answers in the same shape** through the problem-details builder `@decohere/http` exports (today `problemDetails.create` and `problemDetails.toResult`, a namespace object that becomes a class when `http` moves, per [ADR 0027](0027-code-design.md)).
 - **A UI served from the root keeps its own not-found handler** (it falls back to the app), and answers the same 404 problem when it doesn't fall back ([ADR 0007](0007-serving-a-built-ui-from-http.md)).
 
 ## Consequences

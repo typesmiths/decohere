@@ -1,6 +1,6 @@
 # 0027. Decohere's code is one class per job, named for its thing and role, with packages as modules and tests beside the code
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-22
 
 ## Context
@@ -23,7 +23,7 @@ The picture: [code design](../architecture/code-design.svg).
 ### Packages are modules
 
 - **Each package is a module with one job.** Package names stay as [ADR 0014](0014-package-names.md) set them. No package is split or added for this.
-- **A base package holds the contracts, and a provider package implements them.** `data` holds `IUnitOfWork`, `Repository<T>` and `RowStore`, and `data-mikro-orm`, `data-typeorm` and `data-memory` implement them. `http` holds `HttpProvider`, implemented by `http-fastify`; `scribe` holds the facade, implemented by `scribe-pino` and `scribe-console`. Dependencies run one way: a provider imports its base package, never the reverse, and a base package installs no vendor.
+- **A base package holds the contracts, and a provider package implements them** ([ADR 0014](0014-package-names.md) is that rule's home). `data` holds `IUnitOfWork`, `Repository<T>` and `RowStore`, and `data-mikro-orm`, `data-typeorm` and `data-memory` implement them. `http` holds `HttpProvider`, implemented by `http-fastify`; `scribe` holds the facade, implemented by `scribe-pino` and `scribe-console`.
 - **Only an app's composition root names a provider.** An app's other code imports base packages.
 - Ledger's split of a module into `contracts`, `domain` and `api` projects is for an application. A framework package has no edge of its own, so it doesn't apply here.
 
@@ -36,18 +36,20 @@ The picture: [code design](../architecture/code-design.svg).
 
 - **Everything with state, a lifecycle, more than one implementation, or a rule is a class with one job, named for it.** Its state is private, with read-only getters where others need it. A calculation is a method on the thing it is about.
 - **What kinds share is an abstract base class**, not a helper module they all import.
-- **A service is an interface and a token, implemented by one injected class.** Classes get what they need through the constructor, never `container.resolve` outside the composition root and the container itself.
+- **A service is an interface and a token, implemented by one injected class.** The token sits beside its interface and is named `<Thing>Token` (`export const ClockToken = Symbol("Clock")`). Classes get what they need through the constructor, never `container.resolve` outside the composition root and the container itself.
 - **Loose exported functions are only:**
   - plugin factories (`typeOrm()`, `memory()`);
   - decorators (`@injectable()`);
   - `define…` helpers whose result is data (`defineMigration`, `mapEntity`);
+  - `is…`/`has…` predicates (`isDevelopmentEnv`);
   - mechanics with no domain meaning (`sleep`).
-  Namespace objects (`export const x = { a, b }`) go: a group of related functions is a class.
+  Namespace objects (`export const x = { a, b }`) go: a group of related functions is a class. A `const` typed by a contract (`export const postgres: DatabaseSupport = { … }`) is a value that implements it, not a namespace object.
 - **No reads of the process environment in library code.** Config sources and bins read it and pass values in ([architecture §1](../architecture/README.md#1-keep-the-product-pure-of-its-host)).
 
 ### Names
 
 - **A file is named for the thing it holds and its role, one thing per file:** `route-path.value.ts`, `memory.plugin.ts`, `optimistic-lock.error.ts`. The roles are `.entity`, `.value`, `.service`, `.strategy`, `.factory`, `.repository`, `.port`, `.adapter`, `.provider`, `.plugin`, `.controller`, `.handler`, `.command`, `.action`, `.decorator`, `.event`, `.error`, `.const`, `.config`, `.module`, `.model`, `.mapping`, `.contract`, `.registry`, `.builder`, `.host`, and `.cases` in `testing/`. A role the list lacks is added here before it is used.
+- **The roles that are easy to confuse:** `.contract` is an interface a provider implements, with its token, in the base package. `.provider` is the class that implements a contract, in a provider package. `.adapter` wraps an outside API (a vendor's client, a CLI) behind an interface the package owns. `.port` is an app's interface to something outside it. A package's constants are `<thing>.const.ts`, not a bare `const.ts`.
 - **No `utils`, `helpers`, `common`, `shared`, `misc`, `.types.ts`, `.store.ts` or verb-named files.** A type lives beside the thing it describes: in its file, or a `.contract.ts` when it is the contract a provider implements.
 - **Errors are named classes ending in `Error`**, one per file (`optimistic-lock.error.ts`), thrown and never swallowed. Decohere's errors already end in `Error`.
 - **Entities in an app are `.entity.ts`.** Decohere's own models of the workspace (`project.model.ts`) keep `.model.ts`, since they model files, not a business domain.
@@ -55,15 +57,16 @@ The picture: [code design](../architecture/code-design.svg).
 ### Tests
 
 - **A spec sits beside the file it tests:** `routing/router.spec.ts` next to `routing/router.ts`. Forge's release build leaves `*.spec.ts` out, and Vitest finds specs anywhere. Behaviour suites that span a package (`*.integration.spec.ts`) and Docker suites sit beside the package's `index.ts`, or the subdomain they exercise. `e2e/` stays apart, since it drives built output.
+- **Fixtures and test-only helpers** (`__fixtures__/`, `*.cases.ts`, `*.fixtures.ts`, `*.harness.ts`) sit in `src/` only once forge's release build leaves them out; until then they stay in `tests/`.
 - A test goes through the public face of what it tests. An interface with several implementations has a `.cases.ts` suite each passes, as the unit-of-work contract does.
 
 ### Measured, and only falling
 
-`pnpm design:check` measures the counts above on every pull request, as part of `lint:check`, against a committed baseline. A count that rises fails the check. A count that falls fails too, until the baseline is lowered with `pnpm design:check --update`, so it can't rise back. Moving the code is done package by package, each move its own pull request.
+`pnpm design:check` measures the counts above on every pull request, as part of `lint:check`, against a committed baseline. A count that rises fails the check. A count that falls fails too, until the baseline is lowered with `pnpm design:check --update`, so it can't rise back. Existing code moves package by package, each move its own pull request. New code adds no break. A pull request that fixes a break anyway lowers the baseline in the same pull request.
 
 ### Apps
 
-The scaffolder generates apps that follow the same rules. An app's own layout (modules split into `contracts`, `domain` and `api`, domains by subdomain then kind) follows ledger's, and is written up when the scaffolder's template is.
+The scaffolder generates apps that follow the same rules, and Crucible's decorators are allowed in an app's domain code. An app's own layout (modules split into `contracts`, `domain` and `api`, domains by subdomain then kind) follows ledger's, and is written up when the scaffolder's template is.
 
 ### Where the rules live
 

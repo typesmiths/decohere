@@ -1,5 +1,7 @@
 # Env-dependent decorators
 
+> **For existing code only.** [ADR 0027](../../adr/0027-code-design.md) says library code doesn't read `process.env`: the bin or config source reads it and passes the value in, and a test passes the value too. Don't write new decorators that read the environment. This page goes once the last one moves.
+
 Some decorators read the environment when the class is defined, that is, when its module is imported. `@cache()` is skipped when `FORGE_DISABLE_CACHE=true` (`ignoreIf` in `projects/core/src/system/decorator.ts`). Setting the variable inside a test is too late: the module is already imported and cached.
 
 ## Pattern

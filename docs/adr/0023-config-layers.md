@@ -18,7 +18,7 @@
 - **Errors name the path and the rule, never the value**, which may be a secret ([ADR 0002](0002-secrets-from-the-environment.md)).
 - **`configSection(Type)` checks at boot** and makes the section injectable by its class. `config(...)` loads every source at build, so a bad source stops the app before any section is read.
 - **Null means unset**, at any depth, so it clears a key: the class's default applies, or `required` fails. Type coercion never sees it, and would otherwise turn it into 0, false or "".
-- **Dev values stay out of the base file and class defaults.** `devOnly: true` in a schema refuses a key's value unless `NODE_ENV` is `development` or `dev`, so staging and typos fail. The rule has one home, `isDevelopmentEnv` in `core/system`. It reads which environment the app is deployed to, as `YamlDataSource` and `auth` already do; the host-purity rule is about test and CI branches.
+- **Dev values stay out of the base file and class defaults.** `devOnly: true` in a schema refuses a key's value unless `NODE_ENV` is `development` or `dev`, so staging and typos fail. The rule has one home, `isDevelopmentEnv` in `core/system`, which takes the environment's name as an argument. Config sources and bins read `NODE_ENV` and pass it in; library code never reads `process.env` ([ADR 0027](0027-code-design.md)). Until core moves, `isDevelopmentEnv` still falls back to `process.env.NODE_ENV`.
 - **Framework schemas refuse undeclared keys**, `api` first.
 - **Variables that clash stop the app**, instead of their order choosing a winner.
 - **Keys every object inherits are refused**, from any source.
@@ -45,3 +45,4 @@ Rejected:
 - 2026-11-06: Decided.
 - 2026-11-07: Config files are named by app and environment, and `forge package` copies only what a package reads.
 - 2026-11-07: Added the guards: null means unset, `devOnly`, undeclared keys, clashing variables, inherited keys, and loading sources at build. Dev values don't belong in the base file or class defaults.
+- 2026-11-22: Library code no longer reads `NODE_ENV` itself; config sources and bins pass it in, following ADR 0027. This replaces the earlier note that reading the deployed environment was fine.
