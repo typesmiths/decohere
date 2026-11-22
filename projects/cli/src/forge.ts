@@ -3,6 +3,7 @@ import "./compile-cache.js";
 import "./logger.setup.js";
 import { ForgeModule } from "@decohere/forge";
 import { scribe } from "@decohere/scribe";
+import { pino } from "@decohere/scribe-pino";
 import { cliLogLevel } from "./log-level.js";
 import { RootModule } from "./root.module.js";
 
@@ -13,10 +14,7 @@ const logLevel = logLevelIndex !== -1 ? process.argv[logLevelIndex + 1] : undefi
 const rootDirIndex = process.argv.indexOf("--root-dir");
 const rootDir = rootDirIndex !== -1 ? process.argv[rootDirIndex + 1] : undefined;
 
-scribe.withPinoPretty({
-	logLevel: cliLogLevel(logLevel),
-	when: "always",
-});
+scribe.use(pino({ pretty: true }), { logLevel: cliLogLevel(logLevel) });
 
 const logger = scribe.logger("@decohere/cli");
 const app = await RootModule.create([ForgeModule], { configFile, logLevel, rootDir });

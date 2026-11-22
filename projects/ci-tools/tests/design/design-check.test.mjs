@@ -75,6 +75,27 @@ describe("design:check", () => {
 		});
 	});
 
+	it("counts environment reads in code, not the words in a string or a comment", () => {
+		seed({
+			"src/app.service.ts":
+				"// reads process.env.PORT\nexport class AppService {\n" +
+				'\tpublic readonly text = "const port = process.env.PORT;";\n' +
+				"\tpublic readonly port = process.env.PORT;\n}\n",
+		});
+		expect(run(["--update"]).code).toBe(0);
+		expect(JSON.parse(vol.readFileSync(`${root}/${BASELINE}`, "utf8"))).toEqual({
+			http: { envReads: 1 },
+		});
+	});
+
+	it("keeps the factory in a .plugin.ts file, whatever it returns", () => {
+		seed({
+			"src/pino.plugin.ts":
+				"export function pino(): PinoAdapter {\n\treturn new PinoAdapter();\n}\n",
+		});
+		expect(run()).toEqual({ code: 0, output: expect.stringContaining("design: 0 breaks") });
+	});
+
 	it("keeps plugin factories, decorators, define helpers and predicates", () => {
 		seed({
 			...CLEAN,

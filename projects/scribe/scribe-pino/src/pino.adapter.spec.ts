@@ -1,9 +1,8 @@
 import { EventEmitter } from "node:events";
 import { Writable } from "node:stream";
 import { LogAdapter, scribe } from "@decohere/scribe";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { PinoAdapter } from "../src/pino.adapater.js";
-import { pinoTransport } from "../src/scribe-pino.js";
+import { describe, expect, it, vi } from "vitest";
+import { PinoAdapter } from "./pino.adapter.js";
 
 function makeStream(): { stream: Writable; lines: () => string[] } {
 	const chunks: string[] = [];
@@ -143,63 +142,6 @@ describe("PinoAdapter", () => {
 		expect(destroy).toHaveBeenCalled();
 		adapter.retire();
 		expect(destroy).toHaveBeenCalledTimes(1);
-	});
-});
-
-describe("pinoTransport.guardTransport", () => {
-	afterEach(() => {
-		vi.restoreAllMocks();
-	});
-
-	it("retires once on error and no-ops further writes", () => {
-		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-		const writes: string[] = [];
-		const stream = new Writable({
-			write(chunk, _encoding, callback) {
-				writes.push(String(chunk));
-				callback();
-			},
-		});
-		const guarded = pinoTransport.guardTransport(stream);
-
-		expect(stream.write("alive")).toBe(true);
-		stream.emit("error", new Error("the worker has exited"));
-		expect(stream.write("dead-1")).toBe(true);
-		expect(stream.write("dead-2")).toBe(true);
-
-		expect(writes).toEqual(["alive"]);
-		expect(guarded.retired).toBe(true);
-		expect(
-			stderr.mock.calls.filter((c) => String(c[0]).includes("transport retired")),
-		).toHaveLength(1);
-		expect(String(stderr.mock.calls[0]?.[0])).toContain("the worker has exited");
-	});
-
-	it("retires when write throws", () => {
-		const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-		const transport = Object.assign(new EventEmitter(), {
-			write(_chunk?: unknown) {
-				throw new Error("the worker has exited");
-			},
-			destroy: vi.fn(),
-		});
-		const guarded = pinoTransport.guardTransport(transport as never);
-
-		expect(transport.write("x")).toBe(true);
-		expect(transport.write("y")).toBe(true);
-		expect(guarded.retired).toBe(true);
-		expect(transport.destroy).toHaveBeenCalledTimes(1);
-		expect(
-			stderr.mock.calls.filter((c) => String(c[0]).includes("transport retired")),
-		).toHaveLength(1);
-	});
-
-	it("silenceErrors still guards without crashing", () => {
-		const transport = new EventEmitter();
-		pinoTransport.silenceErrors(transport as never);
-		expect(() =>
-			transport.emit("error", new Error("EEXIST: file already exists")),
-		).not.toThrow();
 	});
 });
 

@@ -1,17 +1,17 @@
 /**
- * Scribe + Pino through the public recipe surface (`withPino*` / `scribe.logger`).
+ * Scribe and Pino through what an app calls: `scribe.use(pino(...))` and `scribe.logger`.
  *
  * Prefer observable outcomes: logger level, JSON on a destination stream, roll files
- * on real fs. Unit suites already cover `pinoRecipe.transport` plan shapes.
+ * on real fs. `pino-targets.value.spec.ts` covers the transport shapes.
  */
-import "@decohere/scribe-pino";
 import { join } from "node:path";
 import { Writable } from "node:stream";
 import { Shell } from "@decohere/devkit/interop";
 import { ConsoleAdapter, scribe } from "@decohere/scribe";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { realFs } from "../../../../vitest.setup.js";
-import { PinoAdapter } from "../src/pino.adapater.js";
+import { PinoAdapter } from "./pino.adapter.js";
+import { pino } from "./pino.plugin.js";
 
 afterEach(async () => {
 	vi.unstubAllEnvs();
@@ -65,7 +65,7 @@ class OtpArgvShell extends Shell {
 	}
 }
 
-describe("scribe-pino recipes (behavior)", () => {
+describe("scribe.use(pino())", () => {
 	it("writes structured JSON with logger name via PinoAdapter", async () => {
 		const { stream, text } = captureStream();
 		scribe.configure({
@@ -79,12 +79,11 @@ describe("scribe-pino recipes (behavior)", () => {
 		expect(line).toContain("listening");
 	});
 
-	it("withPinoRoll persists a line to the roll file", async () => {
+	it("writes a line to the roll file", async () => {
 		const dir = realFs.mkdtempSync(join(realFs.realpathSync("/tmp"), "scribe-pino-roll-"));
 		const file = join(dir, "app.log");
-		vi.stubEnv("NODE_ENV", "development");
 
-		scribe.withPinoRoll({ file, when: "always", size: "1m", keep: 2, mkdir: true });
+		scribe.use(pino({ roll: { file, size: "1m", keep: 2, mkdir: true } }));
 		scribe.logger("roll").info("hello-roll");
 		await new Promise((r) => setTimeout(r, 800));
 		await scribe.stop();
@@ -101,86 +100,18 @@ describe("scribe-pino recipes (behavior)", () => {
 		realFs.rmSync(dir, { recursive: true, force: true });
 	}, 15_000);
 
-	it("SCRIBE_LOG_FILE redirects roll destination without app code changes", async () => {
-		const dir = realFs.mkdtempSync(join(realFs.realpathSync("/tmp"), "scribe-pino-env-"));
-		const defaultFile = join(dir, "default.log");
-		const overrideFile = join(dir, "override.log");
-		vi.stubEnv("NODE_ENV", "development");
-		vi.stubEnv("SCRIBE_LOG_FILE", overrideFile);
-
-		scribe.withPinoRoll({
-			file: defaultFile,
-			when: "always",
-			size: "1m",
-			keep: 2,
-			mkdir: true,
-		});
-		scribe.logger("roll").info("env-redirect");
-		await new Promise((r) => setTimeout(r, 800));
-		await scribe.stop();
-		await new Promise((r) => setTimeout(r, 200));
-
-		const bodies = realFs.readdirSync(dir).map((name) => {
-			try {
-				return { name, body: realFs.readFileSync(join(dir, name), "utf8") };
-			} catch {
-				return { name, body: "" };
-			}
-		});
-		expect(
-			bodies.some((f) => f.name.startsWith("override") && f.body.includes("env-redirect")),
-		).toBe(true);
-		expect(
-			bodies.some((f) => f.name.startsWith("default") && f.body.includes("env-redirect")),
-		).toBe(false);
-		realFs.rmSync(dir, { recursive: true, force: true });
-	}, 15_000);
-
-	it("skips in-process roll when NODE_ENV=production and when is development", async () => {
-		const dir = realFs.mkdtempSync(join(realFs.realpathSync("/tmp"), "scribe-pino-prod-"));
-		const file = join(dir, "app.log");
-		vi.stubEnv("NODE_ENV", "production");
-
-		scribe.withPinoRoll({ file, when: "development" });
-		scribe.logger("prod").info("stdout-only");
-		await scribe.stop();
-		await new Promise((r) => setTimeout(r, 200));
-
-		expect(realFs.existsSync(file)).toBe(false);
-		realFs.rmSync(dir, { recursive: true, force: true });
-	});
-
-	/**
-	 * Omitting recipe logLevel must still consult LOG_LEVEL /
-	 * SCRIBE_LOG_LEVEL (same as bare `scribe.configure` without a logLevel).
-	 */
-	it("withPinoPretty honors SCRIBE_LOG_LEVEL when logLevel is omitted", () => {
+	it("honours SCRIBE_LOG_LEVEL when no level is given", () => {
 		vi.stubEnv("SCRIBE_LOG_LEVEL", "debug");
-		scribe.withPinoPretty();
+		scribe.use(pino({ pretty: true }));
 		const log = scribe.logger("EnvPretty");
 		expect(log.currentLevel).toBe("debug");
 		expect(log.isLevelEnabled("debug")).toBe(true);
 	});
 
-	it("withPino honors LOG_LEVEL when logLevel is omitted", () => {
+	it("takes the level passed to use over the environment", () => {
 		vi.stubEnv("LOG_LEVEL", "warn");
-		scribe.withPino({
-			transports: { target: "pino/file", options: { destination: 1 } },
-		});
-		expect(scribe.logger("EnvPino").currentLevel).toBe("warn");
-	});
-
-	it("withPinoRoll honors SCRIBE_LOG_LEVEL when logLevel is omitted", () => {
-		vi.stubEnv("SCRIBE_LOG_LEVEL", "trace");
-		vi.stubEnv("NODE_ENV", "production");
-		scribe.withPinoRoll({ file: "logs/unused.log" });
-		expect(scribe.logger("EnvRoll").currentLevel).toBe("trace");
-	});
-
-	it("withPinoCustom honors SCRIBE_LOG_LEVEL when scribe.logLevel is omitted", () => {
-		vi.stubEnv("SCRIBE_LOG_LEVEL", "debug");
-		scribe.withPinoCustom({});
-		expect(scribe.logger("EnvCustom").currentLevel).toBe("debug");
+		scribe.use(pino(), { logLevel: "trace" });
+		expect(scribe.logger("Explicit").currentLevel).toBe("trace");
 	});
 
 	/**
@@ -191,17 +122,11 @@ describe("scribe-pino recipes (behavior)", () => {
 		const first = captureStream();
 		const second = captureStream();
 
-		scribe.configure({
-			adapter: new PinoAdapter({}, first.stream),
-			options: { logLevel: "info" },
-		});
+		scribe.use(new PinoAdapter({}, first.stream), { logLevel: "info" });
 		const log = scribe.logger("Early");
 		log.info("first");
 
-		scribe.configure({
-			adapter: new PinoAdapter({}, second.stream),
-			options: { logLevel: "info" },
-		});
+		scribe.use(new PinoAdapter({}, second.stream), { logLevel: "info" });
 		log.info("second");
 		await new Promise((r) => setTimeout(r, 30));
 

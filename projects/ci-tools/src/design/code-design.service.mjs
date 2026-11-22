@@ -103,18 +103,20 @@ export class CodeDesign {
 		if (BANNED.test(base)) add("bannedNames", rel);
 		const role = base.split(".");
 		if (base !== "index" && (role.length < 2 || !ROLES.has(role.at(-1)))) add("noRole", rel);
-		const env = text.match(/process\.env\b/g)?.length ?? 0;
-		if (env > 0 && name !== "config" && !bins.has(relative(this.root, file))) {
-			for (let i = 0; i < env; i++) add("envReads", rel);
-		}
 		const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+		const isPluginFile = role.at(-1) === "plugin";
+		if (name !== "config" && !bins.has(relative(this.root, file))) {
+			for (let i = countEnvReads(source); i > 0; i--) add("envReads", rel);
+		}
 		let classes = 0;
 		for (const statement of source.statements) {
 			if (ts.isClassDeclaration(statement)) classes++;
 			if (!isExported(statement)) continue;
 			if (ts.isFunctionDeclaration(statement)) {
 				const fn = statement.name?.text ?? "default";
-				if (!isAllowedFunction(fn, statement)) add("looseFunctions", `${rel}: ${fn}`);
+				// A .plugin.ts file holds a plugin factory, whatever writer or module it returns.
+				if (!isPluginFile && !isAllowedFunction(fn, statement))
+					add("looseFunctions", `${rel}: ${fn}`);
 			}
 			if (ts.isVariableStatement(statement)) {
 				for (const declaration of statement.declarationList.declarations) {
@@ -195,6 +197,28 @@ export class CodeDesign {
 }
 
 /** @param {ts.Statement} statement */
+/**
+ * `process.env` in code: a property read, so the words in a string (a template for generated
+ * code) or a comment don't count.
+ *
+ * @param {ts.Node} node
+ * @returns {number}
+ */
+function countEnvReads(node) {
+	const here =
+		ts.isPropertyAccessExpression(node) &&
+		node.name.text === "env" &&
+		ts.isIdentifier(node.expression) &&
+		node.expression.text === "process"
+			? 1
+			: 0;
+	let below = 0;
+	node.forEachChild((child) => {
+		below += countEnvReads(child);
+	});
+	return here + below;
+}
+
 function isExported(statement) {
 	return (
 		ts.canHaveModifiers(statement) &&
