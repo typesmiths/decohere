@@ -1,0 +1,239 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1820" viewBox="0 0 1600 1820" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" fill="#1f2328">
+  <title>Decohere app design (ADR 0027)</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+    <marker id="ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2e7d32"/>
+    </marker>
+    <marker id="no" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+    <style>
+      .panel { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .h1 { font-size: 30px; font-weight: 700; }
+      .h2 { font-size: 21px; font-weight: 700; }
+      .sub { font-size: 14px; fill: #57606a; }
+      .small { font-size: 13px; fill: #57606a; }
+      .b { font-weight: 700; }
+      .contracts { fill: #e8f1fb; stroke: #3b6ea8; stroke-width: 2; }
+      .domain { fill: #eaf6ec; stroke: #3f8a4f; stroke-width: 2; }
+      .api { fill: #fdf1e3; stroke: #b9772e; stroke-width: 2; }
+      .host { fill: #f6f8fa; stroke: #57606a; stroke-width: 2; }
+      .decohere { fill: #f1edf7; stroke: #6b5b95; stroke-width: 2; }
+      .module { fill: none; stroke: #8c959f; stroke-width: 1.5; stroke-dasharray: 6 4; }
+      .line { stroke: #57606a; stroke-width: 2; fill: none; }
+      .good { stroke: #2e7d32; stroke-width: 2.5; fill: none; }
+      .bad { stroke: #c0392b; stroke-width: 2.5; fill: none; stroke-dasharray: 7 5; }
+      .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 14.5px; }
+      .note { fill: #57606a; font-style: italic; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1820" fill="#ffffff"/>
+  <text x="40" y="52" class="h1">How a Decohere app is laid out</text>
+  <text x="40" y="78" class="sub">ADR 0027 · modules by role, domain by subdomain, one class per concept</text>
+
+  <!-- ───────────── 1. Modules ───────────── -->
+  <rect x="30" y="100" width="1540" height="560" rx="10" class="panel"/>
+  <text x="54" y="134" class="h2">1. Modules by role: dependencies point one way</text>
+
+  <rect x="580" y="152" width="440" height="58" rx="8" class="host"/>
+  <text x="800" y="177" text-anchor="middle" class="b">app.ts · the composition root</text>
+  <text x="800" y="198" text-anchor="middle" class="small">sees every module; binds each contract to an implementation</text>
+
+  <!-- funding module -->
+  <rect x="60" y="240" width="680" height="290" rx="12" class="module"/>
+  <text x="80" y="266" class="b">funding module (a bounded context)</text>
+
+  <rect x="80" y="300" width="190" height="190" rx="8" class="contracts"/>
+  <text x="175" y="328" text-anchor="middle" class="b">funding.contracts</text>
+  <text x="175" y="354" text-anchor="middle" class="small">interfaces + tokens</text>
+  <text x="175" y="374" text-anchor="middle" class="small">events, values, DTOs</text>
+  <text x="175" y="404" text-anchor="middle" class="small">imports nothing</text>
+
+  <rect x="310" y="300" width="200" height="190" rx="8" class="domain"/>
+  <text x="410" y="328" text-anchor="middle" class="b">funding.domain</text>
+  <text x="410" y="354" text-anchor="middle" class="small">everything that decides</text>
+  <text x="410" y="384" text-anchor="middle" class="small">+ @decohere/data</text>
+  <text x="410" y="404" text-anchor="middle" class="small">(Repository&lt;T&gt;, events)</text>
+  <text x="410" y="424" text-anchor="middle" class="small">+ crucible decorators</text>
+
+  <rect x="550" y="300" width="170" height="190" rx="8" class="api"/>
+  <text x="635" y="328" text-anchor="middle" class="b">funding.api</text>
+  <text x="635" y="354" text-anchor="middle" class="small">the edge: HTTP, tables,</text>
+  <text x="635" y="374" text-anchor="middle" class="small">streams, processes</text>
+  <text x="635" y="404" text-anchor="middle" class="small">+ @decohere/http</text>
+  <text x="635" y="424" text-anchor="middle" class="small">+ a data provider</text>
+
+  <path d="M548,395 L514,395" class="line" marker-end="url(#arrow)"/>
+  <path d="M308,395 L274,395" class="line" marker-end="url(#arrow)"/>
+
+  <!-- trading module -->
+  <rect x="860" y="240" width="680" height="290" rx="12" class="module"/>
+  <text x="880" y="266" class="b">trading module</text>
+
+  <rect x="880" y="300" width="190" height="190" rx="8" class="contracts"/>
+  <text x="975" y="328" text-anchor="middle" class="b">trading.contracts</text>
+  <rect x="1110" y="300" width="200" height="190" rx="8" class="domain"/>
+  <text x="1210" y="328" text-anchor="middle" class="b">trading.domain</text>
+  <rect x="1350" y="300" width="170" height="190" rx="8" class="api"/>
+  <text x="1435" y="328" text-anchor="middle" class="b">trading.api</text>
+
+  <path d="M1348,395 L1314,395" class="line" marker-end="url(#arrow)"/>
+  <path d="M1108,395 L1074,395" class="line" marker-end="url(#arrow)"/>
+
+  <!-- crossings -->
+  <path d="M1150,492 C1100,600 300,600 185,494" class="good" marker-end="url(#ok)"/>
+  <text x="600" y="585" class="b" fill="#2e7d32">✓ another module imports only *.contracts</text>
+  <path d="M1170,298 C1080,226 560,226 452,298" class="bad" marker-end="url(#no)"/>
+
+  <!-- composition -->
+  <path d="M760,210 C760,250 700,260 690,298" class="line" stroke-dasharray="3 4" marker-end="url(#arrow)"/>
+  <path d="M840,210 C840,250 1400,250 1420,298" class="line" stroke-dasharray="3 4" marker-end="url(#arrow)"/>
+
+  <rect x="584" y="217" width="356" height="21" fill="#ffffff"/>
+  <text x="590" y="233" class="b" fill="#c0392b">✕ never another module's domain or api</text>
+
+  <rect x="60" y="612" width="1480" height="34" rx="6" class="decohere"/>
+  <text x="800" y="634" text-anchor="middle" class="small">Decohere: core · crucible · data (contracts) · data-mikro-orm / data-typeorm / data-memory (providers) · http · http-fastify · config · scribe</text>
+  <text x="1200" y="585" class="small">arrows: “imports”; dotted: app.ts composes</text>
+
+  <!-- ───────────── 2. Layout ───────────── -->
+  <rect x="30" y="690" width="760" height="1100" rx="10" class="panel"/>
+  <text x="54" y="724" class="h2">2. Folders: domain by subdomain, then kind</text>
+  <text x="54" y="748" class="sub">one thing per file, named &lt;thing&gt;.&lt;role&gt;.ts · tests beside the code</text>
+
+  <g class="mono" xml:space="preserve">
+    <text x="60" y="790">projects/modules/funding/</text>
+    <text x="60" y="814">├─ <tspan fill="#3b6ea8" font-weight="700">funding.contracts/</tspan>src/</text>
+    <text x="60" y="838">│  ├─ exchange-accounts.contract.ts</text>
+    <text x="60" y="862">│  ├─ venue-account.value.ts</text>
+    <text x="60" y="886">│  └─ funding.const.ts</text>
+    <text x="60" y="910">├─ <tspan fill="#3f8a4f" font-weight="700">funding.domain/</tspan>src/</text>
+    <text x="60" y="934">│  ├─ <tspan font-weight="700">position/</tspan>              <tspan class="note">← a subdomain</tspan></text>
+    <text x="60" y="958">│  │  ├─ stories.md           <tspan class="note">← its user stories</tspan></text>
+    <text x="60" y="982">│  │  ├─ entities/carry.entity.ts</text>
+    <text x="60" y="1006">│  │  ├─ entities/carry.entity.spec.ts</text>
+    <text x="60" y="1030">│  │  ├─ values/money.value.ts</text>
+    <text x="60" y="1054">│  │  ├─ services/pricing.service.ts</text>
+    <text x="60" y="1078">│  │  ├─ repositories/carries.repository.ts</text>
+    <text x="60" y="1102">│  │  ├─ events/carry-opened.event.ts</text>
+    <text x="60" y="1126">│  │  └─ errors/halted.error.ts</text>
+    <text x="60" y="1150">│  ├─ <tspan font-weight="700">carry/</tspan>                 <tspan class="note">← another subdomain</tspan></text>
+    <text x="60" y="1174">│  │  ├─ strategies/top-carry.strategy.ts</text>
+    <text x="60" y="1198">│  │  └─ factories/carry-algo.factory.ts</text>
+    <text x="60" y="1222">│  └─ testing/carries.repository.cases.ts</text>
+    <text x="60" y="1246">├─ <tspan fill="#b9772e" font-weight="700">funding.api/</tspan>src/</text>
+    <text x="60" y="1270">│  ├─ controllers/carry.controller.ts</text>
+    <text x="60" y="1294">│  ├─ mappings/carry.mapping.ts  <tspan class="note">← provider's mapping</tspan></text>
+    <text x="60" y="1318">│  ├─ migrations/index.ts</text>
+    <text x="60" y="1342">│  ├─ handlers/order-filled.handler.ts</text>
+    <text x="60" y="1366">│  ├─ publishers/carry.publisher.ts</text>
+    <text x="60" y="1390">│  ├─ processes/funding-sweep.service.ts</text>
+    <text x="60" y="1414">│  ├─ testing/funding.harness.ts</text>
+    <text x="60" y="1438">│  ├─ funding.module.ts</text>
+    <text x="60" y="1462">│  └─ funding.config.ts</text>
+    <text x="60" y="1486">└─ funding.tools/src/</text>
+    <text x="60" y="1510">   └─ replay-fills.command.ts</text>
+  </g>
+
+  <text x="60" y="1560" class="b">A new app starts as one module:</text>
+  <text x="60" y="1584" class="mono">src/domain/&lt;subdomain&gt;/… and src/api/…</text>
+  <text x="60" y="1608" class="small">It splits into projects when another module needs its contracts,</text>
+  <text x="60" y="1628" class="small">or to break an import cycle.</text>
+  <text x="60" y="1672" class="b">Never:</text>
+  <text x="60" y="1696" class="small">utils · helpers · common · shared · misc · .types.ts · .store.ts · verb-named files</text>
+  <text x="60" y="1730" class="b">Errors:</text>
+  <text x="60" y="1754" class="small">a named class ending in Error, one per file: HaltedError in halted.error.ts</text>
+
+  <!-- ───────────── 3. Inside a domain ───────────── -->
+  <rect x="810" y="690" width="760" height="600" rx="10" class="panel"/>
+  <text x="834" y="724" class="h2">3. Who calls whom</text>
+
+  <rect x="840" y="750" width="420" height="60" rx="8" class="api"/>
+  <text x="1050" y="775" text-anchor="middle" class="b">controller · handler · command</text>
+  <text x="1050" y="797" text-anchor="middle" class="small">orchestrate; decide nothing</text>
+
+  <rect x="840" y="850" width="420" height="60" rx="8" class="domain"/>
+  <text x="1050" y="875" text-anchor="middle" class="b">service: interface + Token, one class</text>
+  <text x="1050" y="897" text-anchor="middle" class="small">decides; injected, never container.resolve</text>
+
+  <rect x="840" y="950" width="200" height="70" rx="8" class="domain"/>
+  <text x="940" y="976" text-anchor="middle" class="b">repository</text>
+  <text x="940" y="998" text-anchor="middle" class="small">Repository&lt;T&gt;, one per</text>
+  <text x="940" y="1014" text-anchor="middle" class="small">aggregate root</text>
+
+  <rect x="1060" y="950" width="200" height="70" rx="8" class="domain"/>
+  <text x="1160" y="976" text-anchor="middle" class="b">factory → strategies</text>
+  <text x="1160" y="998" text-anchor="middle" class="small">kinds share an abstract</text>
+  <text x="1160" y="1014" text-anchor="middle" class="small">base class, not a helper</text>
+
+  <rect x="840" y="1060" width="420" height="70" rx="8" class="domain"/>
+  <text x="1050" y="1086" text-anchor="middle" class="b">aggregate root: an entity</text>
+  <text x="1050" y="1108" text-anchor="middle" class="small">private state, behaviour; holds its entities and values</text>
+
+  <path d="M1050,812 L1050,846" class="line" marker-end="url(#arrow)"/>
+  <path d="M940,912 L940,946" class="line" marker-end="url(#arrow)"/>
+  <path d="M1160,912 L1160,946" class="line" marker-end="url(#arrow)"/>
+  <path d="M940,1022 L940,1056" class="line" marker-end="url(#arrow)"/>
+
+  <rect x="1300" y="1060" width="240" height="70" rx="8" class="contracts"/>
+  <text x="1420" y="1086" text-anchor="middle" class="b">raises *.event</text>
+  <text x="1420" y="1108" text-anchor="middle" class="small">past tense, by id</text>
+  <path d="M1262,1095 L1296,1095" class="line" marker-end="url(#arrow)"/>
+
+  <rect x="1300" y="950" width="240" height="70" rx="8" class="api"/>
+  <text x="1420" y="976" text-anchor="middle" class="b">outbox → publisher</text>
+  <text x="1420" y="998" text-anchor="middle" class="small">written in the same commit,</text>
+  <text x="1420" y="1014" text-anchor="middle" class="small">sent after it is kept</text>
+  <path d="M1420,1058 L1420,1024" class="line" marker-end="url(#arrow)"/>
+
+  <rect x="1300" y="850" width="240" height="60" rx="8" class="api"/>
+  <text x="1420" y="875" text-anchor="middle" class="b">throws *Error</text>
+  <text x="1420" y="897" text-anchor="middle" class="small">a problem at the edge</text>
+  <path d="M1262,880 L1296,880" class="line" marker-end="url(#arrow)"/>
+
+  <text x="840" y="1170" class="b">Tests beside the code</text>
+  <text x="840" y="1194" class="small">carry.entity.spec.ts next to carry.entity.ts, through the public face, naming its story.</text>
+  <text x="840" y="1216" class="small">carries.repository.cases.ts runs on data-memory in pnpm test, and on the real</text>
+  <text x="840" y="1236" class="small">provider in a Docker spec. No hand-written in-memory repository.</text>
+  <text x="840" y="1266" class="small">A crossing between modules has a contract test, run by the provider.</text>
+
+  <!-- ───────────── 4. Standards ───────────── -->
+  <rect x="810" y="1310" width="760" height="480" rx="10" class="panel"/>
+  <text x="834" y="1344" class="h2">4. Shared rules: how a change reaches each repo</text>
+
+  <rect x="840" y="1370" width="300" height="80" rx="8" class="decohere"/>
+  <text x="990" y="1398" text-anchor="middle" class="b">typesmiths/standards</text>
+  <text x="990" y="1420" text-anchor="middle" class="small">the rules (DDD, names, tests)</text>
+  <text x="990" y="1438" text-anchor="middle" class="small">+ checks for what a tool can see</text>
+
+  <rect x="1240" y="1370" width="300" height="80" rx="8" class="decohere"/>
+  <text x="1390" y="1398" text-anchor="middle" class="b">@typesmiths/standards</text>
+  <text x="1390" y="1420" text-anchor="middle" class="small">a versioned package on npm</text>
+  <text x="1390" y="1438" text-anchor="middle" class="small">published by its CI</text>
+  <path d="M1142,1410 L1236,1410" class="line" marker-end="url(#arrow)"/>
+  <text x="1160" y="1400" class="small">release</text>
+
+  <rect x="1060" y="1500" width="300" height="80" rx="8" class="host"/>
+  <text x="1210" y="1528" text-anchor="middle" class="b">update PR in each project</text>
+  <text x="1210" y="1550" text-anchor="middle" class="small">opened by the dependency bot,</text>
+  <text x="1210" y="1568" text-anchor="middle" class="small">like any other dependency</text>
+  <path d="M1390,1452 C1390,1480 1300,1480 1290,1496" class="line" marker-end="url(#arrow)"/>
+
+  <rect x="860" y="1630" width="300" height="80" rx="8" class="api"/>
+  <text x="1010" y="1658" text-anchor="middle" class="b">decohere</text>
+  <text x="1010" y="1680" text-anchor="middle" class="small">CI runs the new checks;</text>
+  <text x="1010" y="1698" text-anchor="middle" class="small">fails if a rule is broken</text>
+  <rect x="1240" y="1630" width="300" height="80" rx="8" class="api"/>
+  <text x="1390" y="1658" text-anchor="middle" class="b">ledger</text>
+  <text x="1390" y="1680" text-anchor="middle" class="small">same PR, same checks</text>
+  <text x="1390" y="1698" text-anchor="middle" class="small">on its own schedule</text>
+  <path d="M1150,1582 L1060,1626" class="line" marker-end="url(#arrow)"/>
+  <path d="M1270,1582 L1350,1626" class="line" marker-end="url(#arrow)"/>
+
+  <text x="840" y="1746" class="small">AGENTS.md points at node_modules/@typesmiths/standards/, the version that project runs,</text>
+  <text x="840" y="1766" class="small">so agents read the rules CI checks. Nothing to pull by hand; no copy to drift.</text>
+</svg>

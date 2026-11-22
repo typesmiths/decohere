@@ -47,7 +47,7 @@ Projects are defined in the root `vitest.config.ts`.
 
 | File | Place | Run by |
 |---|---|---|
-| `*.spec.ts` | `tests/` beside the package's `src/` | `pnpm test` (project `unit`) |
+| `*.spec.ts` | beside the file it tests: `src/order.entity.spec.ts` next to `src/order.entity.ts` ([ADR 0027](../adr/0027-app-design.md)). Packages that still have a `tests/` folder move as they're touched | `pnpm test` (project `unit`) |
 | `*.integration.spec.ts` | `tests/`; a behavior suite, same runner | `pnpm test` |
 | `*.docker.spec.ts` | `tests/`; needs a Docker daemon (for example real Postgres) | `pnpm test:docker` (project `docker`), and CI |
 | `*.spec.ts` under `e2e/` | `e2e/` beside `src/`; drives built CLIs or images, real disk | `pnpm run test:e2e` (project `e2e`), and CI |

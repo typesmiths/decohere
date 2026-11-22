@@ -35,10 +35,11 @@ Functions do something; everything else is something.
 1. ES modules; `.js` extensions in TypeScript import paths.
 2. Import through `package.json` `exports` and `tsconfig` paths.
 3. Never `import type` a constructor-injected class. Guide: [`@decohere/crucible`](../../projects/crucible/README.md).
-4. Suffixes: `*.decorator.ts`, `*.service.ts`, `*.controller.ts`, `*.types.ts`, `const.ts`, `*.spec.ts`.
+4. A file holds one thing and is named for it and its role: `order.entity.ts` (not `.model.ts`), `money.value.ts`, `*.service.ts`, `*.strategy.ts`, `*.factory.ts`, `*.repository.ts`, `*.port.ts`, `*.adapter.ts`, `*.controller.ts`, `*.handler.ts`, `*.command.ts`, `*.event.ts`, `*.error.ts`, `*.mapping.ts`, `*.decorator.ts`, `*.const.ts`, `*.module.ts`, `*.config.ts`, `*.contract.ts`, `*.spec.ts`, and in `testing/` `*.cases.ts`. No `utils`, `helpers`, `common`, `shared`, `misc`, `.types.ts`, `.store.ts` or verb-named files in new code; Decohere's own `.types.ts` files are renamed as they're touched ([ADR 0027](../adr/0027-app-design.md)).
 5. Build outputs under `dist/` (`debug` / `release`).
 6. Never silence an error to get past it: no empty `catch`, no error listener that only logs and carries on, no `any` or `@ts-expect-error` to turn a check green.
 7. No issue or PR numbers in files: code, tests, docs and ADRs say the reason in words. The code is the source of truth; the link to a discussion lives in the commit and the PR (`Closes #N`).
+8. Errors are named classes ending in `Error`, one per file (`FundsShortError` in `funds-short.error.ts`), thrown and never swallowed.
 
 Prefer a single `Map` lookup with a null guard over `has` + `get!`:
 
