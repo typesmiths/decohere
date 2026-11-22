@@ -5,20 +5,26 @@
  * already done, so with nothing to do it changes nothing.
  *
  *   npm login
- *   pnpm npm:bootstrap --otp <code> [--dry-run] [--channel dev] [<package-name>...]
+ *   pnpm npm:bootstrap --otp <code> [--dry-run] [<package-name>...]
  *
- * Without names: every publishable package. Everything is read first, in parallel, and then only
- * the missing steps run, so one OTP code (about 30 seconds) can cover them. npm wants the code even
- * to read a package's Trusted Publishers, so it is required, also for `--dry-run`.
+ * Without names: every publishable package in this checkout. A named package needn't be in it, so a
+ * new package's PR can be set up from `main`; one that isn't on npm yet must be in a package.json on
+ * some branch of the repo, so a typo can't claim a name. Everything is read first, in parallel, and
+ * then only the missing steps run, so one OTP code (about 30 seconds) can cover them. npm wants the
+ * code even to read a package's Trusted Publishers, so it is required, also for `--dry-run`.
  *
- * The first publish and the `publish.yml` publisher go through npm's CLI. The `promote-latest.yml`
+ * The first publish only claims the name: a stub with a package.json and a README, version
+ * `0.0.0-bootstrap.0`, so nothing from the checkout is shipped. CI publishes the package built.
+ * It and the `publish.yml` publisher go through npm's CLI. The `promote-latest.yml`
  * publisher is copied from a package that has it, through the registry endpoint `npm trust` uses,
  * because `npm trust` has no flag for the dist-tag permission (`manageDistTags`). npm doesn't
  * document that endpoint. The calls use the npm login in the user's npmrc, which is never printed.
  */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 import { parseArgs } from "node:util";
 import { pathToFileURL } from "node:url";
 import { listPublishablePackages } from "./publish-verify.mjs";
@@ -40,21 +46,68 @@ export const PROMOTE_WORKFLOW = "promote-latest.yml";
  * @typedef {(args: string[], options?: NpmOptions) => { status: number, output: string }} Npm
  */
 
-/** @param {string | undefined} version */
-export function needsPrereleaseTag(version) {
-	return String(version ?? "").includes("-");
+/** The stub's version: below any version CI publishes, and a prerelease, so it needs a tag. */
+export const STUB_VERSION = "0.0.0-bootstrap.0";
+
+/**
+ * npm arguments for the first publish, of the stub in `dir`. Scoped names default to restricted,
+ * so `--access public`; a prerelease needs a tag other than `latest`.
+ *
+ * @param {string} dir an absolute path, so npm doesn't read it as a GitHub `owner/repo`
+ */
+export function publishArgs(dir) {
+	return ["publish", dir, "--access", "public", "--tag", "bootstrap"];
 }
 
 /**
- * npm arguments for a name-only first publish. Scoped names default to restricted,
- * so `--access public`. `./` stops npm reading the path as a GitHub `owner/repo`.
+ * Write the stub that claims a name: a package.json and a README, in a new temporary folder.
  *
- * @param {Package} pkg
- * @param {string} channel
+ * @param {string} name
+ * @returns {string} the folder
  */
-export function publishArgs(pkg, channel) {
-	const tag = needsPrereleaseTag(pkg.version) ? ["--tag", channel] : [];
-	return ["publish", `./projects/${pkg.dir}`, "--access", "public", ...tag];
+export function writeStub(name) {
+	const dir = join(tmpdir(), `npm-bootstrap-${randomUUID()}`);
+	mkdirSync(dir, { recursive: true });
+	const manifest = {
+		name,
+		version: STUB_VERSION,
+		description: `Reserves ${name}. Its releases are published from CI.`,
+		license: "ISC",
+		repository: { type: "git", url: `git+https://github.com/${REPOSITORY}.git` },
+	};
+	writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+	writeFileSync(
+		join(dir, "README.md"),
+		`# ${name}\n\nThis version only reserves the name. Install a release: see https://github.com/${REPOSITORY}.\n`,
+	);
+	return dir;
+}
+
+/**
+ * Whether a package of this name is in a package.json under projects/ on any branch of the repo,
+ * after fetching them.
+ *
+ * @param {string} name
+ * @param {string} root
+ */
+async function isOnBranch(name, root) {
+	const git = (/** @type {string[]} */ args) =>
+		spawnSync("git", args, { cwd: root, encoding: "utf8" });
+	const fetched = git(["fetch", "--quiet", "origin"]);
+	if (fetched.status !== 0) throw new Error(`git fetch origin failed: ${fetched.stderr}`);
+	const refs = git(["for-each-ref", "--format=%(refname)", "refs/remotes/origin"])
+		.stdout.split("\n")
+		.filter((ref) => ref !== "" && !ref.endsWith("/HEAD"));
+	const found = git([
+		"grep",
+		"--fixed-strings",
+		"--files-with-matches",
+		`"name": "${name}"`,
+		...refs,
+		"--",
+		"projects/**/package.json",
+	]);
+	return found.status === 0;
 }
 
 /** @param {string} name */
@@ -167,6 +220,8 @@ function readLoginToken(npm) {
  *     fetch?: typeof globalThis.fetch,
  *     token?: () => string | undefined,
  *     log?: (line: string) => void,
+ *     isOnBranch?: (name: string) => Promise<boolean>,
+ *     writeStub?: (name: string) => string,
  *   },
  * }} [options]
  * @returns {Promise<number>} exit code
@@ -177,7 +232,6 @@ export async function runBootstrap(options = {}) {
 		options: {
 			otp: { type: "string" },
 			"dry-run": { type: "boolean", default: false },
-			channel: { type: "string", default: "dev" },
 		},
 		allowPositionals: true,
 	});
@@ -203,12 +257,14 @@ export async function runBootstrap(options = {}) {
 		return 1;
 	}
 
-	const publishable = listPublishablePackages(options.root ?? process.cwd());
-	const unknown = positionals.filter((name) => !publishable.some((pkg) => pkg.name === name));
-	if (unknown.length > 0) {
-		log(`Not a publishable package in projects/: ${unknown.join(", ")}`);
-		return 1;
-	}
+	const root = options.root ?? process.cwd();
+	const inCheckout = listPublishablePackages(root);
+	// Named packages this checkout doesn't have, such as a new one whose PR isn't merged.
+	/** @type {Package[]} */
+	const elsewhere = positionals
+		.filter((name) => !inCheckout.some((pkg) => pkg.name === name))
+		.map((name) => ({ name, dir: "" }));
+	const publishable = [...inCheckout, ...elsewhere];
 	const chosen =
 		positionals.length > 0
 			? publishable.filter((pkg) => positionals.includes(pkg.name))
@@ -224,6 +280,20 @@ export async function runBootstrap(options = {}) {
 				return { pkg, exists, trust: exists ? await npmRegistry.trust(pkg.name) : [] };
 			}),
 		);
+		// A name to claim must be a package somewhere in the repo, so a typo can't take one.
+		const checkBranch = io.isOnBranch ?? ((name) => isOnBranch(name, root));
+		const unknown = [];
+		for (const { pkg, exists } of state) {
+			if (elsewhere.includes(pkg) && !exists && !(await checkBranch(pkg.name))) {
+				unknown.push(pkg.name);
+			}
+		}
+		if (unknown.length > 0) {
+			log(
+				`Not a package on any branch of ${REPOSITORY}: ${unknown.join(", ")}. Nothing changed.`,
+			);
+			return 1;
+		}
 	} catch (error) {
 		log(`Nothing changed. ${String(error)}`);
 		return 1;
@@ -267,11 +337,13 @@ export async function runBootstrap(options = {}) {
 
 	for (const plan of plans) {
 		const { pkg } = plan;
-		log(`\n${pkg.name} (projects/${pkg.dir}, ${pkg.version})`);
+		log(
+			pkg.dir ? `\n${pkg.name} (projects/${pkg.dir})` : `\n${pkg.name} (not in this checkout)`,
+		);
 
 		if (!plan.publish) {
 			log("  name is on npm: skip the first publish");
-		} else if (!runChange(publishArgs(pkg, values.channel))) {
+		} else if (!runChange(publishArgs((io.writeStub ?? writeStub)(pkg.name)))) {
 			log("  first publish failed: stopping");
 			return 1;
 		}

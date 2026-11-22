@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from "node:fs";
 import { vol } from "memfs";
 import { afterEach, describe, expect, it } from "vitest";
 import { runBootstrap } from "../../src/github/npm-bootstrap.mjs";
@@ -46,11 +47,16 @@ const FULL = [PUBLISH, PROMOTE];
 function fakeNpm({ packages = {}, loggedIn = true, failPosting = [] } = {}) {
 	const calls = [];
 	const posts = [];
+	const published = [];
 	const npm = (args, { otp } = {}) => {
 		calls.push(`${args.join(" ")}${otp ? ` [otp ${otp}]` : ""}`);
 		if (args[0] === "whoami") return { status: loggedIn ? 0 : 1, output: "" };
 		// A first publish creates the name, with no Trusted Publishers yet.
-		if (args[0] === "publish") packages[`@decohere/${args[1].split("/").at(-1)}`] = [];
+		if (args[0] === "publish") {
+			const stub = JSON.parse(readFileSync(`${args[1]}/package.json`, "utf8"));
+			published.push({ manifest: stub, files: readdirSync(args[1]).sort() });
+			packages[stub.name] = [];
+		}
 		return { status: 0, output: "" };
 	};
 	const fetch = async (url, init = {}) => {
@@ -76,10 +82,14 @@ function fakeNpm({ packages = {}, loggedIn = true, failPosting = [] } = {}) {
 		}
 		return new Response(JSON.stringify(packages[name]));
 	};
-	return { npm, fetch, calls, posts };
+	return { npm, fetch, calls, posts, published };
 }
 
-async function run(argv, registry) {
+/** Anything printed that names the stub's temporary folder, with the folder taken out. */
+const STUB = /publish \/\S+ /g;
+const plain = (lines) => lines.map((line) => line.replace(STUB, "publish <stub> "));
+
+async function run(argv, registry, { onBranches = [] } = {}) {
 	const lines = [];
 	const code = await runBootstrap({
 		argv,
@@ -89,9 +99,11 @@ async function run(argv, registry) {
 			fetch: registry.fetch,
 			token: () => LOGIN,
 			log: (line) => lines.push(line),
+			isOnBranch: async (name) => onBranches.includes(name),
 		},
 	});
-	return { code, output: lines.join("\n") };
+	registry.calls.splice(0, registry.calls.length, ...plain(registry.calls));
+	return { code, output: plain(lines).join("\n") };
 }
 
 afterEach(() => {
@@ -110,8 +122,18 @@ describe("npm-bootstrap", () => {
 		expect(code).toBe(0);
 		expect(registry.calls).toEqual([
 			"whoami",
-			"publish ./projects/scribe/scribe-console --access public --tag dev [otp 123456]",
+			"publish <stub> --access public --tag bootstrap [otp 123456]",
 			"trust github @decohere/scribe-console --file publish.yml --repo typesmiths/decohere --env npm-publish --allow-publish --yes [otp 123456]",
+		]);
+		// Only a stub claims the name: none of the package's source, which CI publishes built.
+		expect(registry.published).toEqual([
+			{
+				manifest: expect.objectContaining({
+					name: "@decohere/scribe-console",
+					version: "0.0.0-bootstrap.0",
+				}),
+				files: ["README.md", "package.json"],
+			},
 		]);
 		expect(registry.posts).toEqual([
 			{
@@ -257,9 +279,7 @@ describe("npm-bootstrap", () => {
 		expect(code).toBe(0);
 		expect(registry.calls).toEqual(["whoami"]);
 		expect(registry.posts).toEqual([]);
-		expect(output).toContain(
-			"[dry run] npm publish ./projects/scribe/scribe-console --access public --tag dev",
-		);
+		expect(output).toContain("[dry run] npm publish <stub> --access public --tag bootstrap");
 		expect(output).toContain(
 			"[dry run] copy the Trusted Publisher for promote-latest.yml to @decohere/http-fastify",
 		);
@@ -271,10 +291,49 @@ describe("npm-bootstrap", () => {
 		expect((await run(["--otp", "1"], loggedOut)).code).toBe(1);
 		expect(loggedOut.calls).toEqual(["whoami"]);
 
-		const typo = fakeNpm();
+		const typo = fakeNpm({ packages: { "@decohere/cli": FULL } });
 		const { code, output } = await run(["--otp", "1", "@decohere/scribe-consol"], typo);
 		expect(code).toBe(1);
-		expect(output).toBe("Not a publishable package in projects/: @decohere/scribe-consol");
+		expect(output).toBe(
+			"Not a package on any branch of typesmiths/decohere: @decohere/scribe-consol. Nothing changed.",
+		);
+		expect(typo.calls).toEqual(["whoami"]);
+	});
+
+	it("sets up a new package named from a checkout that doesn't have it, such as main", async () => {
+		seedWorkspace();
+		const registry = fakeNpm({
+			packages: {
+				"@decohere/cli": FULL,
+				"@decohere/http-fastify": FULL,
+				"@decohere/scribe-console": FULL,
+			},
+		});
+
+		const { code } = await run(["--otp", "7", "@decohere/data-memory"], registry, {
+			onBranches: ["@decohere/data-memory"],
+		});
+
+		expect(code).toBe(0);
+		expect(registry.calls).toEqual([
+			"whoami",
+			"publish <stub> --access public --tag bootstrap [otp 7]",
+			"trust github @decohere/data-memory --file publish.yml --repo typesmiths/decohere --env npm-publish --allow-publish --yes [otp 7]",
+		]);
+		expect(registry.published[0].manifest.name).toBe("@decohere/data-memory");
+		expect(registry.posts.map((p) => p.name)).toEqual(["@decohere/data-memory"]);
+	});
+
+	it("repairs a package on npm that this checkout doesn't have, with no branch to look it up on", async () => {
+		seedWorkspace();
+		const registry = fakeNpm({
+			packages: { "@decohere/cli": FULL, "@decohere/data-memory": [PUBLISH] },
+		});
+
+		const { code } = await run(["--otp", "7", "@decohere/data-memory"], registry);
+
+		expect(code).toBe(0);
+		expect(registry.posts.map((p) => p.name)).toEqual(["@decohere/data-memory"]);
 	});
 
 	it("never prints the login", async () => {
