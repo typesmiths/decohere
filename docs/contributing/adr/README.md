@@ -28,7 +28,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 ## Merging and splitting
 
 - When topics drift together, merge them. The earliest record still in force keeps its number; delete the others (git keeps them), repoint references, and list the old numbers on the survivor's **Merges** line.
-- A number with no file was merged: `grep -l 0035 docs/adr/*.md` finds the record that lists it.
+- A number with no file was merged: `grep -l 0035 docs/contributing/adr/*.md` finds the record that lists it.
 - When a record passes about two pages, split it by topic.
 
 ## Index
@@ -43,7 +43,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 
 | ADR | Decision | Status |
 |---|---|---|
-| [0001](0001-record-architecture-decisions.md) | ADRs live in `docs/adr/`, one record per topic, each with a History | Accepted |
+| [0001](0001-record-architecture-decisions.md) | ADRs live in `docs/contributing/adr/`, one record per topic, each with a History | Accepted |
 | [0002](0002-secrets-from-the-environment.md) | Secrets come only from the process environment; `.env` files load only via `--env-file`; Bitwarden recommended | Accepted |
 | [0003](0003-no-changesets-until-public-release.md) | No changesets for now | Accepted |
 | [0004](0004-oxlint-and-prettier.md) | Lint with oxlint, format with Prettier | Accepted |

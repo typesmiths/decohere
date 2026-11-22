@@ -13,7 +13,7 @@
 
 <br />
 
-[**Docs**](docs/) &nbsp;&bull;&nbsp; [**Getting started**](docs/getting-started.md) &nbsp;&bull;&nbsp; [**Recipes**](docs/recipes/) &nbsp;&bull;&nbsp; [**Why Decohere**](docs/why-decohere.md)
+[**Docs**](docs/) &nbsp;&bull;&nbsp; [**Getting started**](docs/guide/getting-started.md) &nbsp;&bull;&nbsp; [**Recipes**](docs/guide/recipes/) &nbsp;&bull;&nbsp; [**Why Decohere**](docs/guide/why-decohere.md)
 
 <br />
 
@@ -72,17 +72,17 @@ $ npx flux run app.ts
 Hello, Ada!
 ```
 
-No `tsconfig.json`, no build step, and flux itself starts in about 150 ms. The [getting started guide](docs/getting-started.md) walks through both.
+No `tsconfig.json`, no build step, and flux itself starts in about 150 ms. The [getting started guide](docs/guide/getting-started.md) walks through both.
 
 ## Why Decohere?
 
 - **Run TypeScript as it is -** [Flux](projects/flux/README.md) runs a single file or a whole app straight from source and reloads on save. No build step, no config, no module-format decisions.
 - **A production API in one command -** [`create`](projects/create/README.md) scaffolds an app with logging, health routes, tests, linting, CI and Dockerfiles already wired, plus Postgres and Auth0 if you want them.
 - **One toolchain from first file to deploy -** [Forge](projects/forge/README.md) builds, tests, versions, containerizes and publishes on the same SWC pipeline Flux runs on.
-- **A framework with defaults you can swap -** HTTP, dependency injection, config, logging, auth and data, on Fastify, Pino, Postgres and Auth0. [Learn more &raquo;](docs/architecture/)
-- **Adopt one piece at a time -** Add Forge or Flux to the workspace you already have; the framework is optional. [Learn more &raquo;](docs/recipes/)
+- **A framework with defaults you can swap -** HTTP, dependency injection, config, logging, auth and data, on Fastify, Pino, Postgres and Auth0. [Learn more &raquo;](docs/guide/#packages)
+- **Adopt one piece at a time -** Add Forge or Flux to the workspace you already have; the framework is optional. [Learn more &raquo;](docs/guide/recipes/)
 
-How it compares with NestJS and Nx: [Why Decohere &raquo;](docs/why-decohere.md)
+How it compares with NestJS and Nx: [Why Decohere &raquo;](docs/guide/why-decohere.md)
 
 ## Want to help?
 

@@ -1,6 +1,6 @@
 # Testing
 
-The rules for tests in this repo. Commands for running them: [contributing](../contributing/). Patterns: [how-tos](#how-tos).
+The rules for tests in this repo. Commands for running them: [contributing](../). Patterns: [how-tos](#how-tos).
 
 ## Behavior over internals
 
@@ -12,7 +12,7 @@ Test what the program does for its users (files written, HTTP responses, exit co
 
 ## Executable behavior before type contracts
 
-[Forge](../../projects/forge/README.md) transpiles with SWC and [Flux](../../projects/flux/README.md) runs the output without waiting for a typecheck. A green typecheck does not prove the process starts or a route responds; a test does. So:
+[Forge](../../../projects/forge/README.md) transpiles with SWC and [Flux](../../../projects/flux/README.md) runs the output without waiting for a typecheck. A green typecheck does not prove the process starts or a route responds; a test does. So:
 
 1. Run the program and exercise the behavior.
 2. Prove it with the smallest executable test: a behavior suite for user-visible results, a unit for an isolated edge.

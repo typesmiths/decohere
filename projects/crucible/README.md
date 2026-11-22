@@ -126,7 +126,7 @@ builder.registerSingleton(SampleStoreToken, store);
 
 ## Registration and lifetimes
 
-Keys match by **identity** ([ADR 0013](../../docs/adr/0013-container-keys-and-lifetimes.md)): a class matches only itself, a symbol only itself, a string only an equal string. So `resolve("SampleService")` does not find `registerSingleton(SampleService)`, `Symbol("TokenService")` does not collide with a class `TokenService`, two classes with the same name in different modules stay apart, and minified class names still work.
+Keys match by **identity** ([ADR 0013](../../docs/contributing/adr/0013-container-keys-and-lifetimes.md)): a class matches only itself, a symbol only itself, a string only an equal string. So `resolve("SampleService")` does not find `registerSingleton(SampleService)`, `Symbol("TokenService")` does not collide with a class `TokenService`, two classes with the same name in different modules stay apart, and minified class names still work.
 
 Registering the same class (or the same type on a token) twice **throws** `RegistrationError` — silent last-wins hides accidental double-registers. Replace it explicitly:
 
@@ -292,7 +292,7 @@ using scope = container.beginScope("test");
 const hello = scope.resolve(HelloController);
 ```
 
-To assert constructor arguments under DI, use `spyOnConstructor` from `@decohere/testing` — a bare `vi.spyOn` / `vi.fn` constructor drops `design:paramtypes`. See [Asserting DI constructor arguments](../../docs/testing/how-tos/vitest-constructor-spy-with-di.md).
+To assert constructor arguments under DI, use `spyOnConstructor` from `@decohere/testing` — a bare `vi.spyOn` / `vi.fn` constructor drops `design:paramtypes`. See [Asserting DI constructor arguments](../../docs/contributing/testing/how-tos/vitest-constructor-spy-with-di.md).
 
 ---
 
@@ -339,15 +339,9 @@ To assert constructor arguments under DI, use `spyOnConstructor` from `@decohere
 - Property or setter injection (constructors only)
 - Compile-time graph checking
 
-## Dependencies
+## Working on this package
 
-| Package | Role |
-|---|---|
-| [`@decohere/core`](../core) | Reflection helpers for `design:paramtypes` (`getMeta`, `isConstructable`, …) |
-
-Layering: [architecture](../../docs/architecture/).
-
-## Layout and tests
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 Crucible implements the container contract in [`@decohere/core/composition`](../core/README.md) (`ContainerBuilder`, `IContainer`, `LifetimeScope`, `inject`, `optional`). Folders in `src/`:
 
@@ -355,4 +349,12 @@ Crucible implements the container contract in [`@decohere/core/composition`](../
 - `decorators/`: `@injectable()`, and `@inject`/`@optional` re-exported from core (`@decohere/crucible/decorators`).
 - `models/`: what a registration and a key are. `types/`: the errors (`ResolveError`, `RegistrationError`, …) and types.
 
-There is no canonical suite for crucible in the [testing table](../../docs/testing/README.md#canonical-suite-ownership). Its specs are in `tests/` (registration, resolution, scopes, multiple package copies), with `tests/hosting/` exercising core's `Builder` on this container (start steps, a worker with hosted services). They move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).
+There is no canonical suite for crucible in the [testing table](../../docs/contributing/testing/README.md#canonical-suite-ownership). Its specs are in `tests/` (registration, resolution, scopes, multiple package copies), with `tests/hosting/` exercising core's `Builder` on this container (start steps, a worker with hosted services). They move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).
+
+### Dependencies
+
+| Package | Role |
+|---|---|
+| [`@decohere/core`](../core) | Reflection helpers for `design:paramtypes` (`getMeta`, `isConstructable`, …) |
+
+Layering: [architecture](../../docs/contributing/architecture/).

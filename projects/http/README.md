@@ -1,6 +1,6 @@
 # @decohere/http
 
-HTTP/API platform for Decohere: decorator-based controllers, routing, auth, OpenAPI, health, problem details, and the `HttpProvider` contract a web server implements. Architecture and the provider boundary: [docs/architecture](../../docs/architecture/).
+HTTP/API platform for Decohere: decorator-based controllers, routing, auth, OpenAPI, health, problem details, and the `HttpProvider` contract a web server implements. Architecture and the provider boundary: [architecture](../../docs/contributing/architecture/).
 
 Controllers and services depend on the contracts exported from `@decohere/http`. The web server itself is a provider the app picks, in its own package: [`@decohere/http-fastify`](../http-fastify/README.md) (`FastifyProvider`) today. This package installs no web server.
 
@@ -144,7 +144,7 @@ Builder.create(new ServiceContainerBuilder())
 
 **`exclude`.** Patterns for paths the mount never answers, neither a file nor the fallback (the request gets the JSON `404`), for anything the defaults get wrong. They are globs ([picomatch](https://github.com/micromatch/picomatch), `dot` on) matched against the full request path after decoding it and collapsing repeated slashes, not relative to the prefix: `*` is any characters within one segment, `**` crosses segments, `?` is one character. `"/docs/**"` covers `/docs`, `/docs/` and everything below.
 
-Why this shape, and what is left (running the UI's own build): [ADR 0007](../../docs/adr/0007-serving-a-built-ui-from-http.md).
+Why this shape, and what is left (running the UI's own build): [ADR 0007](../../docs/contributing/adr/0007-serving-a-built-ui-from-http.md).
 
 ## Global prefix
 
@@ -224,7 +224,7 @@ http(FastifyProvider, {
 - **BREACH.** Compressing a response served over HTTPS that contains both a secret and input an attacker controls can leak the secret to someone who can watch response sizes. It mostly concerns HTML that reflects input next to a CSRF token. A JSON API that authenticates with a bearer token in a header is low risk, because the token is not in the body. If you render such pages, mask per-response secrets, do not reflect input beside them, or turn compression off for them.
 - **Testing.** Node's `fetch` negotiates and decodes compression itself. To see what is on the wire, use `node:http` and read the body undecoded.
 
-Why this shape: [ADR 0008](../../docs/adr/0008-response-compression-in-http.md).
+Why this shape: [ADR 0008](../../docs/contributing/adr/0008-response-compression-in-http.md).
 
 ## Server-sent events
 
@@ -275,7 +275,7 @@ Browser side: `new EventSource("/lp/portfolio/stream")`. It reconnects by itself
 - **App stop.** `app.dispose()` (also what Flux calls on a reboot, and what a SIGTERM runs) aborts every open stream and waits for them to end before closing.
 - **OpenAPI.** The `200` response is documented as `text/event-stream`, and a `@LastEventId()` argument shows up as the `Last-Event-ID` header parameter.
 
-Why this shape, and what is left for later: [ADR 0005](../../docs/adr/0005-server-sent-events-in-http.md).
+Why this shape, and what is left for later: [ADR 0005](../../docs/contributing/adr/0005-server-sent-events-in-http.md).
 
 ### Testing a stream
 
@@ -309,7 +309,9 @@ it("streams the first three prices", async () => {
 
 Hosted services, start steps and how the app starts and stops are in [`@decohere/core`: hosting](../core/README.md#hosting). `health()` adds the `/ready` probe that reports them.
 
-## Layout and tests
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 `http` holds the contracts a web server implements (`HttpProvider` in `routing/http.types.ts`, registered under core's `AppServerToken`); [`@decohere/http-fastify`](../http-fastify/README.md) is the provider. Folders in `src/`:
 
@@ -319,4 +321,4 @@ Hosted services, start steps and how the app starts and stops are in [`@decohere
 - `openapi/`: the OpenAPI document and request validation. `sse/`: server-sent events. `health/`: `health()`, `/health` and `/ready`.
 - `app/`: the `Module` base class. `testing/`: `startTestApp`, `bootModule` and the event reader (`@decohere/http/testing`).
 
-The canonical suites are `tests/*.integration.spec.ts`, run on `FastifyProvider`; `*.pentest.spec.ts` and units cover crypto and SSRF edges ([testing](../../docs/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).
+The canonical suites are `tests/*.integration.spec.ts`, run on `FastifyProvider`; `*.pentest.spec.ts` and units cover crypto and SSRF edges ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).

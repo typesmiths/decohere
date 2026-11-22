@@ -4,31 +4,31 @@ The rules every package follows. New code follows them; if existing code disagre
 
 ## Packages
 
-Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects/workspace/README.md#workspace-layout) finds them through `projects/**/package.json`.
+Publishable packages live in `projects/`. [`@decohere/workspace`](../../../projects/workspace/README.md#workspace-layout) finds them through `projects/**/package.json`.
 
 | Package | Path | Role |
 |---|---|---|
-| [`@decohere/core`](../../projects/core/) | `projects/core` | Runtime base: reflection, composition, extensibility, caching, file IO ([ADR 0015](../adr/0015-core-devkit-testing.md)) |
-| [`@decohere/crucible`](../../projects/crucible/README.md) | `projects/crucible` | Dependency injection |
-| [`@decohere/scribe`](../../projects/scribe/README.md) | `projects/scribe/scribe` | Logging facade; no dependencies, any runtime with a `console` ([ADR 0016](../adr/0016-scribe-on-any-runtime.md)) |
+| [`@decohere/core`](../../../projects/core/) | `projects/core` | Runtime base: reflection, composition, extensibility, caching, file IO ([ADR 0015](../adr/0015-core-devkit-testing.md)) |
+| [`@decohere/crucible`](../../../projects/crucible/README.md) | `projects/crucible` | Dependency injection |
+| [`@decohere/scribe`](../../../projects/scribe/README.md) | `projects/scribe/scribe` | Logging facade; no dependencies, any runtime with a `console` ([ADR 0016](../adr/0016-scribe-on-any-runtime.md)) |
 | `@decohere/scribe-pino` | `projects/scribe/scribe-pino` | Pino writer |
 | `@decohere/scribe-console` | `projects/scribe/scribe-console` | JSON console writer (Workers, browsers, Deno, Bun, Node) |
-| [`@decohere/http`](../../projects/http/README.md) | `projects/http` | HTTP: controllers, routing, auth, OpenAPI, health, problem details and the `HttpProvider` contract, with no web server of its own ([ADR 0014](../adr/0014-package-names.md)); the test helpers at `/testing` ([ADR 0026](../adr/0026-app-recipes-and-test-helper.md)) |
-| [`@decohere/http-fastify`](../../projects/http-fastify/README.md) | `projects/http-fastify` | Fastify provider: `FastifyProvider`, with helmet, CORS, compression, rate limit and static files |
-| [`@decohere/config`](../../projects/config/README.md) | `projects/config` | Configuration from YAML and environment sources |
-| [`@decohere/data`](../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)) |
-| [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `database` |
-| [`@decohere/data-mikro-orm`](../../projects/data/data-mikro-orm/README.md) | `projects/data/data-mikro-orm` | MikroORM provider: the `mikroOrm()` plugin, over MikroORM's own unit of work |
-| [`@decohere/data-typeorm`](../../projects/data/data-typeorm/README.md) | `projects/data/data-typeorm` | TypeORM provider: the `typeOrm()` plugin, on data's change tracker |
-| [`@decohere/data-memory`](../../projects/data/data-memory/README.md) | `projects/data/data-memory` | In-memory provider: the `memory()` plugin, on data's change tracker, for tests and local runs with no database |
-| [`@decohere/devkit`](../../projects/devkit/README.md) | `projects/devkit` | Base for the CLIs: commands, `git`/`npm`/`docker` wrappers, file search and watch. Never in a production app |
-| [`@decohere/workspace`](../../projects/workspace/README.md) | `projects/workspace` | Workspace model: package discovery and aliases |
-| [`@decohere/forge`](../../projects/forge/README.md) | `projects/forge` | Build (SWC), typecheck, test, version, publish, Docker; Vitest plugin at `@decohere/forge/vitest`; `@decohere/forge/transpile` compiles a file without loading forge's commands (what flux uses) |
-| [`@decohere/flux`](../../projects/flux/README.md) | `projects/flux` | Runs TypeScript from source with in-process reload |
+| [`@decohere/http`](../../../projects/http/README.md) | `projects/http` | HTTP: controllers, routing, auth, OpenAPI, health, problem details and the `HttpProvider` contract, with no web server of its own ([ADR 0014](../adr/0014-package-names.md)); the test helpers at `/testing` ([ADR 0026](../adr/0026-app-recipes-and-test-helper.md)) |
+| [`@decohere/http-fastify`](../../../projects/http-fastify/README.md) | `projects/http-fastify` | Fastify provider: `FastifyProvider`, with helmet, CORS, compression, rate limit and static files |
+| [`@decohere/config`](../../../projects/config/README.md) | `projects/config` | Configuration from YAML and environment sources |
+| [`@decohere/data`](../../../projects/data/data/README.md) | `projects/data/data` | Repository, query and unit-of-work contracts; the change tracker for providers without one ([ADR 0024](../adr/0024-default-orm.md)) |
+| [`@decohere/data-postgres`](../../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `database` |
+| [`@decohere/data-mikro-orm`](../../../projects/data/data-mikro-orm/README.md) | `projects/data/data-mikro-orm` | MikroORM provider: the `mikroOrm()` plugin, over MikroORM's own unit of work |
+| [`@decohere/data-typeorm`](../../../projects/data/data-typeorm/README.md) | `projects/data/data-typeorm` | TypeORM provider: the `typeOrm()` plugin, on data's change tracker |
+| [`@decohere/data-memory`](../../../projects/data/data-memory/README.md) | `projects/data/data-memory` | In-memory provider: the `memory()` plugin, on data's change tracker, for tests and local runs with no database |
+| [`@decohere/devkit`](../../../projects/devkit/README.md) | `projects/devkit` | Base for the CLIs: commands, `git`/`npm`/`docker` wrappers, file search and watch. Never in a production app |
+| [`@decohere/workspace`](../../../projects/workspace/README.md) | `projects/workspace` | Workspace model: package discovery and aliases |
+| [`@decohere/forge`](../../../projects/forge/README.md) | `projects/forge` | Build (SWC), typecheck, test, version, publish, Docker; Vitest plugin at `@decohere/forge/vitest`; `@decohere/forge/transpile` compiles a file without loading forge's commands (what flux uses) |
+| [`@decohere/flux`](../../../projects/flux/README.md) | `projects/flux` | Runs TypeScript from source with in-process reload |
 | `@decohere/cli` | `projects/cli` | The CLI host: `decohere`, `forge` and `flux` bins |
-| [`@decohere/create`](../../projects/create/README.md) | `projects/create` | `npm create @decohere`: runs the scaffolder in Docker |
+| [`@decohere/create`](../../../projects/create/README.md) | `projects/create` | `npm create @decohere`: runs the scaffolder in Docker |
 | `@decohere/scaffold` | `projects/scaffold` | The scaffolder: `create`, `add` and `auth0` modules |
-| [`@decohere/testing`](../../projects/testing/README.md) | `projects/testing` | Vitest helpers: memfs, mock logger, constructor spies |
+| [`@decohere/testing`](../../../projects/testing/README.md) | `projects/testing` | Vitest helpers: memfs, mock logger, constructor spies |
 | `@decohere/ci-tools` | `projects/ci-tools` | Scripts the CI workflows run |
 | `@decohere/devcontainer` | `projects/devcontainer` | Base image for scaffolded apps' Dev Containers (private; image only) |
 
@@ -78,7 +78,7 @@ How Decohere's own code is shaped ([ADR 0027](../adr/0027-code-design.md); the p
 
 ## Key patterns
 
-- **DI:** `@injectable()` with a **value** import for constructor parameter types; `@inject(Class | Token)` for interfaces, symbols, arrays or an explicit key. [Crucible](../../projects/crucible/README.md).
+- **DI:** `@injectable()` with a **value** import for constructor parameter types; `@inject(Class | Token)` for interfaces, symbols, arrays or an explicit key. [Crucible](../../../projects/crucible/README.md).
 - **HTTP:** `@Controller()` from `@decohere/http`; handlers orchestrate, services hold the logic.
 - **Dispose and reload:** Flux calls `Symbol.asyncDispose` on the entry's default export, so `export default app` is enough at the composition root. `App.dispose` stops hosted services (`withHostedService`, [ADR 0010](../adr/0010-hosted-services.md)), then disposes the container, then Scribe. Long-lived services implement `Symbol.asyncDispose`.
 - **Logging:** libraries log through Scribe, never a concrete logger or `console`: `private readonly log = scribe.logger("http.router")`.

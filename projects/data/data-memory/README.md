@@ -52,8 +52,10 @@ It behaves as Postgres does wherever a repository could tell the difference:
 
 What differs: strings compare and sort by code unit, not by the database's collation. Columns have no types, lengths or `NOT NULL` checks beyond the key and required references. And the rows last only as long as the app.
 
-## Layout and tests
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 `data-memory` implements data's `RowStore` in the process, under data's `TrackingUnitOfWork`. `src/` is flat: `memory.plugin.ts` (`memory(...)`), `memory-entity.ts` (`mapEntity`, the mapping), `memory.row-store.ts` (`MemoryRowStore`) and `memory.store.ts` (`MemoryStore` and its transactions: keys, locks and copies).
 
-Its canonical suite is data's unit-of-work contract: the cases run on it in `projects/data/data/tests/unit-of-work.contract.spec.ts`, in `pnpm test` ([testing](../../../docs/testing/README.md#canonical-suite-ownership)). Here, `tests/memory.store.spec.ts` covers the store's keys, locks and copies, and `tests/memory.plugin.spec.ts` the plugin. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/adr/0027-code-design.md)).
+Its canonical suite is data's unit-of-work contract: the cases run on it in `projects/data/data/tests/unit-of-work.contract.spec.ts`, in `pnpm test` ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/memory.store.spec.ts` covers the store's keys, locks and copies, and `tests/memory.plugin.spec.ts` the plugin. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).

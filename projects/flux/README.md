@@ -36,7 +36,7 @@ The `flux` command is on `@decohere/cli` (this package is the API):
 npm i -D @decohere/cli
 ```
 
-With pnpm, see [Using pnpm](../../docs/getting-started.md#using-pnpm).
+With pnpm, see [Using pnpm](../../docs/guide/getting-started.md#using-pnpm).
 
 That installs the `flux`, `forge`, and `decohere` bins. Then:
 
@@ -273,7 +273,9 @@ await server.dispose();
 
 Slice helpers (`classifySliceProjects`, `normalizeSlicePrefix`, …) and the engine types (`SourceModuleLoader`, `HotReloadServer`) stay exported for tests and tooling; the CLI and `flux` facade are the primary surfaces.
 
-## Layout and tests
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 `src/` is flat today. Flux is a CLI module, `FluxModule` (`flux.module.ts`), with the `run` and `serve` commands and actions (`run.command.ts`, `run.action.ts`, `serve.command.ts`, `serve.action.ts`). Beside them:
 
@@ -281,4 +283,4 @@ Slice helpers (`classifySliceProjects`, `normalizeSlicePrefix`, …) and the eng
 - serving: `hot-reload-server.ts` (HMR reboots), `slice-serve.ts` (which projects `flux serve <dir>` runs) and `deferred-script-runner.ts` (projects with a script of their own);
 - `flux.ts`: the `flux` namespace object (`flux.run`, `flux.serve`, `flux.dispose`) for code that runs Flux without the CLI.
 
-The canonical suite is the flux CLI's, `projects/cli/tests/flux.integration.spec.ts`; `tests/hmr.server.spec.ts` covers `HotReloadServer` edges the CLI can't see ([testing](../../docs/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)). `bench/` holds the load, run, serve and transpile benchmarks.
+The canonical suite is the flux CLI's, `projects/cli/tests/flux.integration.spec.ts`; `tests/hmr.server.spec.ts` covers `HotReloadServer` edges the CLI can't see ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)). `bench/` holds the load, run, serve and transpile benchmarks.

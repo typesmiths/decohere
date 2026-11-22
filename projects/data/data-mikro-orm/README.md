@@ -44,8 +44,10 @@ Things to know:
 - **Version fields** need a database default (`version int not null default 1`). MikroORM leaves the column to it on insert.
 - **SQL a query can't express:** `uow.entityManager.getKysely()`, inside a repository.
 
-## Layout and tests
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 `data-mikro-orm` implements data's `IUnitOfWork` on MikroORM. `src/` is flat: `mikro-orm.module.ts` (the `mikroOrm(...)` plugin and `MikroOrmModule`, which opens the data sources), `mikro-orm.unit-of-work.ts` (`MikroOrmUnitOfWork`) and `inject-mikro-orm.ts` (`@injectMikroOrm()`).
 
-Its canonical suite is data's unit-of-work contract, `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, where MikroORM's writes are the snapshotted reference ([testing](../../../docs/testing/README.md#canonical-suite-ownership)). Here, `tests/mikro-orm.module.spec.ts` covers the plugin's wiring and `tests/mikro-orm.plugin.docker.spec.ts` runs it against Postgres. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/adr/0027-code-design.md)).
+Its canonical suite is data's unit-of-work contract, `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, where MikroORM's writes are the snapshotted reference ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/mikro-orm.module.spec.ts` covers the plugin's wiring and `tests/mikro-orm.plugin.docker.spec.ts` runs it against Postgres. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).

@@ -10,7 +10,7 @@ npm i -D @decohere/cli
 npx flux run report.ts
 ```
 
-No build step, `tsconfig.json` or framework. [Flux](../projects/flux/README.md) compiles with Forge's SWC pipeline as Node loads each file.
+No build step, `tsconfig.json` or framework. [Flux](../../projects/flux/README.md) compiles with Forge's SWC pipeline as Node loads each file.
 
 ## Scaffold an API
 
@@ -22,7 +22,7 @@ cd orders
 pnpm dev
 ```
 
-You get a working app with config and environment conventions, structured logging, health and readiness routes, tests, lint and typecheck, reload on save, CI, a production build and Dockerfiles, plus a Dev Container. The scaffolder can also wire Postgres (MikroORM by default, or TypeORM), with migrations, and Auth0. Options: [`@decohere/create`](../projects/create/README.md).
+You get a working app with config and environment conventions, structured logging, health and readiness routes, tests, lint and typecheck, reload on save, CI, a production build and Dockerfiles, plus a Dev Container. The scaffolder can also wire Postgres (MikroORM by default, or TypeORM), with migrations, and Auth0. Options: [`@decohere/create`](../../projects/create/README.md).
 
 Saving a file reloads the API through Flux, including changes in workspace libraries, without prebuilding them. `pnpm build` runs the same compiler through Forge and emits what `pnpm start` and the Dockerfile run.
 
@@ -46,8 +46,8 @@ flowchart LR
 
 `npm i -D @decohere/cli` gives package scripts and `npx` the `forge`, `flux` and `decohere` commands. Use them in an existing workspace without the framework.
 
-- **[Flux](../projects/flux/README.md)** runs TypeScript from source: one file with `flux run`, or a long-running app with `flux serve`, reloading on save.
-- **[Forge](../projects/forge/README.md)** builds, typechecks, tests, versions, publishes and builds Docker images, workspace-aware: `forge build` resolves workspace imports to source; `forge build --configuration release` emits the published package shape.
+- **[Flux](../../projects/flux/README.md)** runs TypeScript from source: one file with `flux run`, or a long-running app with `flux serve`, reloading on save.
+- **[Forge](../../projects/forge/README.md)** builds, typechecks, tests, versions, publishes and builds Docker images, workspace-aware: `forge build` resolves workspace imports to source; `forge build --configuration release` emits the published package shape.
 
 ## Using pnpm
 

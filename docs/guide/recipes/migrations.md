@@ -1,6 +1,6 @@
 # Migrations
 
-How to change a Decohere app's database: set up the commands, change the schema in development, migrate in a deploy, change a schema while the app keeps serving, and move an app over from TypeORM's own migrations. The format and the commands are in [`@decohere/data`](../../projects/data/data/README.md#migrations); the Postgres runner is in [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md#running-migrations). A generated app comes set up.
+How to change a Decohere app's database: set up the commands, change the schema in development, migrate in a deploy, change a schema while the app keeps serving, and move an app over from TypeORM's own migrations. The format and the commands are in [`@decohere/data`](../../../projects/data/data/README.md#migrations); the Postgres runner is in [`@decohere/data-postgres`](../../../projects/data/data-postgres/README.md#running-migrations). A generated app comes set up.
 
 ## Set up
 

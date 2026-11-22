@@ -78,7 +78,7 @@ database:
 
 `${NAME}` reads an environment variable, and `${NAME:default}` gives it a default. Placeholders are resolved **after** the merge. That way an environment file can replace a production `${VAR}` without the variable being set. Placeholders still unset after the merge fail together, and the error names every variable and where it was used. A variable set to the text `null` means no value.
 
-Secrets come only from the process environment ([ADR 0002](../../docs/adr/0002-secrets-from-the-environment.md)). Nothing here reads a `.env` file; a CLI loads one only with an explicit `--env-file`.
+Secrets come only from the process environment ([ADR 0002](../../docs/contributing/adr/0002-secrets-from-the-environment.md)). Nothing here reads a `.env` file; a CLI loads one only with an explicit `--env-file`.
 
 ## Layers
 
@@ -143,8 +143,10 @@ A `devOnly` key with a value stops the app unless `NODE_ENV` is `development` or
 
 **What these can't catch:** an ordinary value such as `host: localhost` in the base file, because nothing says it's wrong; use `${VAR}` with no default for values that differ by environment, so a missing one stops the app. A section read by name, or with no schema, skips the schema checks.
 
-## Layout and tests
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 `src/` is flat today, one subdomain: the plugins (`configuration.plugin.ts`), the service that implements core's `IConfigurationService` (`configuration.service.ts`), the `ConfigurationDataSource` base and its two sources (`yaml-data-source.ts`, `env-data-source.ts`), and the merge of layers (`tree-merge.ts`).
 
-There is no canonical suite for config in the [testing table](../../docs/testing/README.md#canonical-suite-ownership). Its behaviour is covered by `tests/layers.spec.ts` (layers, sections, guards through a built app), `tests/yaml-config.spec.ts` and `tests/env-only.spec.ts`, with `tests/yaml-data-source.pentest.spec.ts` for unsafe input. Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).
+There is no canonical suite for config in the [testing table](../../docs/contributing/testing/README.md#canonical-suite-ownership). Its behaviour is covered by `tests/layers.spec.ts` (layers, sections, guards through a built app), `tests/yaml-config.spec.ts` and `tests/env-only.spec.ts`, with `tests/yaml-data-source.pentest.spec.ts` for unsafe input. Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).

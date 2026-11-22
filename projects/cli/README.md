@@ -14,8 +14,10 @@ The scaffolder's modules come from [`@decohere/scaffold`](../scaffold/README.md)
 
 `decohere db <command>` runs an API's own `src/db.ts` from source with Flux, passing the rest of the command line to it: `migrate`, `status`, `revert`, `new`, `generate`. `--api <name>` picks the API (folder or package name) when more than one has a `src/db.ts`. The commands themselves live in the app and in [`@decohere/data`](../data/data/README.md); this CLI only finds and runs the file.
 
-## Layout and tests
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 `src/` is flat: one file per bin (`cli.ts`, `forge.ts`, `flux.ts`), the root module and command, the module factory, the scaffold host wrappers and the `db` module, command and action.
 
-The canonical suites are `tests/product.integration.spec.ts` (the product CLI's shape), `tests/forge.integration.spec.ts` and `tests/flux.integration.spec.ts`. They run in memory against memfs: `RootModule.create([...])`, then `app.run(["forge", "build"])` ([testing](../../docs/testing/README.md#canonical-suite-ownership)). `tests/*.bin.spec.ts` run a bin as a child process, `tests/db.docker.spec.ts` needs Docker, and `e2e/` drives the built CLI. Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/adr/0027-code-design.md)).
+The canonical suites are `tests/product.integration.spec.ts` (the product CLI's shape), `tests/forge.integration.spec.ts` and `tests/flux.integration.spec.ts`. They run in memory against memfs: `RootModule.create([...])`, then `app.run(["forge", "build"])` ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)). `tests/*.bin.spec.ts` run a bin as a child process, `tests/db.docker.spec.ts` needs Docker, and `e2e/` drives the built CLI. Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).

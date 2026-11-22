@@ -23,13 +23,13 @@ npx flux run hello.ts -- Ada
 # hello Ada
 ```
 
-[Flux](../../projects/flux/README.md) compiles the file with SWC as it loads and forwards everything after `--` to it as `process.argv`.
+[Flux](../../../projects/flux/README.md) compiles the file with SWC as it loads and forwards everything after `--` to it as `process.argv`.
 
 ## Keep secrets out of files (Bitwarden)
 
 Inject secrets into the environment for one command, so they never sit on disk.
 
-Decohere reads settings from environment variables, never from a `.env` file unless you ask ([ADR 0002](../adr/0002-secrets-from-the-environment.md)).
+Decohere reads settings from environment variables, never from a `.env` file unless you ask ([ADR 0002](../../contributing/adr/0002-secrets-from-the-environment.md)).
 
 1. In Bitwarden Secrets Manager, create a project and add secrets named like the environment variables your app reads (`DB_PASSWORD`, `AUTH0_AUDIENCE`).
 2. Create a machine account with read access to that project and copy its access token.
@@ -51,7 +51,7 @@ In CI, use [`bitwarden/sm-action`](https://github.com/bitwarden/sm-action); in p
 
 Build a package into ESM and type declarations, then publish that build.
 
-The default [workspace](../../projects/workspace/README.md) layout finds packages under `projects/`:
+The default [workspace](../../../projects/workspace/README.md) layout finds packages under `projects/`:
 
 ```text
 package.json
@@ -61,7 +61,7 @@ projects/
     src/index.ts
 ```
 
-Point the package's `exports` at the layout [Forge](../../projects/forge/README.md) emits:
+Point the package's `exports` at the layout [Forge](../../../projects/forge/README.md) emits:
 
 ```json
 {
@@ -130,7 +130,7 @@ npx flux run main.ts
 # stopped
 ```
 
-The app stops its hosted services on SIGTERM or SIGINT. See [hosted services](../../projects/core/README.md#hosted-services) for the full contract.
+The app stops its hosted services on SIGTERM or SIGINT. See [hosted services](../../../projects/core/README.md#hosted-services) for the full contract.
 
 ## Shut down without dropping requests
 

@@ -6,7 +6,7 @@ on:
     branches: [main]
     types: [completed]
   # A stable release, started by hand. It lives in this file because npm's trusted publishing is
-  # tied to it. See "Stable release" in docs/ci/README.md.
+  # tied to it. See "Stable release" in docs/contributing/ci/README.md.
   workflow_dispatch:
     inputs:
       tested_version:

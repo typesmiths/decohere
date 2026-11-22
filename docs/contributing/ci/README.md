@@ -14,7 +14,7 @@ CI stores no secrets or variables. npm publishing uses Trusted Publishing (OIDC)
 | Nightly 03:17 UTC | Bench on `main`, then Pages (benchmark charts). |
 | Nightly 06:00 UTC | npm audit. |
 
-`main` accepts changes only through the merge queue, with squash merges, and requires the `ci` check. A branch without a pull request gets no CI; open a draft PR. Docs-only changes (nothing matching [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml)) skip the suite on pull requests and `main` pushes, and the `ci` check still passes. `workflow_dispatch` and the merge queue never skip for docs. An image break can land on `main` when a PR didn't touch the image files: `main` turns red and nothing publishes until it's fixed.
+`main` accepts changes only through the merge queue, with squash merges, and requires the `ci` check. A branch without a pull request gets no CI; open a draft PR. Docs-only changes (nothing matching [`code-paths-filter.yml`](../../../.github/ci/code-paths-filter.yml)) skip the suite on pull requests and `main` pushes, and the `ci` check still passes. `workflow_dispatch` and the merge queue never skip for docs. An image break can land on `main` when a PR didn't touch the image files: `main` turns red and nothing publishes until it's fixed.
 
 ## The flows
 
@@ -56,22 +56,22 @@ flowchart LR
 
 | File | Role |
 |---|---|
-| [`ci.yml`](../../.github/workflows/ci.yml) | The suite; required check `ci`. |
-| [`promote-latest.yml`](../../.github/workflows/promote-latest.yml) | Started by hand: moves npm `latest` to a version that fully shipped. |
-| [`publish.yml`](../../.github/workflows/publish.yml) | After CI succeeds on `main`: npm, Docker images, `v*` tag. Started by hand: a stable release. |
-| [`pages.yml`](../../.github/workflows/pages.yml) | After CI succeeds on `main`: coverage and CI badges to GitHub Pages. |
-| [`bench.yml`](../../.github/workflows/bench.yml) | Nightly benchmarks on `main`, deployed to Pages. |
-| [`clear-benchmark-history.yml`](../../.github/workflows/clear-benchmark-history.yml) | Manual: redeploys Pages with an empty benchmark history. |
-| [`npm-audit.yml`](../../.github/workflows/npm-audit.yml) | Nightly `pnpm audit` report. |
-| [`setup-node-pnpm`](../../.github/actions/setup-node-pnpm/action.yml) | Composite action: pnpm, Node, install, optional git identity. |
-| [`publish-prepare`](../../.github/actions/publish-prepare/action.yml) | Composite action: applies the build's version and downloads CI's release build for Publish. |
-| [`verify-release`](../../.github/actions/verify-release/action.yml) | Composite action: uses a build from a temporary registry, the way a user does. |
-| [`failure-report`](../../.github/actions/failure-report/action.yml) | Composite action: puts why a failed job failed on the run's summary page. |
-| [`code-paths-filter.yml`](../../.github/ci/code-paths-filter.yml) | Which paths count as code for CI and Publish. |
+| [`ci.yml`](../../../.github/workflows/ci.yml) | The suite; required check `ci`. |
+| [`promote-latest.yml`](../../../.github/workflows/promote-latest.yml) | Started by hand: moves npm `latest` to a version that fully shipped. |
+| [`publish.yml`](../../../.github/workflows/publish.yml) | After CI succeeds on `main`: npm, Docker images, `v*` tag. Started by hand: a stable release. |
+| [`pages.yml`](../../../.github/workflows/pages.yml) | After CI succeeds on `main`: coverage and CI badges to GitHub Pages. |
+| [`bench.yml`](../../../.github/workflows/bench.yml) | Nightly benchmarks on `main`, deployed to Pages. |
+| [`clear-benchmark-history.yml`](../../../.github/workflows/clear-benchmark-history.yml) | Manual: redeploys Pages with an empty benchmark history. |
+| [`npm-audit.yml`](../../../.github/workflows/npm-audit.yml) | Nightly `pnpm audit` report. |
+| [`setup-node-pnpm`](../../../.github/actions/setup-node-pnpm/action.yml) | Composite action: pnpm, Node, install, optional git identity. |
+| [`publish-prepare`](../../../.github/actions/publish-prepare/action.yml) | Composite action: applies the build's version and downloads CI's release build for Publish. |
+| [`verify-release`](../../../.github/actions/verify-release/action.yml) | Composite action: uses a build from a temporary registry, the way a user does. |
+| [`failure-report`](../../../.github/actions/failure-report/action.yml) | Composite action: puts why a failed job failed on the run's summary page. |
+| [`code-paths-filter.yml`](../../../.github/ci/code-paths-filter.yml) | Which paths count as code for CI and Publish. |
 
 ## When a run fails
 
-The run's summary page says which step failed and why, with the step's last lines and a link to its full log. Every workflow does this through [`failure-report.mjs`](../../projects/ci-tools/src/github/failure-report.mjs), so a script only has to print its reason before exiting. In `ci.yml` it's a step in the `ci` job; elsewhere it's a `failure-report` job, which a test requires of every workflow.
+The run's summary page says which step failed and why, with the step's last lines and a link to its full log. Every workflow does this through [`failure-report.mjs`](../../../projects/ci-tools/src/github/failure-report.mjs), so a script only has to print its reason before exiting. In `ci.yml` it's a step in the `ci` job; elsewhere it's a `failure-report` job, which a test requires of every workflow.
 
 ## CI (`ci.yml`)
 
@@ -82,8 +82,8 @@ The run's summary page says which step failed and why, with the step's last line
 - **coverage** (`main`): the unit tests with coverage thresholds. It uploads coverage for Pages.
 - **test-docker**: Docker-backed tests. On `main` and manual runs, and on a PR that changes data code.
 - **build** (`main` and manual runs): stamps the dev version, syncs dependency versions and uploads the release build as `forge-release-beta-<run>`.
-- **package** (everything except `main`): one release build, dependency drift report, a generated app typechecked against that build ([`generated-app-types.e2e.spec.ts`](../../projects/scaffold/e2e/generated-app-types.e2e.spec.ts)) and `forge publish --dry-run`. When the image files changed, it also packs `create.tgz`, runs `forge docker --dry-run` (images built, not pushed), and builds a generated app's Dev Container on that base image.
-- **verify-release** (`main` and manual runs only): takes `build`'s build, runs the quick e2e specs for the build and the forge CLI, publishes it to a temporary registry ([Verdaccio](../../.github/ci/verdaccio.yaml)) inside the job, builds the images, checks the scaffolder in the `create` image matches its tag, then runs [`real-install.e2e.spec.ts`](../../projects/create/e2e/real-install.e2e.spec.ts): the real launcher, the generated app's install, typecheck, build, test, lint and `/health` on exact pnpm versions, the generated Dev Container, with and without Postgres, and the install steps in the docs. If it fails, nothing reaches npm. A broken merge turns `main` red, and publishing stops until a fix or revert lands ([ADR 0020](../adr/0020-test-the-real-install-before-publishing.md)).
+- **package** (everything except `main`): one release build, dependency drift report, a generated app typechecked against that build ([`generated-app-types.e2e.spec.ts`](../../../projects/scaffold/e2e/generated-app-types.e2e.spec.ts)) and `forge publish --dry-run`. When the image files changed, it also packs `create.tgz`, runs `forge docker --dry-run` (images built, not pushed), and builds a generated app's Dev Container on that base image.
+- **verify-release** (`main` and manual runs only): takes `build`'s build, runs the quick e2e specs for the build and the forge CLI, publishes it to a temporary registry ([Verdaccio](../../../.github/ci/verdaccio.yaml)) inside the job, builds the images, checks the scaffolder in the `create` image matches its tag, then runs [`real-install.e2e.spec.ts`](../../../projects/create/e2e/real-install.e2e.spec.ts): the real launcher, the generated app's install, typecheck, build, test, lint and `/health` on exact pnpm versions, the generated Dev Container, with and without Postgres, and the install steps in the docs. If it fails, nothing reaches npm. A broken merge turns `main` red, and publishing stops until a fix or revert lands ([ADR 0020](../adr/0020-test-the-real-install-before-publishing.md)).
 
 To run it on a branch without publishing: `gh workflow run ci.yml --ref <branch>`. Publish only follows pushes.
 
@@ -165,7 +165,7 @@ pnpm bench:save                  # also append to projects/ci-tools/dist/ci/benc
 
 `BENCH_SAMPLES` (default 10) sets samples per benchmark. Runs are compared only within one machine type, which keeps its last 30 runs. Shared runners vary, so read the trend and measure a change locally.
 
-Each night [`nightly.mjs`](../../projects/ci-tools/src/bench/nightly.mjs) runs tonight's commit and the previous nightly's on the same runner, 2 rounds each. A benchmark more than 20% slower in both rounds opens or updates the issue `perf(bench): <id> is slower`.
+Each night [`nightly.mjs`](../../../projects/ci-tools/src/bench/nightly.mjs) runs tonight's commit and the previous nightly's on the same runner, 2 rounds each. A benchmark more than 20% slower in both rounds opens or updates the issue `perf(bench): <id> is slower`.
 
 ## npm audit
 
@@ -194,13 +194,13 @@ npm login
 pnpm npm:bootstrap --otp <code> @decohere/<name>   # without names: every package in this checkout
 ```
 
-[`npm-bootstrap.mjs`](../../projects/ci-tools/src/github/npm-bootstrap.mjs) checks every package (or the ones named) and does only what is missing: the first publish of the name, the `publish.yml` Trusted Publisher (`npm trust github`), and the `promote-latest.yml` one, copied from a package that has it. The first publish is a stub, `0.0.0-bootstrap.0` with a package.json and a README, on the `bootstrap` tag: it only claims the name, and CI publishes the package built. npm points `latest` at a name's first version, so `latest` is the stub until [Promote to latest](#promote-to-latest) moves it. A name that isn't on npm must be in a `package.json` on some branch of the repo, so a typo can't claim one. It reads everything first, so one code covers the changes. npm wants the code even to read Trusted Publishers, so `--otp` is required, also with `--dry-run`, which prints what it would do. With nothing missing it changes nothing, so it is safe to run any time. Then add the PR to the merge queue. Doing this only when it's ready avoids leaving an unused name on npm if the PR is abandoned.
+[`npm-bootstrap.mjs`](../../../projects/ci-tools/src/github/npm-bootstrap.mjs) checks every package (or the ones named) and does only what is missing: the first publish of the name, the `publish.yml` Trusted Publisher (`npm trust github`), and the `promote-latest.yml` one, copied from a package that has it. The first publish is a stub, `0.0.0-bootstrap.0` with a package.json and a README, on the `bootstrap` tag: it only claims the name, and CI publishes the package built. npm points `latest` at a name's first version, so `latest` is the stub until [Promote to latest](#promote-to-latest) moves it. A name that isn't on npm must be in a `package.json` on some branch of the repo, so a typo can't claim one. It reads everything first, so one code covers the changes. npm wants the code even to read Trusted Publishers, so `--otp` is required, also with `--dry-run`, which prints what it would do. With nothing missing it changes nothing, so it is safe to run any time. Then add the PR to the merge queue. Doing this only when it's ready avoids leaving an unused name on npm if the PR is abandoned.
 
 `npm trust` has no flag for the dist-tag permission, so the promote publisher goes through the registry endpoint `npm trust` itself uses, which npm doesn't document. The script reads the login `npm login` saved in your npmrc and never prints it. If no package has a promote publisher to copy, it says how to add one on npmjs.com, and changes nothing.
 
 ## Promote to latest
 
-[`promote-latest.yml`](../../.github/workflows/promote-latest.yml) moves `latest` to a version already on `dev`, with no login or OTP. Start it from the Actions tab, or:
+[`promote-latest.yml`](../../../.github/workflows/promote-latest.yml) moves `latest` to a version already on `dev`, with no login or OTP. Start it from the Actions tab, or:
 
 ```bash
 gh workflow run promote-latest.yml                       # what dev points at

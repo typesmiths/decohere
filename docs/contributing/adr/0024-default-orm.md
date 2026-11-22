@@ -89,7 +89,7 @@ Rejected:
 - MikroORM's diff opens with `create schema` and its reverse with `drop schema`; both are left out, as schemas are the bootstrap's.
 - A data migration's services write through their own connections, outside the migration's transaction. Only `sql` is inside it.
 - Resumable checkpoints for long data migrations, and a helper to test a migration against a throwaway database, are later steps.
-- Existing apps move their repositories onto the unit of work and their migrations into the Decohere format, one repository at a time. An app on TypeORM's own migrations converts each one and records them on its existing databases with `db baseline` ([Migrations](../recipes/migrations.md#move-from-typeorms-migrations)).
+- Existing apps move their repositories onto the unit of work and their migrations into the Decohere format, one repository at a time. An app on TypeORM's own migrations converts each one and records them on its existing databases with `db baseline` ([Migrations](../../guide/recipes/migrations.md#move-from-typeorms-migrations)).
 
 ## History
 

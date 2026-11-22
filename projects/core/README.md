@@ -124,7 +124,7 @@ While they start, `/health` answers 200 and `/ready` answers 503 (`hosted servic
 3. awaits each `stop()` in reverse order. If a `start()` was still running, it waits for it first. Every `stop()` runs even if one throws.
 4. disposes the container, which closes what the services used (DataSources from `typeOrm()`, anything with `Symbol.asyncDispose`).
 
-`stop()` is optional: a service with nothing to wait for can rely on the signal, or implement `Symbol.asyncDispose`, which step 4 calls. A hosted service is a singleton, so other services and controllers can inject it by its class. Why this shape: [ADR 0010](../../docs/adr/0010-hosted-services.md).
+`stop()` is optional: a service with nothing to wait for can rely on the signal, or implement `Symbol.asyncDispose`, which step 4 calls. A hosted service is a singleton, so other services and controllers can inject it by its class. Why this shape: [ADR 0010](../../docs/contributing/adr/0010-hosted-services.md).
 
 `GET /health` and `GET /ready` come from `health()` in [`@decohere/http`](../http/README.md). `/ready` runs each `IReadinessCheck` registered under `ReadinessCheckToken`, and the checks the hosted services give it (`HostedServiceHost.readinessChecks()`).
 
@@ -132,10 +132,12 @@ While they start, `/health` answers 200 and `/ready` answers 503 (`hosted servic
 
 Throw `new DependencyUnavailableError(dependency, reason?)` when something a request needs can't be reached right now, such as a data source still connecting while its start step is retried. `@decohere/http` answers it `503 Service Unavailable` and logs the reason instead of sending it, since it can name hosts.
 
-## Layout and tests
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 `src/` has one folder per subpath above, each with an `index.ts` that says what it exports. `hosting/` holds `Builder` (`builder.ts`), `App` (`app.ts`), `HostedServiceHost` (`hosted-service-host.ts`), which starts, retries and stops the steps and services, and the tokens in `const.ts`.
 
-There is no canonical suite for core in the [testing table](../../docs/testing/README.md#canonical-suite-ownership). Its own specs, in `tests/`, cover caching, collections, extensibility and system. Hosting is tested through the packages that use it: `projects/http/tests/app.hosted-services.spec.ts`, `app.shutdown.integration.spec.ts`, `app.spec.ts` and `builder.spec.ts` with a web server, and `projects/crucible/tests/hosting/` without one (start steps, a worker). Specs move beside the code, starting with `core` ([ADR 0027](../../docs/adr/0027-code-design.md)).
+There is no canonical suite for core in the [testing table](../../docs/contributing/testing/README.md#canonical-suite-ownership). Its own specs, in `tests/`, cover caching, collections, extensibility and system. Hosting is tested through the packages that use it: `projects/http/tests/app.hosted-services.spec.ts`, `app.shutdown.integration.spec.ts`, `app.spec.ts` and `builder.spec.ts` with a web server, and `projects/crucible/tests/hosting/` without one (start steps, a worker). Specs move beside the code, starting with `core` ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).
 
 Some of core doesn't follow ADR 0027 yet: `collections` and `io` are namespace objects of loose functions, and `isDevelopmentEnv`, `ignoreIf` and the method decorators read `process.env` (`NODE_ENV`, `TEST`).

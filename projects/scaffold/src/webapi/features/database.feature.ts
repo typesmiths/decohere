@@ -136,7 +136,7 @@ pnpm decohere db status
 pnpm decohere db revert
 \`\`\`
 
-With more than one API, name it: \`pnpm decohere db status --api billing\`. How it works, deploys, and changing a schema without downtime: https://github.com/typesmiths/decohere/blob/main/docs/recipes/migrations.md
+With more than one API, name it: \`pnpm decohere db status --api billing\`. How it works, deploys, and changing a schema without downtime: https://github.com/typesmiths/decohere/blob/main/docs/guide/recipes/migrations.md
 
 ## Production (migrations only)
 

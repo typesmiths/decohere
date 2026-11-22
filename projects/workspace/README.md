@@ -95,11 +95,13 @@ A tool with defaults of its own passes them as the second argument, `WorkspaceFa
 
 Pass a pre-built `workspace` into Forge/Flux in tests to skip filesystem discovery.
 
-## Layout and tests
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
 `src/` has two folders:
 
-- `models/`: the workspace and its projects (`workspace.model.ts`, `project.model.ts`), their `package.json` and `tsconfig` models with the mixins that give a project them, package aliases, project scripts, source extensions, and JSONC parsing. They keep `.model.ts`, since they model files, not a business domain ([ADR 0027](../../docs/adr/0027-code-design.md)).
+- `models/`: the workspace and its projects (`workspace.model.ts`, `project.model.ts`), their `package.json` and `tsconfig` models with the mixins that give a project them, package aliases, project scripts, source extensions, and JSONC parsing. They keep `.model.ts`, since they model files, not a business domain ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).
 - `factories/`: `ProjectFactory`, plus `WorkspaceFactory` and `UserConfigFactory` (which loads `.decohere.js`); those two are exported as instances today, not classes.
 
-There is no canonical suite for workspace in the [testing table](../../docs/testing/README.md#canonical-suite-ownership): it is exercised through the forge and flux CLI suites in `projects/cli/tests/`. Its own specs, in `tests/`, cover the factories and models in memfs, and move beside the code.
+There is no canonical suite for workspace in the [testing table](../../docs/contributing/testing/README.md#canonical-suite-ownership): it is exercised through the forge and flux CLI suites in `projects/cli/tests/`. Its own specs, in `tests/`, cover the factories and models in memfs, and move beside the code.

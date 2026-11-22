@@ -1,6 +1,6 @@
 # Constructor spy under DI
 
-To assert what crucible injected into a constructor, a bare `vi.fn` or `vi.spyOn` on the class does not work: crucible reads `design:paramtypes` from `reflect-metadata`, the spy has none, and the constructor gets no arguments. Container usage: [crucible README](../../../projects/crucible/README.md).
+To assert what crucible injected into a constructor, a bare `vi.fn` or `vi.spyOn` on the class does not work: crucible reads `design:paramtypes` from `reflect-metadata`, the spy has none, and the constructor gets no arguments. Container usage: [crucible README](../../../../projects/crucible/README.md).
 
 ## Pattern
 
