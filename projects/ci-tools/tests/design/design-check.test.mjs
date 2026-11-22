@@ -46,7 +46,7 @@ describe("design:check", () => {
 		const { code, output } = run();
 		expect(code).toBe(1);
 		expect(output).toContain("http  exported loose functions");
-		expect(output).toContain("0 → 1  (+1)");
+		expect(output).toContain("0 → 1  (+1), among:");
 		expect(output).toContain("projects/http/src/routing/route-path.value.ts: toPath");
 	});
 
@@ -60,7 +60,10 @@ describe("design:check", () => {
 			"tests/router.spec.ts": "it('x', () => {});\n",
 		});
 		run(["--update"]);
-		expect(JSON.parse(String(vol.readFileSync(`${root}/${BASELINE}`)))).toEqual({
+		const written = String(vol.readFileSync(`${root}/${BASELINE}`));
+		// As Prettier formats JSON in this repo, so an update changes only the counts.
+		expect(written).toMatch(/^\{\n {2}"http": \{\n {4}"/);
+		expect(JSON.parse(written)).toEqual({
 			http: {
 				bannedNames: 2,
 				noRole: 3,

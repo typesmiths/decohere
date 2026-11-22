@@ -32,7 +32,8 @@ export function runDesignCheck(options = {}) {
 
 	if (values.update) {
 		mkdirSync(dirname(path), { recursive: true });
-		writeFileSync(path, `${JSON.stringify(counts, null, "\t")}\n`);
+		// Two spaces, as Prettier formats JSON here, so an update changes only the counts.
+		writeFileSync(path, `${JSON.stringify(counts, null, 2)}\n`);
 		log(`design: wrote the baseline (${total(counts)} breaks of ADR 0027 in all).`);
 		return 0;
 	}
@@ -46,9 +47,10 @@ export function runDesignCheck(options = {}) {
 			const now = counts[pkg]?.[rule] ?? 0;
 			const was = baseline[pkg]?.[rule] ?? 0;
 			if (now > was) {
-				const where = measured[pkg][rule].where.slice(-(now - was));
+				// The baseline keeps counts, not places, so the new ones are somewhere in this list.
+				const where = measured[pkg][rule].where;
 				rose.push(
-					`design: ${pkg}  ${RULES[rule]}  ${was} → ${now}  (+${now - was})\n  ${where.join("\n  ")}`,
+					`design: ${pkg}  ${RULES[rule]}  ${was} → ${now}  (+${now - was}), among:\n  ${where.join("\n  ")}`,
 				);
 			}
 			if (now < was) fell.push(`design: ${pkg}  ${RULES[rule]}  ${was} → ${now}`);
