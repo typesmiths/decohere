@@ -18,6 +18,8 @@ builder.use(
 
 Building the app connects to nothing. When the app starts, before hosted services and the server, it bootstraps (given a `database`) and initializes each `DataSource`, then each data source applies pending migrations (`migrateOnStart`), synchronizes (`synchronize`) and seeds (`seed(dataSource)`), as its config says. TypeORM itself is never given `synchronize`. If the database is down, that step is retried until it isn't, holding back the hosted services; until then a request for the unit of work answers 503 ([data](../data/README.md#setting-up-the-database)). A singleton that injects the `DataSource` itself gets it uninitialized until then.
 
+Config is plain data, so a TypeORM option that isn't, such as a `driver`, is given in code: `typeOrm({ …, dataSourceOptions: { driver } })`. It is spread over what config gives, so code wins only for what it sets. An app whose data sources share one `pg` pool passes each the same driver. `db generate`'s connection as the migrate role doesn't use it.
+
 Mapping rules for the tracker:
 
 - **Child collections** are mapped as one-to-many with `persistence: false`. The unit of work writes them, and TypeORM would otherwise refuse a class that starts them as a `ChildList`.

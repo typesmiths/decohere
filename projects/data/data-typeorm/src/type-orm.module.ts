@@ -108,7 +108,7 @@ export class TypeOrmModule {
 		builder: ContainerBuilder,
 		logger: Logger,
 	) {
-		const { entities, repositories, outbox } = moduleConfig;
+		const { entities, repositories, outbox, dataSourceOptions } = moduleConfig;
 		const dataSource = DataSourceFactory.create(
 			{
 				entities,
@@ -116,6 +116,7 @@ export class TypeOrmModule {
 				...connectionInfo,
 			},
 			logger,
+			dataSourceOptions,
 		);
 
 		const unitOfWork = () => {
