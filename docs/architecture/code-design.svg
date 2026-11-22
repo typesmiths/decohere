@@ -191,7 +191,7 @@
 
     <rect x="840" y="1160" width="330" height="80" rx="6" class="was"/>
     <text x="852" y="1184" class="b">process.env in a library</text>
-    <text x="852" y="1206" class="small">48 reads, e.g. core/system/</text>
+    <text x="852" y="1206" class="small">49 reads, e.g. core/system/</text>
     <text x="852" y="1224" class="small">environment.ts</text>
     <path d="M1172,1200 L1206,1200" class="line" marker-end="url(#arrow)"/>
     <rect x="1210" y="1160" width="330" height="80" rx="6" class="now"/>
@@ -209,28 +209,28 @@
   <!-- ───────────── 4. How far ───────────── -->
   <rect x="30" y="1440" width="760" height="500" rx="10" class="panel"/>
   <text x="54" y="1474" class="h2">4. How far we are, 2026-11-22</text>
-  <text x="54" y="1498" class="sub">438 source files, 33k lines · CI fails if a count rises; it may only fall</text>
+  <text x="54" y="1498" class="sub">853 breaks · pnpm design:check fails if a count rises; it may only fall</text>
 
   <g>
     <text x="60" y="1544" class="b">specs not beside their code</text>
     <rect x="320" y="1530" width="420" height="20" rx="3" class="track"/>
-    <rect x="320" y="1530" width="401" height="20" rx="3" class="bar"/>
-    <text x="713" y="1546" text-anchor="end" class="b" fill="#ffffff">239, all</text>
+    <rect x="320" y="1530" width="395" height="20" rx="3" class="bar"/>
+    <text x="707" y="1546" text-anchor="end" class="b" fill="#ffffff">235, all</text>
 
     <text x="60" y="1590" class="b">exported loose functions</text>
     <rect x="320" y="1576" width="420" height="20" rx="3" class="track"/>
-    <rect x="320" y="1576" width="420" height="20" rx="3" class="bar"/>
-    <text x="732" y="1592" text-anchor="end" class="b" fill="#ffffff">250</text>
+    <rect x="320" y="1576" width="417" height="20" rx="3" class="bar"/>
+    <text x="729" y="1592" text-anchor="end" class="b" fill="#ffffff">248</text>
 
     <text x="60" y="1636" class="b">files with no role suffix</text>
     <rect x="320" y="1622" width="420" height="20" rx="3" class="track"/>
-    <rect x="320" y="1622" width="371" height="20" rx="3" class="bar"/>
-    <text x="684" y="1638" text-anchor="end" class="b" fill="#ffffff">221</text>
+    <rect x="320" y="1622" width="413" height="20" rx="3" class="bar"/>
+    <text x="725" y="1638" text-anchor="end" class="b" fill="#ffffff">246</text>
 
     <text x="60" y="1682" class="b">process.env reads in libraries</text>
     <rect x="320" y="1668" width="420" height="20" rx="3" class="track"/>
-    <rect x="320" y="1668" width="81" height="20" rx="3" class="bar"/>
-    <text x="410" y="1684" class="b">48</text>
+    <rect x="320" y="1668" width="82" height="20" rx="3" class="bar"/>
+    <text x="411" y="1684" class="b">49</text>
 
     <text x="60" y="1728" class="b">namespace objects</text>
     <rect x="320" y="1714" width="420" height="20" rx="3" class="track"/>
@@ -242,16 +242,16 @@
     <rect x="320" y="1760" width="35" height="20" rx="3" class="bar"/>
     <text x="364" y="1776" class="b">21</text>
 
-    <text x="60" y="1820" class="b">.types.ts and utils files</text>
+    <text x="60" y="1820" class="b">.types, .store, utils files</text>
     <rect x="320" y="1806" width="420" height="20" rx="3" class="track"/>
-    <rect x="320" y="1806" width="30" height="20" rx="3" class="bar"/>
-    <text x="359" y="1822" class="b">18</text>
+    <rect x="320" y="1806" width="34" height="20" rx="3" class="bar"/>
+    <text x="363" y="1822" class="b">20</text>
 
     <text x="60" y="1866" class="b">error classes without Error</text>
     <rect x="320" y="1852" width="420" height="20" rx="3" class="track"/>
     <text x="330" y="1868" class="b" fill="#2e7d32">0 ✓</text>
   </g>
-  <text x="60" y="1912" class="small">Worst first: scaffold, core and http hold 156 of the 250 loose functions. Moves go package by package.</text>
+  <text x="60" y="1912" class="small">Worst first: scaffold, core and http hold 155 of the 248 loose functions. Moves go package by package.</text>
 
   <!-- ───────────── 5. Standards ───────────── -->
   <rect x="810" y="1440" width="760" height="500" rx="10" class="panel"/>

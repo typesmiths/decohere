@@ -5,14 +5,14 @@
 
 ## Context
 
-Decohere started as class-and-interface code: one job per class, interfaces behind tokens, base classes with abstract parts, named errors, models with behaviour. Since agents took over most of the work it has drifted. The style page allows namespace objects and loose functions, and nothing says how a file is named or where a test goes. A measurement of every package's `src/` on 2026-11-22 found:
+Decohere started as class-and-interface code: one job per class, interfaces behind tokens, base classes with abstract parts, named errors, models with behaviour. Since agents took over most of the work it has drifted. The style page allows namespace objects and loose functions, and nothing says how a file is named or where a test goes. `pnpm design:check` measured every package on 2026-11-22 and found 853 breaks of the rules below:
 
-- 250 exported loose functions that aren't plugin factories, decorators or `is`/`has` predicates;
+- 248 exported loose functions that aren't plugin factories, decorators, `define…` helpers or `is`/`has` predicates;
 - 34 namespace objects;
 - 21 files with several classes;
-- 16 `.types.ts` files and 2 `utils` files;
-- 48 reads of `process.env` outside config and bins;
-- all 239 spec files in `tests/` folders, away from their code.
+- 246 files with no role suffix, and 20 `.types.ts`, `.store.ts` or `utils` files;
+- 49 reads of `process.env` outside config and bins;
+- all 235 spec files in `tests/` folders, away from their code.
 
 Ledger, the largest app on Decohere, wrote down the rules it builds by while re-laying out its funding module. They are the design Decohere started with, stated fully. Two rule sets for one family of projects would teach two styles, so Decohere adopts ledger's for its own code. The scaffolder then generates apps that follow them.
 
@@ -59,7 +59,7 @@ The picture: [code design](../architecture/code-design.svg).
 
 ### Measured, and only falling
 
-The counts above are measured in CI on every pull request, against a committed baseline. A count may fall and the baseline is lowered with it; a count that rises fails the check. Moving the code is done package by package, each move its own pull request.
+`pnpm design:check` measures the counts above on every pull request, as part of `lint:check`, against a committed baseline. A count that rises fails the check. A count that falls fails too, until the baseline is lowered with `pnpm design:check --update`, so it can't rise back. Moving the code is done package by package, each move its own pull request.
 
 ### Apps
 
@@ -72,7 +72,7 @@ The rules that aren't Decohere's own move to a shared standards repository, `typ
 ## Consequences
 
 - Reading a package's file names tells you what it does, and every package reads the same way.
-- The move touches most of the code: 239 spec files, about 300 functions and 221 file names. It goes package by package, starting with `core` and `http`, with the check keeping new code from adding to it.
+- The move touches most of the code: 235 spec files, about 280 functions and namespace objects, and 266 file names. It goes package by package, starting with `core` and `http`, with the check keeping new code from adding to it.
 - Some files are classes for the first time, and a few large ones (`tracking-unit-of-work.ts`, 613 lines) are split by job.
 - Not chosen: splitting packages into `contracts`, `domain` and `api` projects. Decohere's base and provider packages already separate contracts from implementations.
 - Not chosen: copying the rules into each repository, or linking to the standards repo's main branch. A copy drifts unnoticed, and an unpinned link changes every project's rules at once with no CI run.
