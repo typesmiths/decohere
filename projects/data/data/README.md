@@ -1,6 +1,6 @@
 # @decohere/data
 
-The data contracts a Decohere app's repositories are written against, with no ORM in them. A provider package puts an ORM under them: [`@decohere/data-mikro-orm`](../data-mikro-orm/README.md) or [`@decohere/data-typeorm`](../data-typeorm/README.md). Why it's built this way: [ADR 0024](../../../docs/adr/0024-default-orm.md).
+The data contracts a Decohere app's repositories are written against, with no ORM in them. A provider package puts an ORM under them: [`@decohere/data-mikro-orm`](../data-mikro-orm/README.md) or [`@decohere/data-typeorm`](../data-typeorm/README.md). For tests and local runs with no database, [`@decohere/data-memory`](../data-memory/README.md) holds the rows in the process. Why it's built this way: [ADR 0024](../../../docs/adr/0024-default-orm.md).
 
 ## The unit of work
 
@@ -121,7 +121,7 @@ try {
 
 A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
 
-MikroORM's unit of work is the reference. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome.
+MikroORM's unit of work is the reference. The cases are in `tests/contract/cases.ts`. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both SQL providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome. `tests/unit-of-work.contract.spec.ts` runs the same cases on the memory provider, in `pnpm test`, checking outcomes only, since it sends no SQL.
 
 ### Upgrading MikroORM
 

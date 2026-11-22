@@ -20,6 +20,7 @@ Publishable packages live in `projects/`. [`@decohere/workspace`](../../projects
 | [`@decohere/data-postgres`](../../projects/data/data-postgres/README.md) | `projects/data/data-postgres` | Everything Postgres-only: creating a data source's database, roles and schema at startup, passed to a provider as `bootstrap` |
 | [`@decohere/data-mikro-orm`](../../projects/data/data-mikro-orm/README.md) | `projects/data/data-mikro-orm` | MikroORM provider: the `mikroOrm()` plugin, over MikroORM's own unit of work |
 | [`@decohere/data-typeorm`](../../projects/data/data-typeorm/README.md) | `projects/data/data-typeorm` | TypeORM provider: the `typeOrm()` plugin, on data's change tracker |
+| [`@decohere/data-memory`](../../projects/data/data-memory/README.md) | `projects/data/data-memory` | In-memory provider: the `memory()` plugin, on data's change tracker, for tests and local runs with no database |
 | [`@decohere/devkit`](../../projects/devkit/README.md) | `projects/devkit` | Base for the CLIs: commands, `git`/`npm`/`docker` wrappers, file search and watch. Never in a production app |
 | [`@decohere/workspace`](../../projects/workspace/README.md) | `projects/workspace` | Workspace model: package discovery and aliases |
 | [`@decohere/forge`](../../projects/forge/README.md) | `projects/forge` | Build (SWC), typecheck, test, version, publish, Docker; Vitest plugin at `@decohere/forge/vitest`; `@decohere/forge/transpile` compiles a file without loading forge's commands (what flux uses) |
@@ -52,7 +53,7 @@ How we test without those: [testing](../testing/).
 
 ## 2. Vendors stay at the composition edge
 
-Application and domain code depend on Decohere contracts; vendor code lives in an adapter chosen at the app's composition root. Fastify, Pino, MikroORM/Postgres and Auth0 are today's defaults, not requirements. Switching one should be a provider and config change, not a rewrite. Examples: `http` and its provider (`http-fastify`), Scribe's facade and its writers, `data` and its providers (`data-mikro-orm`, `data-typeorm`), `config`'s replaceable sources.
+Application and domain code depend on Decohere contracts; vendor code lives in an adapter chosen at the app's composition root. Fastify, Pino, MikroORM/Postgres and Auth0 are today's defaults, not requirements. Switching one should be a provider and config change, not a rewrite. Examples: `http` and its provider (`http-fastify`), Scribe's facade and its writers, `data` and its providers (`data-mikro-orm`, `data-typeorm`, `data-memory`), `config`'s replaceable sources.
 
 ## 3. One owner per fact
 

@@ -1,0 +1,19 @@
+// The unit-of-work contract on the memory provider: the cases the SQL providers pass against
+// Postgres (unit-of-work.contract.docker.spec.ts), each on a fresh store, checked by outcome.
+// There is no SQL to compare.
+import "reflect-metadata";
+import { describe, it } from "vitest";
+import { cases } from "./contract/cases.js";
+import { openMemory } from "./contract/memory.provider.js";
+
+describe("unit of work contract on the memory provider", () => {
+	for (const { name, seed, run, check } of cases) {
+		it(name, async () => {
+			const p = openMemory();
+			if (seed) await seed(p);
+			p.reads();
+			await run(p);
+			await check?.(p);
+		});
+	}
+});
