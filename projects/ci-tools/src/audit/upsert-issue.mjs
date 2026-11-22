@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { upsertIssue } from "../lib/github-issue.mjs";
+import { resolveIssue, upsertIssue } from "../lib/github-issue.mjs";
 import { formatMarkdown, parseAudit } from "./format.mjs";
 
 const auditFilePath = process.argv[2] ?? "npm-audit.json";
@@ -23,7 +23,15 @@ if (!existsSync(auditFilePath)) {
 
 const parsed = parseAudit(JSON.parse(readFileSync(auditFilePath, "utf8")));
 if (parsed.total === 0) {
-	console.log("No vulnerabilities found; skipping issue create/update.");
+	const closed = resolveIssue({
+		title: ISSUE_TITLE,
+		comment: `The audit finds nothing now (${runUrl()}), so this closes. It reopens if a finding comes back.`,
+	});
+	console.log(
+		closed == null
+			? "No vulnerabilities found; no issue open."
+			: `No vulnerabilities found; closed issue #${closed}.`,
+	);
 	process.exit(0);
 }
 

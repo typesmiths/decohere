@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { pickIssue, upsertIssue } from "../../src/lib/github-issue.mjs";
+import { pickIssue, resolveIssue, upsertIssue } from "../../src/lib/github-issue.mjs";
 
 const TITLE = "security(ci): high or critical npm audit findings";
 
@@ -81,5 +81,24 @@ describe("github-issue", () => {
 			["issue", "reopen", "7"],
 			["issue", "edit", "7"],
 		]);
+	});
+
+	// The audit's issue stayed open, listing an advisory GitHub had withdrawn, because a clean
+	// run only skipped it.
+	it("closes the open issue with a comment once there is nothing to report", () => {
+		const { run, calls } = fakeGh([
+			{ number: 85, title: TITLE, state: "OPEN", url: "u85" },
+			{ number: 9, title: TITLE, state: "CLOSED", url: "u9" },
+		]);
+		expect(resolveIssue({ title: TITLE, comment: "Clean now." }, run)).toBe(85);
+		expect(calls.slice(1)).toEqual([
+			{ args: ["issue", "close", "85", "--comment", "Clean now."], input: undefined },
+		]);
+	});
+
+	it("does nothing when no open issue has the title", () => {
+		const { run, calls } = fakeGh([{ number: 9, title: TITLE, state: "CLOSED", url: "u9" }]);
+		expect(resolveIssue({ title: TITLE, comment: "Clean now." }, run)).toBeNull();
+		expect(calls).toHaveLength(1);
 	});
 });
