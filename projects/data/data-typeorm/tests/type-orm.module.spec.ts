@@ -95,6 +95,26 @@ describe("TypeOrmModule DataSource singleton", () => {
 		);
 	});
 
+	// Config is cloned as plain data, so a driver (a class) can only be given in code.
+	it("gives the DataSource the options the app gives in code, over config's", async () => {
+		const driver = { Pool: class {} };
+		const containerBuilder = new ServiceContainerBuilder();
+		const databaseConfig = new DatabaseConfig();
+		databaseConfig.dataSources = [pgInfo({ port: 5432 })];
+		await new TypeOrmModule().configure({
+			applicationName: "funding-fee.api",
+			databaseConfig,
+			moduleConfigurations: [
+				{ entities: [PositionEntity], dataSourceOptions: { driver, port: 6543 } },
+			],
+			containerBuilder,
+		});
+
+		const dataSource = containerBuilder.build().resolve<DataSource>(TypeOrmDataSourceToken);
+
+		expect(dataSource.options).toMatchObject({ driver, port: 6543, host: "localhost" });
+	});
+
 	it("registers a named DataSource without replacing request-scoped UoW", async () => {
 		const ds = fakeDataSource();
 		vi.spyOn(DataSourceFactory, "create").mockReturnValue(ds as unknown as DataSource);
