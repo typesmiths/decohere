@@ -42,6 +42,7 @@ export type Case<P extends OpenProvider = OpenProvider> = {
 
 const R1 = "00000000-0000-4000-a000-0000000000f1";
 const R2 = "00000000-0000-4000-a000-0000000000f2";
+const R3 = "00000000-0000-4000-a000-0000000000f3";
 
 /** The cases every provider runs, memory included. */
 export const cases: Case[] = [
@@ -402,6 +403,63 @@ export const cases: Case[] = [
 			);
 			await uow.commit();
 			expect(await uow.find(p.model.Order, { where: { customer: "ann" } })).toContain(added);
+		},
+	},
+	{
+		name: "addIfAbsent adds an entity unless its key is kept, says which, and the rest of the unit of work still commits",
+		seed: seedOrders,
+		async run(p) {
+			{
+				await using first = p.begin();
+				const receipt = new p.model.Receipt(R3, 5);
+				expect(await first.addIfAbsent(receipt)).toBe(true);
+				// Written and managed: found by its key, and a later change is saved on commit.
+				expect(await first.findById(p.model.Receipt, R3)).toBe(receipt);
+				receipt.memo = "first";
+				await first.commit();
+			}
+			await using second = p.begin();
+			const again = new p.model.Receipt(R3, 9);
+			expect(await second.addIfAbsent(again)).toBe(false);
+			// Not attached: a change to it isn't saved.
+			again.memo = "second";
+			(await second.findById(p.model.Order, A)).note = "kept";
+			await second.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			expect(await uow.findById(p.model.Receipt, R3)).toMatchObject({
+				amount: 5,
+				memo: "first",
+			});
+			expect((await uow.findById(p.model.Order, A)).note).toBe("kept");
+		},
+	},
+	{
+		name: "addIfAbsent sets what the database generates, and an aggregate it added takes children and changes on commit",
+		async run(p) {
+			await using uow = p.begin();
+			const tag = new p.model.Tag("new");
+			expect(await uow.addIfAbsent(tag)).toBe(true);
+			expect(typeof tag.id).toBe("number");
+			const order = new p.model.Order("ann");
+			expect(await uow.addIfAbsent(order)).toBe(true);
+			expect(order.version).toBe(1);
+			order.addLine("apple", 1);
+			order.note = "added";
+			await uow.commit();
+			expect(order.version).toBe(2);
+			await expect(uow.addIfAbsent(order)).rejects.toThrow(DataError);
+			const withLines = new p.model.Order("bob");
+			withLines.addLine("pear", 2);
+			await expect(uow.addIfAbsent(withLines)).rejects.toThrow(DataError);
+		},
+		async check(p) {
+			await using uow = p.begin();
+			const [order] = await uow.find(p.model.Order, { include: ["lines"] });
+			expect(order.note).toBe("added");
+			expect(skus(order)).toEqual(["apple"]);
+			expect(await uow.find(p.model.Tag)).toHaveLength(1);
 		},
 	},
 ];

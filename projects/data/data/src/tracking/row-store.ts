@@ -56,6 +56,11 @@ export interface RowStore {
 	select(type: EntityClass, query: RowQuery): Promise<Row[]>;
 	/** Insert the rows in one statement. Returns, for each row in order, the values the database generated. */
 	insert(type: EntityClass, rows: Row[]): Promise<Row[]>;
+	/**
+	 * Insert one row unless its key is already kept (`INSERT … ON CONFLICT DO NOTHING`). Returns the
+	 * values the database generated, or null when nothing was inserted.
+	 */
+	insertIfAbsent(type: EntityClass, row: Row): Promise<Row | null>;
 	/** `UPDATE … SET changes WHERE key (AND version = expected)`. Returns the number of rows changed. */
 	update(
 		type: EntityClass,

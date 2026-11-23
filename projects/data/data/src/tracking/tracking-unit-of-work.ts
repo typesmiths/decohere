@@ -112,6 +112,34 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		if (!this.snapshots.has(entity)) this.added.add(entity);
 	}
 
+	public async addIfAbsent(entity: object): Promise<boolean> {
+		this.assertUsable();
+		const type = entity.constructor as EntityClass;
+		const model = this.store.model(type);
+		if (this.snapshots.has(entity) || this.added.has(entity)) {
+			throw new DataError(
+				`${model.name}: addIfAbsent takes a new entity, not one this unit of work holds`,
+			);
+		}
+		for (const spec of model.children) {
+			const children = entity[spec.prop];
+			if (children && !(children instanceof UnloadedChildren) && children.length > 0) {
+				throw new DataError(
+					`${model.name}.${spec.prop}: addIfAbsent writes the entity's own row; add its children once it is added`,
+				);
+			}
+		}
+		await this.beginTransaction();
+		const generated = await this.store.insertIfAbsent(type, this.insertRow(model, entity, []));
+		if (generated === null) return false;
+		Object.assign(entity, generated);
+		this.instances(type).set(this.keyOf(model, entity), entity);
+		const children = new Map<string, object[]>();
+		for (const spec of model.children) if (entity[spec.prop]) children.set(spec.prop, []);
+		this.snapshots.set(entity, { values: this.values(model, entity), children });
+		return true;
+	}
+
 	public remove(entity: object) {
 		this.assertUsable();
 		if (this.added.delete(entity)) return;
@@ -435,23 +463,30 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		deferred: { entity: object; prop: string }[],
 	) {
 		const model = this.store.model(type);
-		const rows = batch.map((entity) => {
-			if (model.version && entity[model.version] == null) entity[model.version] = 1;
-			const row: Row = {};
-			for (const field of model.fields)
-				if (entity[field] !== undefined) row[field] = entity[field];
-			for (const ref of model.references) {
-				const target = entity[ref.prop];
-				const skip = deferred.some((d) => d.entity === entity && d.prop === ref.prop);
-				row[ref.prop] =
-					target == null || skip
-						? null
-						: this.keyValue(this.store.model(target.constructor as EntityClass), target);
-			}
-			return row;
-		});
+		const rows = batch.map((entity) => this.insertRow(model, entity, deferred));
 		const generated = await this.store.insert(type, rows);
 		batch.forEach((entity, i) => Object.assign(entity, generated[i]));
+	}
+
+	/** A new entity's row: fields as they are, a version starting at 1, references as keys (null where deferred). */
+	private insertRow(
+		model: EntityModel,
+		entity: object,
+		deferred: { entity: object; prop: string }[],
+	): Row {
+		if (model.version && entity[model.version] == null) entity[model.version] = 1;
+		const row: Row = {};
+		for (const field of model.fields)
+			if (entity[field] !== undefined) row[field] = entity[field];
+		for (const ref of model.references) {
+			const target = entity[ref.prop];
+			const skip = deferred.some((d) => d.entity === entity && d.prop === ref.prop);
+			row[ref.prop] =
+				target == null || skip
+					? null
+					: this.keyValue(this.store.model(target.constructor as EntityClass), target);
+		}
+		return row;
 	}
 
 	private afterCommit(plan: Plan) {

@@ -40,6 +40,8 @@ Mapping rules for the tracker:
 - **Embedded columns** aren't supported.
 - A **version column** (`version: true`) is checked and incremented on every update.
 
+`addIfAbsent(entity)` ([data](../data/README.md#add-unless-its-already-kept)) is the row store's `insertIfAbsent`: TypeORM's insert builder with `orIgnore()`, returning the key and generated columns, in the unit of work's transaction. No row back means the key was kept.
+
 ## A repository's own SQL
 
 The unit of work `typeOrm()` registers is a `TypeOrmUnitOfWork` (data's `TrackingUnitOfWork` over a `TypeOrmRowStore`). Its `transaction()` opens the transaction if none is open and returns the row store, whose `queryRunner` is the unit of work's own connection. A statement run on it commits or rolls back with the unit of work, and sees what it has written in that transaction ([data](../data/README.md#a-repositorys-own-sql)). The `DataSource` is another connection: a statement run on it is outside the unit of work. A repository that needs its own SQL injects the unit of work as `TypeOrmUnitOfWork`:

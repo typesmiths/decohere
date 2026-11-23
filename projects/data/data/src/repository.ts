@@ -24,6 +24,11 @@ export abstract class Repository<T extends object> {
 		this.unitOfWork.add(entity);
 	}
 
+	/** Insert it now unless its key is already kept; true when it was new. See {@link IUnitOfWork.addIfAbsent}. */
+	public addIfAbsent(entity: T): Promise<boolean> {
+		return this.unitOfWork.addIfAbsent(entity);
+	}
+
 	public remove(entity: T) {
 		this.unitOfWork.remove(entity);
 	}

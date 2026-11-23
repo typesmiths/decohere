@@ -11,7 +11,7 @@ Each request gets one `IUnitOfWork`, injected with `@injectUnitOfWork()`. It pro
 - **One transaction.** A commit writes every change in one transaction, parents before children, children deleted before their parents. Rows that reference each other are inserted with the nullable reference empty, then updated.
 - **Version checks.** When the mapping has a version field, an update matches only the version it loaded, and a lost race throws `OptimisticLockError`.
 - **An outbox.** With an `outbox` mapper configured, events an aggregate raises (`RaisesEvents.pullEvents()`) are written in the same commit.
-- **Nothing before commit.** Reads never write pending changes. Disposing without a commit rolls back. After a failed commit the unit of work is rolled back and refuses further use: start a new one.
+- **Nothing before commit**, but for `addIfAbsent` and a repository's own SQL, which write at once in the unit of work's transaction. Reads never write pending changes. Disposing without a commit rolls back. After a failed commit the unit of work is rolled back and refuses further use: start a new one.
 
 ```ts
 const order = await uow.findById(Order, id, ["lines"]);
@@ -19,6 +19,27 @@ order.lines.add(new Line("apple", 2));
 order.note = "gift";
 await uow.commit(); // INSERT line, UPDATE orders SET note, version
 ```
+
+### Add unless it's already kept
+
+`addIfAbsent(entity)` inserts a new entity unless a row with its key is already kept, and answers whether it was new. It's for append-only records, such as a ledger's entries or a receipt, written once under a key the caller chose:
+
+```ts
+if (await uow.addIfAbsent(new Receipt(paymentId, amount))) {
+	// new: this request is the one that records it
+}
+await uow.commit();
+```
+
+It answers now, so it writes now: `INSERT … ON CONFLICT DO NOTHING RETURNING …` on MikroORM and TypeORM, a key check on memory. The insert runs in the unit of work's transaction, which it begins if none is open, so it commits with the rest of the unit of work, or rolls back with it. After `true` the entity is managed, as if loaded: its generated key and version are set, and later changes to it, children added to it included, are saved on commit. After `false` the entity isn't attached: nothing about it is written, and the rest of the unit of work commits as usual. Load the kept row with `findById` to see it.
+
+What it can't do, since it writes before the rest of the commit:
+
+- **An entity it references must already be in the database**, not just given to `add` in the same unit of work: the foreign key is checked when it writes, and fails the statement (and so the transaction).
+- **It writes one row.** An entity whose child collections hold anything is refused (`DataError`): add it, then add its children.
+- **It takes a new entity.** One the unit of work already loaded or was given to `add` is refused.
+- **"Already kept" means any unique key**, on the SQL providers: `ON CONFLICT DO NOTHING` skips a row that clashes with any unique constraint, not only the primary key. Memory knows only the key.
+- **It waits for a row another transaction is inserting under the same key**, as Postgres does, and answers once that transaction ends.
 
 ## Queries
 
@@ -42,7 +63,7 @@ A statement `Query<T>` can't express runs in a provider-side repository, on the 
 
 - runs at once, not at commit;
 - commits with the unit of work, or rolls back with it when the commit fails or the unit of work is disposed without one;
-- sees what the unit of work has written in that transaction, such as rows an earlier statement wrote. Changes the unit of work hasn't written yet (everything waiting for `commit()`) aren't in the database, so a statement doesn't see them;
+- sees what the unit of work has written in that transaction, such as rows `addIfAbsent` or an earlier statement wrote. Changes the unit of work hasn't written yet (everything waiting for `commit()`) aren't in the database, so a statement doesn't see them;
 - bypasses the identity map and change tracking. Rows it writes or reads aren't entities the unit of work tracks: load them with `findById` or `find` to change them.
 
 `IUnitOfWork` itself has no such method: SQL is written for one provider's API and dialect, and the memory provider has none. A repository that needs it is written per provider, injecting that provider's unit of work type.
@@ -68,7 +89,7 @@ export class OrderRepository extends Repository<Order> {
 }
 ```
 
-`Repository<T>` gives `findById`, `find`, `findOne`, `add` and `remove`. The service that finishes the work commits the unit of work.
+`Repository<T>` gives `findById`, `find`, `findOne`, `add`, `addIfAbsent` and `remove`. The service that finishes the work commits the unit of work.
 
 ## Setting up the database
 
@@ -142,7 +163,7 @@ The canonical suite is the unit-of-work contract, the cases in `tests/contract/c
 
 ### Writing a provider
 
-A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
+A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and five row operations (`select`, `insert`, `insertIfAbsent`, `update`, `delete`) on plain rows.
 
 MikroORM's unit of work is the reference. The cases are in `tests/contract/cases.ts`. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both SQL providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome. `tests/unit-of-work.contract.spec.ts` runs the same cases on the memory provider, in `pnpm test`, checking outcomes only, since it sends no SQL. The cases in `sqlCases` run SQL of their own, through the provider's `transaction()`, so it runs on the SQL providers only.
 

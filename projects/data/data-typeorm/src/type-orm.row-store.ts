@@ -121,6 +121,33 @@ export class TypeOrmRowStore implements RowStore {
 		return result.generatedMaps.map((generated) => this.fromEntityShaped(type, generated));
 	}
 
+	public async insertIfAbsent(type: EntityClass, row: Row): Promise<Row | null> {
+		const { meta, model } = this.map(type);
+		// The key says whether a row came back; generated fields are what the entity takes from it.
+		const generated = meta.columns.filter(
+			(c) => c.isGenerated && model.fields.includes(c.propertyName),
+		);
+		const returned = [...new Set([...meta.primaryColumns, ...generated])];
+		const result = await this.runner.manager
+			.createQueryBuilder()
+			.insert()
+			.into(meta.target)
+			.values(this.entityShaped(type, row))
+			.orIgnore()
+			.returning(returned.map((c) => c.propertyPath))
+			.updateEntity(false)
+			.execute();
+		const [inserted] = result.raw as Row[];
+		if (inserted === undefined) return null;
+		const driver = this.dataSource.driver;
+		return Object.fromEntries(
+			generated.map((c) => [
+				c.propertyName,
+				driver.prepareHydratedValue(inserted[c.databaseName], c),
+			]),
+		);
+	}
+
 	public async update(
 		type: EntityClass,
 		key: Row,

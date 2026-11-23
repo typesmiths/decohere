@@ -131,36 +131,19 @@ export class MemoryStore {
 
 	public insert(tx: MemoryTransaction, type: EntityClass, rows: Row[]): Promise<Row[]> {
 		return this.statement(tx, async () => {
-			const model = this.model(type);
 			const generated: Row[] = [];
-			for (const input of rows) {
-				const row = copy(input) as Row;
-				const out: Row = {};
-				if (model.generated && row[model.generated] == null) {
-					const next = (this.sequences.get(type) ?? 0) + 1;
-					this.sequences.set(type, next);
-					row[model.generated] = next;
-					out[model.generated] = next;
-				}
-				for (const prop of model.key) {
-					if (row[prop] == null) throw new DataError(`${model.name}: key ${prop} is empty`);
-				}
-				await this.checkReferences(
-					tx,
-					model,
-					row,
-					model.references.map((r) => r.prop),
-				);
-				const key = this.keyOf(model, row);
-				await this.acquire(tx, type, key, "update");
-				if (this.row(tx, type, key)) {
-					throw new DataError(`${model.name} ${this.describe(model, row)} already exists`);
-				}
-				this.write(tx, type, key, row);
-				generated.push(out);
-			}
+			for (const input of rows) generated.push(await this.insertRow(tx, type, input, "fail"));
 			return generated;
 		});
+	}
+
+	/** Insert one row unless its key is already kept, as `ON CONFLICT DO NOTHING` does: null when it was. */
+	public insertIfAbsent(
+		tx: MemoryTransaction,
+		type: EntityClass,
+		row: Row,
+	): Promise<Row | null> {
+		return this.statement(tx, () => this.insertRow(tx, type, row, "skip"));
 	}
 
 	public update(
@@ -234,6 +217,54 @@ export class MemoryStore {
 	}
 
 	// ── Rows ───────────────────────────────────────────────────────────────
+
+	/** One row inserted, returning the key it generated; a key already kept fails, or with "skip" returns null. */
+	private async insertRow(
+		tx: MemoryTransaction,
+		type: EntityClass,
+		input: Row,
+		onConflict: "fail",
+	): Promise<Row>;
+	private async insertRow(
+		tx: MemoryTransaction,
+		type: EntityClass,
+		input: Row,
+		onConflict: "skip",
+	): Promise<Row | null>;
+	private async insertRow(
+		tx: MemoryTransaction,
+		type: EntityClass,
+		input: Row,
+		onConflict: "fail" | "skip",
+	): Promise<Row | null> {
+		const model = this.model(type);
+		const row = copy(input) as Row;
+		const out: Row = {};
+		// A generated key is used up even when the insert then fails or is skipped, as a sequence is.
+		if (model.generated && row[model.generated] == null) {
+			const next = (this.sequences.get(type) ?? 0) + 1;
+			this.sequences.set(type, next);
+			row[model.generated] = next;
+			out[model.generated] = next;
+		}
+		for (const prop of model.key) {
+			if (row[prop] == null) throw new DataError(`${model.name}: key ${prop} is empty`);
+		}
+		await this.checkReferences(
+			tx,
+			model,
+			row,
+			model.references.map((r) => r.prop),
+		);
+		const key = this.keyOf(model, row);
+		await this.acquire(tx, type, key, "update");
+		if (this.row(tx, type, key)) {
+			if (onConflict === "skip") return null;
+			throw new DataError(`${model.name} ${this.describe(model, row)} already exists`);
+		}
+		this.write(tx, type, key, row);
+		return out;
+	}
 
 	private query(tx: MemoryTransaction, type: EntityClass, query: RowQuery): [string, Row][] {
 		const where = Object.entries(query.where ?? {});

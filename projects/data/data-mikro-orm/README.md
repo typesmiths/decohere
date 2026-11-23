@@ -42,6 +42,7 @@ Things to know:
 
 - **MikroORM changes the classes it maps** at run time: field accessors, `toJSON` and a `__helper`. A loaded child also carries its parent. Map HTTP responses to DTOs rather than serialising entities. Don't map one class with two providers in one process.
 - **Version fields** need a database default (`version int not null default 1`). MikroORM leaves the column to it on insert.
+- **`addIfAbsent(entity)`** ([data](../data/README.md#add-unless-its-already-kept)) is the one write before `commit()`. MikroORM has no insert-if-absent for an entity, so it builds one with the query builder (`insert(…).onConflict().ignore().returning(…)`), in the unit of work's transaction, and on `true` sets the generated key and version and merges the entity (`em.merge`), so MikroORM tracks it as loaded.
 - **SQL a query can't express** goes through `transaction()`, below.
 
 ## A repository's own SQL

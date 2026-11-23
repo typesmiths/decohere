@@ -44,7 +44,7 @@ The mapping is checked when the app is built, so a reference to a class that isn
 
 It behaves as Postgres does wherever a repository could tell the difference:
 
-- **Keys and foreign keys.** A second row with the same key fails. So does a reference to a row that doesn't exist, an empty required reference, or deleting a row that something still references (unless the reference cascades).
+- **Keys and foreign keys.** A second row with the same key fails, and `addIfAbsent` answers `false` for it. So does a reference to a row that doesn't exist, an empty required reference, or deleting a row that something still references (unless the reference cascades).
 - **Transactions.** A unit of work's writes stay its own until it commits, and are applied all together. Reads see what is committed plus their own writes. A statement that fails aborts the transaction, which can then only roll back.
 - **Row locks.** These take Postgres's modes: `lock: "update"` and deletes lock the row, updates lock it against other updates, and a reference locks the row it points at against deletion. A second unit of work waits for the first to commit or roll back, then reads the row as it is. Two that would wait for each other fail one of them with a deadlock error.
 - **Copies.** Rows are copied in and out, so an object held outside the unit of work can't change what is stored.

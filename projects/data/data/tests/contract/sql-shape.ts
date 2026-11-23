@@ -1,4 +1,5 @@
-// What the contract compares between providers: the writes each sends, in order, by table and rows,
+// What the contract compares between providers: the writes each sends, in order, by table and rows
+// (and whether an insert skips a kept key, `on conflict do nothing`),
 // and for updates the columns set; plus reads that lock. An insert's column list isn't compared:
 // TypeORM lists every column, writing DEFAULT for those it has no value for. Plain reads aren't
 // compared at all: MikroORM may join children into one SELECT where the tracker runs one per
@@ -25,7 +26,10 @@ function one(sql: string): string {
 	const insert = s.match(/^insert into ([^ (]+) ?\(([^)]*)\) values (.*?)(?: returning .*)?$/);
 	if (insert) {
 		const rows = insert[3].split(/\)\s*,\s*\(/).length;
-		return `insert ${table(insert[1])} ×${rows}`;
+		const ignore = insert[3].endsWith(" on conflict do nothing")
+			? " on conflict do nothing"
+			: "";
+		return `insert ${table(insert[1])} ×${rows}${ignore}`;
 	}
 	const update = s.match(/^update ([^ ]+) set (.*?) where (.*?)(?: returning .*)?$/);
 	if (update) {

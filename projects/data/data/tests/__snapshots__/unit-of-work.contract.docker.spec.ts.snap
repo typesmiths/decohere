@@ -73,6 +73,30 @@ exports[`unit of work contract > a repository's own statement sees what the unit
 
 exports[`unit of work contract > a row loaded twice is one instance, read once 1`] = `[]`;
 
+exports[`unit of work contract > addIfAbsent adds an entity unless its key is kept, says which, and the rest of the unit of work still commits 1`] = `
+[
+  "begin",
+  "insert receipt ×1 on conflict do nothing",
+  "update receipt (memo) ×1",
+  "commit",
+  "begin",
+  "insert receipt ×1 on conflict do nothing",
+  "update orders (note, version) ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > addIfAbsent sets what the database generates, and an aggregate it added takes children and changes on commit 1`] = `
+[
+  "begin",
+  "insert tag ×1 on conflict do nothing",
+  "insert orders ×1 on conflict do nothing",
+  "insert line ×1",
+  "update orders (note, version) ×1",
+  "commit",
+]
+`;
+
 exports[`unit of work contract > an added entity is found by its key with its children as added, and not after it is removed 1`] = `[]`;
 
 exports[`unit of work contract > an entity added and not yet committed is found by its key, and committed once 1`] = `

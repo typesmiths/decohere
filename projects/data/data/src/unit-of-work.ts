@@ -22,6 +22,14 @@ export interface IUnitOfWork extends AsyncDisposable {
 	findOne<T extends object>(type: EntityClass<T>, query?: Query<T>): Promise<T | null>;
 	/** Insert this new entity, and its children, on commit. */
 	add(entity: object): void;
+	/**
+	 * Insert this new entity now, unless a row with its key is already kept, and say whether it was
+	 * new. It writes at once, in this unit of work's transaction (begun now if none is open), so it
+	 * commits or rolls back with the rest. After `true` the entity is managed: later changes to it are
+	 * saved on commit. After `false` it isn't attached. It writes the entity's own row: one with
+	 * children is refused, and an entity it references must already be in the database.
+	 */
+	addIfAbsent(entity: object): Promise<boolean>;
 	/** Delete this entity, and its children, on commit. */
 	remove(entity: object): void;
 	/** Open the transaction now rather than at commit, for reads that must see one snapshot. */
