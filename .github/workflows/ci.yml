@@ -238,6 +238,8 @@ jobs:
         with:
           name: forge-release-beta-${{ github.run_id }}
           path: dist/release/
+          # Hidden files too: the scaffolder's templates are mostly dot-files (.devcontainer, .github).
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
 
