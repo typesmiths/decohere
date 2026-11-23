@@ -12,6 +12,8 @@ export function mikroOrmEntities({
 	Team,
 	Member,
 	Tag,
+	Receipt,
+	Algo,
 	OutboxMessage,
 }: Model) {
 	const OrderSchema = defineEntity({
@@ -97,6 +99,25 @@ export function mikroOrmEntities({
 		properties: { id: p.integer().primary().autoincrement(), label: p.text() },
 	});
 
+	const ReceiptSchema = defineEntity({
+		class: Receipt,
+		tableName: "receipt",
+		schema,
+		properties: { id: p.uuid().primary(), amount: p.integer(), memo: p.text().nullable() },
+	});
+
+	const AlgoSchema = defineEntity({
+		class: Algo,
+		tableName: "algo",
+		schema,
+		properties: {
+			id: p.uuid().primary(),
+			name: p.text(),
+			document: p.json().columnType("jsonb").lazy(),
+			version: p.integer().version(),
+		},
+	});
+
 	const OutboxSchema = defineEntity({
 		class: OutboxMessage,
 		tableName: "outbox",
@@ -115,6 +136,8 @@ export function mikroOrmEntities({
 		TeamSchema,
 		MemberSchema,
 		TagSchema,
+		ReceiptSchema,
+		AlgoSchema,
 		OutboxSchema,
 	];
 }

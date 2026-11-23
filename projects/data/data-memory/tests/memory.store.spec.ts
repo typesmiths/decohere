@@ -1,8 +1,12 @@
 // What the memory store does that the shared contract cases can't show: the database's own rules
 // (foreign keys, row locks, deadlocks, SQL's nulls) and rows copied in and out.
-import { OptimisticLockError, TrackingUnitOfWork } from "@decohere/data";
+import {
+	DataConfigurationError,
+	OptimisticLockError,
+	TrackingUnitOfWork,
+} from "@decohere/data";
 import { describe, expect, it } from "vitest";
-import { MemoryRowStore, MemoryStore } from "../src/index.js";
+import { mapEntity, MemoryRowStore, MemoryStore } from "../src/index.js";
 import { Book, book, entities, Shelf, shelf } from "./model.js";
 
 function open() {
@@ -153,5 +157,17 @@ describe("memory store", () => {
 		await expect(uow.find(Book, { where: { nope: 1 } as never })).rejects.toThrow(
 			'Book has no field "nope"',
 		);
+	});
+
+	it("refuses a lazy field that isn't one of the fields, or is the key or version", () => {
+		const mappings = [
+			mapEntity(Book, { fields: ["title"], lazy: ["rating"] }),
+			mapEntity(Shelf, { fields: ["label"], version: "version", lazy: ["id"] }),
+			mapEntity(Shelf, { fields: ["label"], version: "version", lazy: ["version"] }),
+		];
+		for (const mapping of mappings) {
+			expect(() => new MemoryStore([mapping])).toThrow(DataConfigurationError);
+			expect(() => new MemoryStore([mapping])).toThrow(/is lazy/);
+		}
 	});
 });

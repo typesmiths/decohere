@@ -8,9 +8,14 @@ import {
 import { Builder } from "@decohere/core/hosting";
 import type { Constructable } from "@decohere/core/reflection";
 import { ServiceContainerBuilder } from "@decohere/crucible";
-import { DatabaseConfig, DEFAULT_DATA_SOURCE, type IUnitOfWork } from "@decohere/data";
+import {
+	DatabaseConfig,
+	DEFAULT_DATA_SOURCE,
+	type IUnitOfWork,
+	TrackingUnitOfWork,
+} from "@decohere/data";
 import { MikroOrmUnitOfWork } from "@decohere/data-mikro-orm";
-import { typeOrm } from "@decohere/data-typeorm";
+import { typeOrm, TypeOrmRowStore } from "@decohere/data-typeorm";
 import { MikroORM } from "@mikro-orm/postgresql";
 import pg from "pg";
 import { mikroOrmEntities } from "./mikro-orm.mapping.js";
@@ -53,7 +58,32 @@ export type OpenProvider = {
 export type SqlProvider = OpenProvider & {
 	/** Every statement sent since the last call, then cleared. */
 	take(): string[];
+	/** Runs a statement as a repository in this provider runs its own SQL. `?` marks each parameter. */
+	statement(
+		uow: IUnitOfWork,
+		sql: string,
+		params: unknown[],
+	): Promise<Record<string, unknown>[]>;
 };
+
+/** MikroORM: the entity manager, in the unit of work's transaction. */
+async function mikroOrmStatement(uow: IUnitOfWork, sql: string, params: unknown[]) {
+	if (!(uow instanceof MikroOrmUnitOfWork)) throw new Error("Not MikroORM's unit of work");
+	const em = await uow.transaction();
+	return em.execute(sql, params);
+}
+
+/** TypeORM: the row store's query runner, in the unit of work's transaction. */
+async function typeOrmStatement(uow: IUnitOfWork, sql: string, params: unknown[]) {
+	if (!(uow instanceof TrackingUnitOfWork)) throw new Error("Not the tracking unit of work");
+	const store = await uow.transaction();
+	if (!(store instanceof TypeOrmRowStore)) throw new Error("Not TypeORM's row store");
+	let n = 0;
+	return store.queryRunner.query(
+		sql.replace(/\?/g, () => `$${++n}`),
+		params,
+	);
+}
 
 export async function openMikroOrm(c: Connection): Promise<SqlProvider> {
 	const model = defineModel();
@@ -67,6 +97,7 @@ export async function openMikroOrm(c: Connection): Promise<SqlProvider> {
 		model,
 		begin: () => new MikroOrmUnitOfWork(orm.em, { outbox: model.toOutbox }),
 		take,
+		statement: mikroOrmStatement,
 		reads: countReads,
 		close: () => orm.close(),
 	};
@@ -113,6 +144,7 @@ export async function openTypeOrm(c: Connection): Promise<SqlProvider> {
 		// One request per unit of work, as an app has.
 		begin: () => app.services.beginScope().resolve<IUnitOfWork>(DEFAULT_DATA_SOURCE),
 		take,
+		statement: typeOrmStatement,
 		reads: countReads,
 		close: () => app[Symbol.asyncDispose](),
 	};

@@ -4,7 +4,10 @@ import {
 	domainEvents,
 	type EntityClass,
 	type EntityKey,
+	type FieldKeys,
+	type FindByIdArgument,
 	type Include,
+	isIncludeList,
 	type IUnitOfWork,
 	OptimisticLockError,
 	type OutboxMapper,
@@ -12,14 +15,18 @@ import {
 	type Where,
 } from "@decohere/data";
 import {
-	type EntityManager,
 	type EntityName,
 	type FilterQuery,
 	type FindOptions,
 	FlushMode,
 	LockMode,
 	OptimisticLockError as MikroOptimisticLockError,
+	ReferenceKind,
 } from "@mikro-orm/core";
+import type { EntityManager } from "@mikro-orm/postgresql";
+
+/** A populate hint: a child collection to include, or a lazy field to load. MikroORM takes both as property paths. */
+type Path<T> = Include<T> | FieldKeys<T>;
 
 export type MikroOrmUnitOfWorkOptions = {
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
@@ -44,21 +51,38 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 		this.em = em.fork({ clear: true, flushMode: FlushMode.COMMIT });
 	}
 
-	/** The entity manager behind this unit of work, for SQL a query can't express (`em.getKysely()`), inside a repository. */
+	/** The entity manager behind this unit of work. For SQL of a repository's own, use {@link transaction}. */
 	public get entityManager(): EntityManager {
+		return this.em;
+	}
+
+	/**
+	 * The entity manager, with this unit of work's transaction open (begun now if none is), for a
+	 * provider-side repository's own SQL: `em.execute()`, `em.getKysely()` or
+	 * `em.createQueryBuilder()` then run on its connection. What they write commits or rolls back
+	 * with the unit of work, and they see what it has written. They bypass the identity map and change
+	 * tracking.
+	 */
+	public async transaction(): Promise<EntityManager> {
+		await this.beginTransaction();
 		return this.em;
 	}
 
 	public findById<T extends object>(
 		type: EntityClass<T>,
 		key: EntityKey<T>,
-		include: readonly Include<T>[] = [],
+		options: FindByIdArgument<T> = {},
 	): Promise<T | null> {
 		this.assertUsable();
+		const { include = [], load = [] } = isIncludeList(options)
+			? { include: options }
+			: options;
 		const where = (
 			key !== null && typeof key === "object" ? toFilter(key as Where<T>) : key
 		) as FilterQuery<T>;
-		return this.em.findOne(entityName(type), where, { populate: include } as FindOptions<T>);
+		// MikroORM populates a lazy field as it does a collection.
+		const populate: readonly Path<T>[] = [...include, ...load];
+		return this.em.findOne(entityName(type), where, { populate } as FindOptions<T>);
 	}
 
 	public async find<T extends object>(
@@ -67,10 +91,11 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 	): Promise<T[]> {
 		this.assertUsable();
 		if (query.lock && !this.em.isInTransaction()) await this.em.begin();
+		const populate: readonly Path<T>[] = [...(query.include ?? []), ...(query.load ?? [])];
 		const options = {
 			orderBy: query.orderBy,
 			limit: query.limit,
-			populate: query.include ?? [],
+			populate,
 			...(query.lock ? { lockMode: LockMode.PESSIMISTIC_WRITE } : {}),
 		} as FindOptions<T>;
 		return this.em.find(
@@ -88,6 +113,41 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 	public add(entity: object) {
 		this.assertUsable();
 		this.em.persist(entity);
+	}
+
+	public async addIfAbsent(entity: object): Promise<boolean> {
+		this.assertUsable();
+		const type = entityName(entity.constructor as EntityClass);
+		const meta = this.em.getMetadata().get(type);
+		const uow = this.em.getUnitOfWork();
+		const held =
+			uow.getPersistStack().has(entity) || [...uow.getIdentityMap().values()].includes(entity);
+		if (held) {
+			throw new DataError(
+				`${meta.className}: addIfAbsent takes a new entity, not one this unit of work holds`,
+			);
+		}
+		const em = await this.transaction();
+		// What the database fills in (a generated key, the version's default) comes back to the entity.
+		const generated = meta.props.filter((p) => p.autoincrement || p.version);
+		const result = await em
+			.createQueryBuilder(type)
+			.insert(em.getComparator().prepareEntity(entity))
+			.onConflict()
+			.ignore()
+			.returning([...new Set([...meta.primaryKeys, ...generated.map((p) => p.name)])])
+			.execute("run");
+		const [inserted] = result.rows ?? [];
+		if (inserted === undefined) return false;
+		for (const prop of generated) entity[String(prop.name)] = inserted[prop.fieldNames[0]];
+		// Its children are new: written on commit, with the rest of the unit of work. Taken before the
+		// merge, which attaches the entity as it is in the database: with no children.
+		const children = meta.relations
+			.filter((prop) => prop.kind === ReferenceKind.ONE_TO_MANY)
+			.flatMap((prop) => [...((entity[prop.name] as Iterable<object> | undefined) ?? [])]);
+		em.merge(entity);
+		for (const child of children) em.persist(child);
+		return true;
 	}
 
 	public remove(entity: object) {

@@ -5,11 +5,22 @@ import { ChildList } from "../children.js";
 import { comparison } from "../comparison.js";
 import { domainEvents, type OutboxMapper } from "../domain-event.js";
 import { DataError, OptimisticLockError } from "../error.js";
-import type { Comparison, EntityClass, EntityKey, Include, Query } from "../query.types.js";
+import {
+	type Comparison,
+	type EntityClass,
+	type EntityKey,
+	type FindByIdArgument,
+	isIncludeList,
+	type Query,
+} from "../query.types.js";
 import type { IUnitOfWork } from "../unit-of-work.js";
 import type { ChildrenModel, EntityModel, Row, RowQuery, RowStore } from "./row-store.js";
 
-type Snapshot = { values: Row; children: Map<string, object[]> };
+/**
+ * What a loaded entity held when loaded or last committed. `unloaded` names its fields loaded only on
+ * request that weren't: they're left out of `values` and never written unless assigned.
+ */
+type Snapshot = { values: Row; children: Map<string, object[]>; unloaded: Set<string> };
 
 type Plan = {
 	inserts: object[];
@@ -45,7 +56,11 @@ class UnloadedChildren {
 	}
 }
 
-export class TrackingUnitOfWork implements IUnitOfWork {
+/**
+ * @typeParam S the provider's row store, which {@link transaction} hands to a repository's own
+ * statements.
+ */
+export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitOfWork {
 	/** Per class, by key: every instance this unit of work knows, loaded or only referenced. */
 	private readonly identity = new Map<EntityClass, Map<string, object>>();
 	/** Loaded instances and what they held when loaded or last committed. */
@@ -56,16 +71,19 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 	private released = false;
 
 	public constructor(
-		private readonly store: RowStore,
+		private readonly store: S,
 		private readonly options: TrackingUnitOfWorkOptions = {},
 	) {}
 
 	public async findById<T extends object>(
 		type: EntityClass<T>,
 		key: EntityKey<T>,
-		include: readonly Include<T>[] = [],
+		options: FindByIdArgument<T> = {},
 	): Promise<T | null> {
 		this.assertUsable();
+		const { include = [], load = [] } = isIncludeList(options)
+			? { include: options }
+			: options;
 		const model = this.store.model(type);
 		const where = this.keyWhere(model, key);
 		const wanted = this.keyOf(model, where);
@@ -75,8 +93,12 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 		if (added) return added as T;
 		const hit = this.identity.get(type)?.get(wanted);
 		const snapshot = hit && this.snapshots.get(hit);
-		if (snapshot && include.every((path) => this.isLoaded(type, [hit], path))) return hit as T;
-		return this.findOne(type, { where, include } as Query<T>);
+		const loaded =
+			snapshot &&
+			load.every((field) => !snapshot.unloaded.has(field)) &&
+			include.every((path) => this.isLoaded(type, [hit], path));
+		if (loaded) return hit as T;
+		return this.findOne(type, { where, include, load } as Query<T>);
 	}
 
 	public async findOne<T extends object>(type: EntityClass<T>, query: Query<T> = {}) {
@@ -96,6 +118,7 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 			orderBy: query.orderBy,
 			limit: query.limit,
 			lock: query.lock,
+			load: query.load,
 		});
 		const roots = rows.map((row) => this.hydrate(model, row)) as T[];
 		for (const path of query.include ?? []) await this.loadPath(type, roots, path);
@@ -108,6 +131,31 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 		if (!this.snapshots.has(entity)) this.added.add(entity);
 	}
 
+	public async addIfAbsent(entity: object): Promise<boolean> {
+		this.assertUsable();
+		const type = entity.constructor as EntityClass;
+		const model = this.store.model(type);
+		if (this.snapshots.has(entity) || this.added.has(entity)) {
+			throw new DataError(
+				`${model.name}: addIfAbsent takes a new entity, not one this unit of work holds`,
+			);
+		}
+		await this.beginTransaction();
+		const generated = await this.store.insertIfAbsent(type, this.insertRow(model, entity, []));
+		if (generated === null) return false;
+		Object.assign(entity, generated);
+		this.instances(type).set(this.keyOf(model, entity), entity);
+		// Its children are new too: recorded as loaded and empty, the commit inserts what it holds.
+		const children = new Map<string, object[]>();
+		for (const spec of model.children) if (entity[spec.prop]) children.set(spec.prop, []);
+		this.snapshots.set(entity, {
+			values: this.values(model, entity),
+			children,
+			unloaded: new Set(),
+		});
+		return true;
+	}
+
 	public remove(entity: object) {
 		this.assertUsable();
 		if (this.added.delete(entity)) return;
@@ -117,6 +165,17 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 	public async beginTransaction() {
 		this.assertUsable();
 		if (!this.store.inTransaction()) await this.store.begin();
+	}
+
+	/**
+	 * The row store, with this unit of work's transaction open (begun now if none is), for a
+	 * provider-side repository's own statements on the same connection. What they write commits or
+	 * rolls back with the unit of work, and they see what it has written. They bypass the identity map
+	 * and change tracking.
+	 */
+	public async transaction(): Promise<S> {
+		await this.beginTransaction();
+		return this.store;
 	}
 
 	public async commit() {
@@ -158,13 +217,27 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 
 	// ── Loading ────────────────────────────────────────────────────────────
 
-	/** The instance for a row: the one already known for its key, or a new one. Known instances keep their changes. */
+	/**
+	 * The instance for a row: the one already known for its key, or a new one. Known instances keep
+	 * their changes, and take the fields loaded only on request they lacked, when the row has them.
+	 */
 	private hydrate(model: EntityModel, row: Row): object {
 		const key = this.keyOf(model, row);
 		const known = this.instances(model.type).get(key);
-		if (known && this.snapshots.has(known)) return known;
+		const snapshot = known && this.snapshots.get(known);
+		if (snapshot) {
+			for (const field of snapshot.unloaded) {
+				if (!(field in row)) continue;
+				// A value assigned while it was unloaded is an unsaved change, and stays.
+				if (known[field] === undefined) known[field] = row[field];
+				snapshot.values[field] = clone(row[field]);
+				snapshot.unloaded.delete(field);
+			}
+			return known;
+		}
 		const entity = known ?? Object.create(model.type.prototype);
 		for (const field of model.fields) entity[field] = row[field];
+		const unloaded = new Set((model.lazy ?? []).filter((field) => !(field in row)));
 		for (const ref of model.references) {
 			const value = row[ref.prop];
 			entity[ref.prop] = value == null ? null : this.reference(ref.target, value);
@@ -173,7 +246,11 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 			entity[spec.prop] = new UnloadedChildren(`${model.name}.${spec.prop}`);
 		}
 		this.instances(model.type).set(key, entity);
-		this.snapshots.set(entity, { values: this.values(model, entity), children: new Map() });
+		this.snapshots.set(entity, {
+			values: this.values(model, entity, unloaded),
+			children: new Map(),
+			unloaded,
+		});
 		return entity;
 	}
 
@@ -311,6 +388,7 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 		for (const entity of this.managed()) {
 			if (deletes.has(entity)) continue;
 			const model = this.store.model(entity.constructor as EntityClass);
+			// A field never loaded is in neither: it is written only once something assigns it.
 			const before = this.snapshots.get(entity)?.values ?? {};
 			const now = this.values(model, entity);
 			const changes: Row = {};
@@ -420,23 +498,30 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 		deferred: { entity: object; prop: string }[],
 	) {
 		const model = this.store.model(type);
-		const rows = batch.map((entity) => {
-			if (model.version && entity[model.version] == null) entity[model.version] = 1;
-			const row: Row = {};
-			for (const field of model.fields)
-				if (entity[field] !== undefined) row[field] = entity[field];
-			for (const ref of model.references) {
-				const target = entity[ref.prop];
-				const skip = deferred.some((d) => d.entity === entity && d.prop === ref.prop);
-				row[ref.prop] =
-					target == null || skip
-						? null
-						: this.keyValue(this.store.model(target.constructor as EntityClass), target);
-			}
-			return row;
-		});
+		const rows = batch.map((entity) => this.insertRow(model, entity, deferred));
 		const generated = await this.store.insert(type, rows);
 		batch.forEach((entity, i) => Object.assign(entity, generated[i]));
+	}
+
+	/** A new entity's row: fields as they are, a version starting at 1, references as keys (null where deferred). */
+	private insertRow(
+		model: EntityModel,
+		entity: object,
+		deferred: { entity: object; prop: string }[],
+	): Row {
+		if (model.version && entity[model.version] == null) entity[model.version] = 1;
+		const row: Row = {};
+		for (const field of model.fields)
+			if (entity[field] !== undefined) row[field] = entity[field];
+		for (const ref of model.references) {
+			const target = entity[ref.prop];
+			const skip = deferred.some((d) => d.entity === entity && d.prop === ref.prop);
+			row[ref.prop] =
+				target == null || skip
+					? null
+					: this.keyValue(this.store.model(target.constructor as EntityClass), target);
+		}
+		return row;
 	}
 
 	private afterCommit(plan: Plan) {
@@ -457,7 +542,12 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 				if (list && !(list instanceof UnloadedChildren))
 					children.set(spec.prop, [...(list as Iterable<object>)]);
 			}
-			this.snapshots.set(entity, { values: this.values(model, entity), children });
+			const unloaded = this.stillUnloaded(entity, this.snapshots.get(entity));
+			this.snapshots.set(entity, {
+				values: this.values(model, entity, unloaded),
+				children,
+				unloaded,
+			});
 		}
 		this.added.clear();
 		this.removed.clear();
@@ -515,10 +605,19 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 		return byKey;
 	}
 
-	/** Fields as stored, references as the referenced key. */
-	private values(model: EntityModel, entity: object): Row {
+	/** The fields a snapshot left unloaded that nothing has assigned since. */
+	private stillUnloaded(entity: object, snapshot: Snapshot | undefined): Set<string> {
+		return new Set(
+			[...(snapshot?.unloaded ?? [])].filter((field) => entity[field] === undefined),
+		);
+	}
+
+	/** Fields as stored, references as the referenced key. Fields in `unloaded` are left out. */
+	private values(model: EntityModel, entity: object, unloaded?: ReadonlySet<string>): Row {
 		const values: Row = {};
-		for (const field of model.fields) values[field] = clone(entity[field]);
+		for (const field of model.fields) {
+			if (!unloaded?.has(field)) values[field] = clone(entity[field]);
+		}
 		for (const ref of model.references) {
 			const target = entity[ref.prop];
 			values[ref.prop] =

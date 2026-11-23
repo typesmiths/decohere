@@ -49,9 +49,27 @@ export type Query<T> = {
 	orderBy?: OrderBy<T>;
 	limit?: number;
 	include?: readonly Include<T>[];
+	/** Fields the mapping loads only on request, to load with these rows. */
+	load?: readonly FieldKeys<T>[];
 	/** Lock the matched rows until commit (`SELECT … FOR UPDATE`). Starts the transaction if none is open. */
 	lock?: "update";
 };
+
+/** What `findById` loads beyond the row's own fields: child collections, and fields loaded only on request. */
+export type FindByIdOptions<T> = {
+	include?: readonly Include<T>[];
+	load?: readonly FieldKeys<T>[];
+};
+
+/** `findById`'s third argument: the options, or only the child collections to include. */
+export type FindByIdArgument<T> = readonly Include<T>[] | FindByIdOptions<T>;
+
+/** Whether `findById` was given only the child collections to include, the older form of its options. */
+export function isIncludeList<T>(
+	options: FindByIdArgument<T>,
+): options is readonly Include<T>[] {
+	return Array.isArray(options);
+}
 
 /** A primary key: its fields, or the bare value when the key is one column. */
 export type EntityKey<T> = { [K in FieldKeys<T>]?: T[K] } | string | number;

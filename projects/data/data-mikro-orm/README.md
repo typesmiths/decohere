@@ -36,13 +36,35 @@ If the database is down, that step is retried until it isn't, holding back the h
 
 The container closes the instance when the app stops, after hosted services. Postgres only. Outside a plugin, `new MikroOrmUnitOfWork(orm.em, { outbox })` gives the same unit of work.
 
-Map domain classes with `defineEntity({ class, … })` in infrastructure files, so the domain imports nothing from MikroORM. Map each child collection as a one-to-many with `orphanRemoval()`, so a child dropped from its aggregate is deleted.
+Map domain classes with `defineEntity({ class, … })` in infrastructure files, so the domain imports nothing from MikroORM. Map each child collection as a one-to-many with `orphanRemoval()`, so a child dropped from its aggregate is deleted. Map a field loaded only when asked for with `.lazy()`: `load` populates it, as `include` does a collection ([data](../data/README.md#fields-loaded-only-on-request)).
 
 Things to know:
 
 - **MikroORM changes the classes it maps** at run time: field accessors, `toJSON` and a `__helper`. A loaded child also carries its parent. Map HTTP responses to DTOs rather than serialising entities. Don't map one class with two providers in one process.
 - **Version fields** need a database default (`version int not null default 1`). MikroORM leaves the column to it on insert.
-- **SQL a query can't express:** `uow.entityManager.getKysely()`, inside a repository.
+- **`addIfAbsent(entity)`** ([data](../data/README.md#add-unless-its-already-kept)) is the one write before `commit()`. MikroORM has no insert-if-absent for an entity, so it builds one with the query builder (`insert(…).onConflict().ignore().returning(…)`), in the unit of work's transaction, and on `true` sets the generated key and version and merges the entity (`em.merge`), so MikroORM tracks it as loaded, and persists its children, which the commit writes. An entity already in its identity map or persist stack is refused.
+- **SQL a query can't express** goes through `transaction()`, below.
+
+## A repository's own SQL
+
+`MikroOrmUnitOfWork.transaction()` opens the unit of work's transaction if none is open, and returns its forked entity manager. `em.execute()`, `em.getKysely()` and `em.createQueryBuilder()` then run on the transaction's connection: what they write commits or rolls back with the unit of work, and they see what it has written in that transaction ([data](../data/README.md#a-repositorys-own-sql)). A repository that needs it injects the unit of work as `MikroOrmUnitOfWork`:
+
+```ts
+@injectable()
+export class ReceiptRepository extends Repository<Receipt> {
+	public constructor(@injectUnitOfWork() private readonly mikroOrm: MikroOrmUnitOfWork) {
+		super(mikroOrm, Receipt);
+	}
+
+	public async totalFor(account: string): Promise<number> {
+		const em = await this.mikroOrm.transaction();
+		const [row] = await em.execute("select coalesce(sum(amount), 0) as total from receipt where account = ?", [account]);
+		return Number(row.total);
+	}
+}
+```
+
+The entity manager runs with `flushMode: "commit"`, so a statement doesn't flush pending changes first: it sees the database as this transaction has written it. `entityManager` gives the same entity manager without opening a transaction; a statement run through it outside one commits on its own.
 
 ## Working on this package
 

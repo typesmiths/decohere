@@ -3,6 +3,7 @@ import {
 	type Comparison,
 	DataConfigurationError,
 	type EntityClass,
+	type TrackingUnitOfWork,
 	type EntityModel,
 	type ReferenceModel,
 	type Row,
@@ -31,6 +32,12 @@ const SQL_OPERATORS: Record<string, string> = {
 };
 
 /**
+ * The unit of work `typeOrm()` registers. A provider-side repository injects it as this type to run
+ * its own SQL in the unit of work's transaction: `(await unitOfWork.transaction()).queryRunner`.
+ */
+export type TypeOrmUnitOfWork = TrackingUnitOfWork<TypeOrmRowStore>;
+
+/**
  * The TypeORM provider's share of the unit of work: the mapping, read from TypeORM's metadata,
  * and row operations on one connection. TypeORM builds and sends the SQL; it neither loads
  * relations nor tracks changes here, so child collections are mapped with `persistence: false`.
@@ -41,6 +48,14 @@ export class TypeOrmRowStore implements RowStore {
 
 	public constructor(private readonly dataSource: DataSource) {
 		this.runner = dataSource.createQueryRunner();
+	}
+
+	/**
+	 * The unit of work's own connection. A statement run on it is in the unit of work's transaction
+	 * when one is open: get it through {@link TypeOrmUnitOfWork}'s `transaction()`, which opens one.
+	 */
+	public get queryRunner(): QueryRunner {
+		return this.runner;
 	}
 
 	public model(type: EntityClass): EntityModel {
@@ -69,7 +84,10 @@ export class TypeOrmRowStore implements RowStore {
 
 	public async select(type: EntityClass, query: RowQuery): Promise<Row[]> {
 		const { model, meta, columns } = this.map(type);
-		const props = [...model.fields, ...model.references.map((r) => r.prop)];
+		const fields = model.fields.filter(
+			(field) => !model.lazy?.includes(field) || query.load?.includes(field),
+		);
+		const props = [...fields, ...model.references.map((r) => r.prop)];
 		const qb = this.runner.manager.createQueryBuilder().from(meta.target, "e");
 		qb.select(
 			props.map((prop) => `${this.column("e", columns.get(prop))} AS ${this.escape(prop)}`),
@@ -104,6 +122,33 @@ export class TypeOrmRowStore implements RowStore {
 			.values(rows.map((row) => this.entityShaped(type, row)))
 			.execute();
 		return result.generatedMaps.map((generated) => this.fromEntityShaped(type, generated));
+	}
+
+	public async insertIfAbsent(type: EntityClass, row: Row): Promise<Row | null> {
+		const { meta, model } = this.map(type);
+		// The key says whether a row came back; generated fields are what the entity takes from it.
+		const generated = meta.columns.filter(
+			(c) => c.isGenerated && model.fields.includes(c.propertyName),
+		);
+		const returned = [...new Set([...meta.primaryColumns, ...generated])];
+		const result = await this.runner.manager
+			.createQueryBuilder()
+			.insert()
+			.into(meta.target)
+			.values(this.entityShaped(type, row))
+			.orIgnore()
+			.returning(returned.map((c) => c.propertyPath))
+			.updateEntity(false)
+			.execute();
+		const [inserted] = result.raw as Row[];
+		if (inserted === undefined) return null;
+		const driver = this.dataSource.driver;
+		return Object.fromEntries(
+			generated.map((c) => [
+				c.propertyName,
+				driver.prepareHydratedValue(inserted[c.databaseName], c),
+			]),
+		);
 	}
 
 	public async update(
@@ -179,6 +224,7 @@ export class TypeOrmRowStore implements RowStore {
 			column.relationMetadata?.propertyName ??
 			references.find((r) => columns.get(r.prop)?.databaseName === column.databaseName)?.prop;
 		const fields: string[] = [];
+		const lazy: string[] = [];
 		for (const column of meta.columns) {
 			if (column.embeddedMetadata) {
 				throw new DataConfigurationError(
@@ -187,6 +233,8 @@ export class TypeOrmRowStore implements RowStore {
 			}
 			if (referenceFor(column) || column.isVirtual) continue;
 			fields.push(column.propertyName);
+			// `select: false`: loaded only when a query asks for it.
+			if (!column.isSelect) lazy.push(column.propertyName);
 			columns.set(column.propertyName, column);
 		}
 		const model: EntityModel = {
@@ -208,6 +256,7 @@ export class TypeOrmRowStore implements RowStore {
 				};
 			}),
 			version: meta.versionColumn?.propertyName,
+			lazy,
 		};
 		const mapped = { model, meta, columns, targetKeys };
 		this.mapped.set(type, mapped);

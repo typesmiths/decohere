@@ -39,6 +39,8 @@ export type MemoryEntityOptions<T> = {
 	version?: FieldKeys<T>;
 	/** A key field the store numbers 1, 2, 3… when an insert leaves it empty, like a serial column. */
 	generated?: FieldKeys<T>;
+	/** Fields loaded only when a query asks for them (`load`), like TypeORM's `select: false` or MikroORM's `lazy`. Listed in `fields` too. */
+	lazy?: FieldKeys<T>[];
 };
 
 /** One class's mapping, as {@link mapEntity} makes it. */
@@ -81,6 +83,7 @@ export function mapEntity<T extends object>(
 		})),
 		version: options.version,
 		generated: options.generated,
+		lazy: options.lazy ?? [],
 	};
 }
 
@@ -141,6 +144,17 @@ function check(entities: readonly MemoryEntity[]): Map<EntityClass, MemoryEntity
 		for (const prop of entity.key) {
 			if (!entity.fields.includes(prop) && !isReference(prop)) {
 				throw new DataConfigurationError(`${name}'s key ${prop} isn't mapped`);
+			}
+		}
+		for (const prop of entity.lazy ?? []) {
+			if (
+				!entity.fields.includes(prop) ||
+				entity.key.includes(prop) ||
+				prop === entity.version
+			) {
+				throw new DataConfigurationError(
+					`${name}.${prop} is lazy, so it must be one of fields, and not the key or the version`,
+				);
 			}
 		}
 	}

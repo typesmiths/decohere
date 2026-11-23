@@ -6,7 +6,7 @@ import { ServiceContainerBuilder } from "@decohere/crucible";
 import { DataError, type IUnitOfWork, OptimisticLockError } from "@decohere/data";
 import { expect } from "vitest";
 import type { Order } from "./model.js";
-import type { OpenProvider } from "./providers.js";
+import type { OpenProvider, SqlProvider } from "./providers.js";
 
 const A = "00000000-0000-4000-a000-00000000000a";
 const B = "00000000-0000-4000-a000-00000000000b";
@@ -31,15 +31,37 @@ const load = (p: OpenProvider, uow: IUnitOfWork, id: string) =>
 	uow.findById(p.model.Order, id, ["lines.parts"]);
 const skus = (order: Order) => [...order.lines].map((l) => l.sku);
 
-export type Case = {
+export type Case<P extends OpenProvider = OpenProvider> = {
 	name: string;
-	seed?: (p: OpenProvider) => Promise<void>;
+	seed?: (p: P) => Promise<void>;
 	/** The steps whose SQL is compared. */
-	run: (p: OpenProvider) => Promise<void>;
+	run: (p: P) => Promise<void>;
 	/** Checks the outcome in a fresh unit of work; its SQL isn't compared. */
-	check?: (p: OpenProvider) => Promise<void>;
+	check?: (p: P) => Promise<void>;
+	/** On the SQL providers: checks the statements `run` sent. */
+	checkSql?: (statements: string[]) => void;
 };
 
+const R1 = "00000000-0000-4000-a000-0000000000f1";
+const R2 = "00000000-0000-4000-a000-0000000000f2";
+const R3 = "00000000-0000-4000-a000-0000000000f3";
+const ALPHA = "00000000-0000-4000-a000-0000000000a1";
+/** About 4 KB of JSON: the field a listing shouldn't load. */
+const DOCUMENT = {
+	steps: Array.from({ length: 100 }, (_, i) => ({ step: i, weight: i / 100 })),
+};
+
+/** Two algos, alpha with a large document and beta with an empty one. */
+async function seedAlgos(p: OpenProvider) {
+	await using uow = p.begin();
+	const alpha = new p.model.Algo("alpha", DOCUMENT);
+	alpha.id = ALPHA;
+	uow.add(alpha);
+	uow.add(new p.model.Algo("beta", { steps: [] }));
+	await uow.commit();
+}
+
+/** The cases every provider runs, memory included. */
 export const cases: Case[] = [
 	{
 		name: "one field changed on a loaded aggregate is written on commit, with no save call",
@@ -398,6 +420,216 @@ export const cases: Case[] = [
 			);
 			await uow.commit();
 			expect(await uow.find(p.model.Order, { where: { customer: "ann" } })).toContain(added);
+		},
+	},
+	{
+		name: "addIfAbsent adds an entity unless its key is kept, says which, and the rest of the unit of work still commits",
+		seed: seedOrders,
+		async run(p) {
+			{
+				await using first = p.begin();
+				const receipt = new p.model.Receipt(R3, 5);
+				expect(await first.addIfAbsent(receipt)).toBe(true);
+				// Written and managed: found by its key, and a later change is saved on commit.
+				expect(await first.findById(p.model.Receipt, R3)).toBe(receipt);
+				receipt.memo = "first";
+				await first.commit();
+			}
+			await using second = p.begin();
+			const again = new p.model.Receipt(R3, 9);
+			expect(await second.addIfAbsent(again)).toBe(false);
+			// Not attached: a change to it isn't saved.
+			again.memo = "second";
+			(await second.findById(p.model.Order, A)).note = "kept";
+			await second.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			expect(await uow.findById(p.model.Receipt, R3)).toMatchObject({
+				amount: 5,
+				memo: "first",
+			});
+			expect((await uow.findById(p.model.Order, A)).note).toBe("kept");
+		},
+	},
+	{
+		name: "addIfAbsent takes a whole aggregate: its children are written on commit when it is new, and none when it is kept",
+		async run(p) {
+			const order = new p.model.Order("ann");
+			{
+				await using first = p.begin();
+				order.addLine("apple", 1, ["stalk"]);
+				order.addLine("pear", 2);
+				expect(await first.addIfAbsent(order)).toBe(true);
+				await first.commit();
+			}
+			await using second = p.begin();
+			const again = new p.model.Order("bob");
+			again.id = order.id;
+			again.addLine("plum", 3, ["stone"]);
+			expect(await second.addIfAbsent(again)).toBe(false);
+			await second.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			const [order] = await uow.find(p.model.Order, { include: ["lines.parts"] });
+			expect(order.customer).toBe("ann");
+			expect(skus(order)).toEqual(["apple", "pear"]);
+			expect([...order.lines].map((l) => [...l.parts].map((x) => x.name))).toEqual([
+				["stalk"],
+				[],
+			]);
+			expect(await uow.find(p.model.Line)).toHaveLength(2);
+			expect(await uow.find(p.model.Part)).toHaveLength(1);
+		},
+	},
+	{
+		name: "addIfAbsent sets what the database generates, and an aggregate it added takes children and changes on commit",
+		async run(p) {
+			await using uow = p.begin();
+			const tag = new p.model.Tag("new");
+			expect(await uow.addIfAbsent(tag)).toBe(true);
+			expect(typeof tag.id).toBe("number");
+			const order = new p.model.Order("ann");
+			expect(await uow.addIfAbsent(order)).toBe(true);
+			expect(order.version).toBe(1);
+			order.addLine("apple", 1);
+			order.note = "added";
+			await uow.commit();
+			expect(order.version).toBe(2);
+			await expect(uow.addIfAbsent(order)).rejects.toThrow(DataError);
+		},
+		async check(p) {
+			await using uow = p.begin();
+			const [order] = await uow.find(p.model.Order, { include: ["lines"] });
+			expect(order.note).toBe("added");
+			expect(skus(order)).toEqual(["apple"]);
+			expect(await uow.find(p.model.Tag)).toHaveLength(1);
+		},
+	},
+	{
+		name: "a field loaded on request is left out of a listing",
+		seed: seedAlgos,
+		async run(p) {
+			await using uow = p.begin();
+			const algos = await uow.find(p.model.Algo, { orderBy: { name: "asc" } });
+			expect(algos.map((a) => a.name)).toEqual(["alpha", "beta"]);
+			expect(algos.map((a) => a.document)).toEqual([undefined, undefined]);
+		},
+		checkSql(statements) {
+			const reads = statements.filter((s) => /"algo"/.test(s));
+			expect(reads).toHaveLength(1);
+			expect(reads[0]).not.toMatch(/document/);
+		},
+	},
+	{
+		name: "a field loaded on request is kept when an aggregate loaded with it, or without it, changes",
+		seed: seedAlgos,
+		async run(p) {
+			{
+				await using uow = p.begin();
+				const algo = await uow.findById(p.model.Algo, ALPHA, { load: ["document"] });
+				expect(algo.document).toEqual(DOCUMENT);
+				algo.name = "alpha 2";
+				await uow.commit();
+			}
+			await using uow = p.begin();
+			const algo = await uow.findById(p.model.Algo, ALPHA);
+			expect(algo.document).toBeUndefined();
+			algo.name = "alpha 3";
+			await uow.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			const algo = await uow.findById(p.model.Algo, ALPHA, { load: ["document"] });
+			expect(algo).toMatchObject({ name: "alpha 3", version: 3, document: DOCUMENT });
+		},
+	},
+	{
+		name: "a field loaded on request that wasn't loaded, then assigned, is written on commit",
+		seed: seedAlgos,
+		async run(p) {
+			await using uow = p.begin();
+			const algo = await uow.findById(p.model.Algo, ALPHA);
+			expect(algo.document).toBeUndefined();
+			algo.document = { steps: ["replaced"] };
+			await uow.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			const algo = await uow.findById(p.model.Algo, ALPHA, { load: ["document"] });
+			expect(algo).toMatchObject({ version: 2, document: { steps: ["replaced"] } });
+		},
+	},
+	{
+		name: "asking for a field the loaded instance lacks loads it into that instance, by findById or find",
+		seed: seedAlgos,
+		async run(p) {
+			await using uow = p.begin();
+			const [alpha, beta] = await uow.find(p.model.Algo, { orderBy: { name: "asc" } });
+			expect(await uow.findById(p.model.Algo, ALPHA, { load: ["document"] })).toBe(alpha);
+			expect(alpha.document).toEqual(DOCUMENT);
+			const again = await uow.find(p.model.Algo, {
+				orderBy: { name: "asc" },
+				load: ["document"],
+			});
+			expect(again).toEqual([alpha, beta]);
+			expect(again[1]).toBe(beta);
+			expect(beta.document).toEqual({ steps: [] });
+			// Loaded now: answered from the identity map.
+			p.reads();
+			expect(await uow.findById(p.model.Algo, ALPHA, { load: ["document"] })).toBe(alpha);
+			expect(p.reads()).toBe(0);
+			await uow.commit();
+		},
+	},
+];
+
+/** The cases only the SQL providers run: they send SQL of their own, through the provider's `transaction()`. */
+export const sqlCases: Case<SqlProvider>[] = [
+	{
+		name: "a repository's own statement runs in the unit of work's transaction, and rolls back with a failed commit",
+		seed: seedOrders,
+		async run(p) {
+			await using uow = p.begin();
+			// No transaction is open yet: the statement must begin it, or it would commit on its own.
+			await p.statement(uow, "insert into uow_contract.receipt (id, amount) values (?, ?)", [
+				R1,
+				5,
+			]);
+			uow.add(new p.model.Order("fay"));
+			const duplicate = new p.model.Order("gus");
+			duplicate.id = B;
+			uow.add(duplicate);
+			await expect(uow.commit()).rejects.toThrow();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			expect(await uow.find(p.model.Receipt)).toEqual([]);
+			expect(await uow.find(p.model.Order, { where: { customer: "fay" } })).toEqual([]);
+		},
+	},
+	{
+		name: "a repository's own statement sees what the unit of work wrote before commit, and others don't",
+		async run(p) {
+			await using uow = p.begin();
+			await p.statement(uow, "insert into uow_contract.receipt (id, amount) values (?, ?)", [
+				R2,
+				7,
+			]);
+			const rows = await p.statement(
+				uow,
+				"select amount from uow_contract.receipt where id = ?",
+				[R2],
+			);
+			expect(rows).toEqual([{ amount: 7 }]);
+			await using other = p.begin();
+			expect(await other.findById(p.model.Receipt, R2)).toBeNull();
+			await uow.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			expect((await uow.findById(p.model.Receipt, R2)).amount).toBe(7);
 		},
 	},
 ];

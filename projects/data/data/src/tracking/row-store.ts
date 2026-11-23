@@ -31,6 +31,8 @@ export type EntityModel = {
 	children: ChildrenModel[];
 	/** The field checked and incremented on every update. */
 	version?: string;
+	/** Fields, among {@link fields}, a select leaves out unless its query names them in `load`. */
+	lazy?: string[];
 };
 
 /** A query on rows: fields and references compared with key values. */
@@ -39,6 +41,8 @@ export type RowQuery = {
 	orderBy?: Record<string, "asc" | "desc">;
 	limit?: number;
 	lock?: "update";
+	/** Fields loaded only on request to select too. A row leaves out the others. */
+	load?: readonly string[];
 };
 
 /**
@@ -56,6 +60,11 @@ export interface RowStore {
 	select(type: EntityClass, query: RowQuery): Promise<Row[]>;
 	/** Insert the rows in one statement. Returns, for each row in order, the values the database generated. */
 	insert(type: EntityClass, rows: Row[]): Promise<Row[]>;
+	/**
+	 * Insert one row unless its key is already kept (`INSERT … ON CONFLICT DO NOTHING`). Returns the
+	 * values the database generated, or null when nothing was inserted.
+	 */
+	insertIfAbsent(type: EntityClass, row: Row): Promise<Row | null>;
 	/** `UPDATE … SET changes WHERE key (AND version = expected)`. Returns the number of rows changed. */
 	update(
 		type: EntityClass,

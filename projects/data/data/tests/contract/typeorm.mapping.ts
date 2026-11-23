@@ -12,6 +12,8 @@ export function typeOrmEntities({
 	Team,
 	Member,
 	Tag,
+	Receipt,
+	Algo,
 	OutboxMessage,
 }: Model) {
 	return [
@@ -137,6 +139,29 @@ export function typeOrmEntities({
 			columns: {
 				id: { type: "int", primary: true, generated: "increment" },
 				label: { type: "text" },
+			},
+		}),
+		new EntitySchema<InstanceType<Model["Receipt"]>>({
+			name: "Receipt",
+			target: Receipt,
+			tableName: "receipt",
+			schema,
+			columns: {
+				id: { type: "uuid", primary: true },
+				amount: { type: "int" },
+				memo: { type: "text", nullable: true },
+			},
+		}),
+		new EntitySchema<InstanceType<Model["Algo"]>>({
+			name: "Algo",
+			target: Algo,
+			tableName: "algo",
+			schema,
+			columns: {
+				id: { type: "uuid", primary: true },
+				name: { type: "text" },
+				document: { type: "jsonb", select: false },
+				version: { type: "int", version: true },
 			},
 		}),
 		new EntitySchema<InstanceType<Model["OutboxMessage"]>>({

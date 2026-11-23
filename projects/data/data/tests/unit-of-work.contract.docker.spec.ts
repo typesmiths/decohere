@@ -7,7 +7,7 @@ import {
 	type PostgresContainer,
 	startPostgres,
 } from "../../data-postgres/tests/postgres-container.js";
-import { cases } from "./contract/cases.js";
+import { cases, sqlCases } from "./contract/cases.js";
 import { DDL, SCHEMA, TABLES } from "./contract/model.js";
 import { openMikroOrm, openTypeOrm, type SqlProvider } from "./contract/providers.js";
 import { shapes } from "./contract/sql-shape.js";
@@ -35,7 +35,7 @@ describe("unit of work contract", () => {
 		await pg?.stop();
 	});
 
-	for (const { name, seed, run, check } of cases) {
+	for (const { name, seed, run, check, checkSql } of [...cases, ...sqlCases]) {
 		it(name, async () => {
 			const sent: Record<string, string[]> = {};
 			for (const p of providers) {
@@ -45,7 +45,9 @@ describe("unit of work contract", () => {
 				if (seed) await seed(p);
 				p.take();
 				await run(p);
-				sent[p.name] = shapes(p.take());
+				const statements = p.take();
+				checkSql?.(statements);
+				sent[p.name] = shapes(statements);
 				await check?.(p);
 			}
 			expect(sent.MikroORM).toMatchSnapshot();

@@ -51,6 +51,10 @@ export class MemoryRowStore implements RowStore {
 		return this.run((tx) => this.store.insert(tx, type, rows));
 	}
 
+	public insertIfAbsent(type: EntityClass, row: Row): Promise<Row | null> {
+		return this.run((tx) => this.store.insertIfAbsent(tx, type, row));
+	}
+
 	public update(
 		type: EntityClass,
 		key: Row,
