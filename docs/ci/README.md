@@ -173,26 +173,30 @@ Each night [`nightly.mjs`](../../projects/ci-tools/src/bench/nightly.mjs) runs t
 
 ## Published packages
 
-All under `projects/`, all public on npm: `@decohere/` `core`, `http`, `config`, `data`, `data-typeorm`, `workspace`, `devkit`, `testing`, `crucible`, `scribe`, `scribe-pino`, `scribe-console`, `forge`, `flux`, `cli`, `create`, `scaffold`, `ci-tools`. The Vitest plugin is `@decohere/forge/vitest`. `devcontainer` is private and ships only as an image.
+All under `projects/`, all public on npm: `@decohere/` `core`, `http`, `http-fastify`, `config`, `data`, `data-postgres`, `data-mikro-orm`, `data-typeorm`, `data-memory`, `workspace`, `devkit`, `testing`, `crucible`, `scribe`, `scribe-pino`, `scribe-console`, `forge`, `flux`, `cli`, `create`, `scaffold`, `ci-tools`. The Vitest plugin is `@decohere/forge/vitest`. `devcontainer` is private and ships only as an image.
 
 The repo installs no published `@decohere/*` package (`tools/register.mjs` runs everything from source), so a bad publish cannot break CI.
 
 ## Adding a new npm package
 
-npm can attach a Trusted Publisher only to a name that exists, and creating a name needs an owner's npm login, so CI can't do it. Contributors need no npm access: on their PR, **lint/typecheck** leaves a notice naming the package and stays green. In the merge queue, the same check fails until the name exists.
+CI publishes and promotes over Trusted Publishing, with no npm token. For that, each package needs, on npm:
 
-When the PR is ready to merge:
+- its **name**, since npm attaches a Trusted Publisher only to a name that exists, and creating one needs an owner's login;
+- a **Trusted Publisher for `publish.yml`**, to publish;
+- a **Trusted Publisher for `promote-latest.yml`**, to move `latest`, allowed dist-tags and not publishing.
 
-1. From the repo root, after `npm login` to the org:
+Missing one shows up only after merge: Publish fails partway through a release, or Promote to latest can't move the package. Contributors need no npm access: on their PR, **lint/typecheck** leaves a notice naming a package not on npm yet and stays green. In the merge queue the same check fails until the name exists, and warns about a name on npm that Publish has never published, since that one may lack its Trusted Publishers (only a logged-in owner can see them).
 
-   ```bash
-   pnpm npm:bootstrap --otp <code> @decohere/<name>   # no names: every name not on npm yet
-   ```
+When the PR is ready to merge, an owner runs the command the check prints, from the repo root of any checkout (`main` is fine, since a named package needn't be in it):
 
-   [`npm-bootstrap.mjs`](../../projects/ci-tools/src/github/npm-bootstrap.mjs) first-publishes each name public and runs `npm trust github` for it, skipping what is done. `--otp` is optional (npm asks when needed); `--dry-run` prints the commands.
+```bash
+npm login
+pnpm npm:bootstrap --otp <code> @decohere/<name>   # without names: every package in this checkout
+```
 
-2. By hand instead: `npm publish ./projects/<dir> --access public --tag dev` (drop `--tag` for a stable version), then on npm: package settings, Trusted Publisher, GitHub Actions, with organization `typesmiths`, repository `decohere`, workflow `publish.yml`, environment `npm-publish`, allowed action `npm publish`.
-3. Add the PR to the merge queue. Doing this only when it's ready avoids leaving an unused name on npm if the PR is abandoned.
+[`npm-bootstrap.mjs`](../../projects/ci-tools/src/github/npm-bootstrap.mjs) checks every package (or the ones named) and does only what is missing: the first publish of the name, the `publish.yml` Trusted Publisher (`npm trust github`), and the `promote-latest.yml` one, copied from a package that has it. The first publish is a stub, `0.0.0-bootstrap.0` with a package.json and a README, on the `bootstrap` tag: it only claims the name, and CI publishes the package built. npm points `latest` at a name's first version, so `latest` is the stub until [Promote to latest](#promote-to-latest) moves it. A name that isn't on npm must be in a `package.json` on some branch of the repo, so a typo can't claim one. It reads everything first, so one code covers the changes. npm wants the code even to read Trusted Publishers, so `--otp` is required, also with `--dry-run`, which prints what it would do. With nothing missing it changes nothing, so it is safe to run any time. Then add the PR to the merge queue. Doing this only when it's ready avoids leaving an unused name on npm if the PR is abandoned.
+
+`npm trust` has no flag for the dist-tag permission, so the promote publisher goes through the registry endpoint `npm trust` itself uses, which npm doesn't document. The script reads the login `npm login` saved in your npmrc and never prints it. If no package has a promote publisher to copy, it says how to add one on npmjs.com, and changes nothing.
 
 ## Promote to latest
 
@@ -205,19 +209,7 @@ gh workflow run promote-latest.yml -f version=<version>
 
 It stops with nothing moved if `latest` is already a stable version and this one is a dev version, if any package lacks the version, or the version has no `v*` tag, which means it didn't fully ship. It also stops if the version is under a day old, because current pnpm skips versions that new and would install an older one; `-f allow_young=true` overrides that. Run it again if it stops partway: packages already there are skipped.
 
-**Setup, once.** Each package needs a Trusted Publisher for this workflow, separate from its `publish.yml` one, and `npm trust` has no flag for its permission.
-
-1. On npmjs.com, in the settings of `@decohere/cli`, add a Trusted Publisher: GitHub Actions, organization `typesmiths`, repository `decohere`, workflow `promote-latest.yml`, no environment. Under Allowed actions, turn **Allow npm publish** off and **Allow npm dist-tag** on.
-2. Copy it to every other package with one OTP code. This uses npm's undocumented registry endpoint, and only adds entries:
-
-   ```bash
-   NPM_TOKEN="$(sed -n 's#^//registry.npmjs.org/:_authToken=##p' ~/.npmrc)" \
-     pnpm npm:trust-promote --otp <code>
-   ```
-
-3. Run the workflow within 2 days: npm's docs say a new publisher must complete a successful publish in that time.
-
-A new package needs step 2 again: `pnpm npm:bootstrap` prints a reminder.
+**Setup.** Each package needs a Trusted Publisher for this workflow, separate from its `publish.yml` one: `pnpm npm:bootstrap` adds it ([Adding a new npm package](#adding-a-new-npm-package)). npm's docs say a new publisher must complete a successful publish within 2 days, so run the workflow soon after.
 
 ## Changing npm by hand
 
@@ -232,8 +224,8 @@ To point `latest` at a version on every package without the workflow:
 ```bash
 VERSION=<version>   # must already be on npm for every package; check the dev tag
 read -rp "OTP code: " OTP
-printf '%s\n' core http config data data-typeorm workspace devkit testing crucible scribe scribe-pino scribe-console forge flux cli create scaffold ci-tools |
-  xargs -P 18 -I{} npm dist-tag add "@decohere/{}@$VERSION" latest --otp="$OTP"
+printf '%s\n' core http http-fastify config data data-postgres data-mikro-orm data-typeorm data-memory workspace devkit testing crucible scribe scribe-pino scribe-console forge flux cli create scaffold ci-tools |
+  xargs -P 22 -I{} npm dist-tag add "@decohere/{}@$VERSION" latest --otp="$OTP"
 ```
 
 If some fail because the code expired, run it again with a new code; repeating a package that already moved does no harm. A `+latest: ...` line means that package moved. `npm view` can show the old tag for a minute or so afterwards, so don't take that as a failure or retry because of it; `npm dist-tag add` warning `already set` confirms the move. Then check with `npm view @decohere/<name> dist-tags`.

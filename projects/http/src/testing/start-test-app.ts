@@ -18,8 +18,10 @@ export type TestApp = AsyncDisposable & {
 
 /**
  * Start a built app on a free loopback port (`127.0.0.1:0`), so a test can call it over HTTP. The
- * app runs as it does in production: routing, auth, middleware and the real provider. It doesn't
- * stop on SIGTERM or SIGINT; stop it with `await using` or `stop()`.
+ * app runs as it does in production: routing, auth, middleware and the real provider, with two
+ * differences. It doesn't stop on SIGTERM or SIGINT; stop it with `await using` or `stop()`. And a
+ * hosted service whose `start()` throws fails it, rather than being retried in the background
+ * (`startRetry: false`), so a test sees the error.
  *
  * @example
  * await using api = await startTestApp(createApp());
@@ -31,7 +33,12 @@ export async function startTestApp(app: App | PromiseLike<App>): Promise<TestApp
 	const built = await app;
 	const stop = () => built.dispose();
 	try {
-		await built.start({ port: 0, host: "127.0.0.1", shutdownSignals: false });
+		await built.start({
+			port: 0,
+			host: "127.0.0.1",
+			shutdownSignals: false,
+			startRetry: false,
+		});
 	} catch (error) {
 		await stop();
 		throw error;

@@ -2,13 +2,13 @@ import { basename, resolve } from "node:path";
 import type { PackageManager } from "@decohere/devkit/interop";
 import { detectPackageManager, promptForPackageManager } from "@decohere/devkit/interop";
 import { ask, closePrompt, pick } from "../domain/prompt.js";
-import type { AppTarget } from "../steps/apps.js";
-import { auth0Step } from "../steps/auth0.step.js";
-import { postgresStep } from "../steps/postgres.step.js";
-import { usersStep } from "../steps/users.step.js";
-import { merge } from "../templates/merge.js";
-import { templates } from "../templates/templates.js";
-import { WorkspaceChanges } from "../templates/workspace-changes.js";
+import { Auth0Step } from "../steps/auth0-step.service.js";
+import { PostgresStep } from "../steps/postgres-step.service.js";
+import { UsersStep } from "../steps/users-step.service.js";
+import type { AppTarget } from "../steps/workspace-app.model.js";
+import { FileMerge } from "../templates/file-merge.service.js";
+import { Templates } from "../templates/templates.service.js";
+import { WorkspaceChanges } from "../templates/workspace-changes.model.js";
 import {
 	CreateCliError,
 	isDecohereWorkspace,
@@ -24,7 +24,6 @@ import {
 import { DEFAULT_WEBAPI_NAME, webapiPort, webapiProjectDir } from "./const.js";
 import { DATABASE_PROVIDERS, type DatabaseProvider, ormOf } from "./database-provider.js";
 import { formatScaffoldedFiles } from "./format-files.js";
-import { printByHand } from "./print-by-hand.js";
 
 export type ApiOptions = {
 	d?: string;
@@ -60,7 +59,7 @@ async function askAuth(): Promise<"auth0" | "none"> {
 
 /** Copies the recipe in as `projects/<name>/`, and forwards its port from the Dev Container. */
 function addApp(changes: WorkspaceChanges, workspace: string, target: AppTarget): void {
-	templates.apply(changes, RECIPE, { workspace, app: target.name, port: target.port });
+	new Templates().apply(changes, RECIPE, { workspace, app: target.name, port: target.port });
 	const path = ".devcontainer/devcontainer.json";
 	const devcontainer = changes.read(path);
 	if (devcontainer == null) return;
@@ -69,7 +68,7 @@ function addApp(changes: WorkspaceChanges, workspace: string, target: AppTarget)
 		forwardPorts: [target.port],
 		portsAttributes: { [target.port]: { label, requireLocalPort: true } },
 	});
-	const merged = merge.json(devcontainer, ports, path);
+	const merged = new FileMerge().mergeJson(devcontainer, ports, path);
 	if (merged == null) {
 		changes.tellByHand(path, [`Forward port ${target.port} for ${target.name}.`]);
 		return;
@@ -120,16 +119,20 @@ export async function scaffoldApi(options: ApiOptions): Promise<void> {
 	const changes = new WorkspaceChanges(targetDir);
 	if (!options.add) {
 		const [first] = targets;
-		templates.apply(changes, "workspace", { workspace, app: first.name, port: first.port });
+		new Templates().apply(changes, "workspace", {
+			workspace,
+			app: first.name,
+			port: first.port,
+		});
 	}
 	for (const target of targets) addApp(changes, workspace, target);
-	if (orm != null) postgresStep.apply(changes, workspace, targets, orm);
-	if (withAuth0) auth0Step.apply(changes, workspace, targets, auth0Env);
-	if (withUsers) usersStep.apply(changes, workspace, targets, adminEnv);
+	if (orm != null) new PostgresStep(changes).apply(workspace, targets, orm);
+	if (withAuth0) new Auth0Step(changes).apply(workspace, targets, auth0Env);
+	if (withUsers) new UsersStep(changes).apply(workspace, targets, adminEnv);
 	const written = changes.commit();
 
 	await finish(targetDir, workspace, names, { add: options.add === true, install, written });
-	printByHand(changes);
+	changes.printByHand();
 }
 
 function checkCanAdd(targetDir: string, names: readonly string[]): string[] {

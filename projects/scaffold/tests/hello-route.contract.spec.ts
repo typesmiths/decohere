@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { RouteMetadata } from "../../http/src/routing/http.types.js";
 import { RouteRegistry } from "../../http/src/routing/services/route-registry.js";
-import { templates } from "../src/templates/templates.js";
+import { Templates } from "../src/templates/templates.service.js";
 import { HelloController } from "../templates/recipes/webapi/projects/app-name/src/controllers/hello.controller.js";
 
 const realFs = await vi.importActual<typeof import("node:fs")>("node:fs");
@@ -14,7 +14,7 @@ const realFs = await vi.importActual<typeof import("node:fs")>("node:fs");
 describe("the web API recipe's Hello routes", () => {
 	it("enables openApi, so Hello's @Field bodies are validated", () => {
 		const app = realFs.readFileSync(
-			join(templates.recipesDir(), "webapi/projects/app-name/src/app.ts"),
+			join(new Templates().recipesDir, "webapi/projects/app-name/src/app.ts"),
 			"utf8",
 		);
 		expect(app).toContain("openApi:");

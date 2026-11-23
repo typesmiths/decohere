@@ -272,3 +272,69 @@ describe("scopes", () => {
 		expect(outer.resolve(LifetimeScopeToken)).toBe(outer);
 	});
 });
+
+describe("request-scoped services from the root", () => {
+	@injectable()
+	class Uow {}
+
+	it("refuses to resolve one from the root, which would share it with every request", () => {
+		const builder = new ServiceContainerBuilder();
+		builder.registerRequestScoped(Uow);
+		const container = builder.build();
+
+		expect(() => container.resolve(Uow)).toThrow(ResolveError);
+		expect(() => container.resolve(Uow)).toThrow(
+			/^Uow is request-scoped: resolve it from a scope \(beginScope\), or make it a singleton/,
+		);
+	});
+
+	it("resolves one from a scope, a new one per scope", () => {
+		const builder = new ServiceContainerBuilder();
+		builder.registerRequestScoped(Uow);
+		const container = builder.build();
+		using first = container.beginScope();
+		using second = container.beginScope();
+
+		expect(first.resolve(Uow)).toBe(first.resolve(Uow));
+		expect(first.resolve(Uow)).not.toBe(second.resolve(Uow));
+	});
+
+	it("refuses a singleton that resolves one from the lifetime scope it was given", () => {
+		@injectable()
+		class Jobs {
+			public constructor(@inject(LifetimeScopeToken) private readonly scope: LifetimeScope) {}
+			public run() {
+				return this.scope.resolve(Uow);
+			}
+		}
+		const builder = new ServiceContainerBuilder();
+		builder.registerRequestScoped(Uow);
+		builder.registerSingleton(Jobs);
+		using scope = builder.build().beginScope();
+
+		expect(() => scope.resolve(Jobs).run()).toThrow(/^Uow is request-scoped/);
+	});
+
+	it("lets a singleton begin a scope of its own and resolve one there", () => {
+		@injectable()
+		class Jobs {
+			public constructor(@inject(LifetimeScopeToken) private readonly scope: LifetimeScope) {}
+			public run() {
+				using work = this.scope.beginScope();
+				return work.resolve(Uow);
+			}
+		}
+		const builder = new ServiceContainerBuilder();
+		builder.registerRequestScoped(Uow);
+		builder.registerSingleton(Jobs);
+		const jobs = builder.build().resolve(Jobs);
+
+		expect(jobs.run()).toBeInstanceOf(Uow);
+		expect(jobs.run()).not.toBe(jobs.run());
+	});
+
+	it("still lets the root resolve its own lifetime scope", () => {
+		const container = new ServiceContainerBuilder().build();
+		expect(container.resolve(LifetimeScopeToken)).toBe(container);
+	});
+});

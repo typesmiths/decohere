@@ -1,6 +1,7 @@
 import { config, EnvDataSource } from "@decohere/config";
 import { auth } from "@decohere/http";
 import { bootModule } from "@decohere/http/testing";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { afterEach, expect, it, vi } from "vitest";
 import { HelloController } from "../src/controllers/hello.controller.js";
 import { SampleService } from "../src/services/sample.service.js";
@@ -17,6 +18,7 @@ it("GET /hello answers with the greeting from config", async () => {
 	vi.stubEnv("AUTH__SECRET", "a-secret-only-this-test-knows");
 	vi.stubEnv("AUTH__AUDIENCE", "hello-test");
 	await using api = await bootModule({
+		provider: FastifyProvider,
 		controllers: [HelloController],
 		services: (services) => {
 			services.registerSingleton(SampleService);

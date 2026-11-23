@@ -1,16 +1,14 @@
 import { basename, resolve } from "node:path";
-import type { AppTarget } from "../steps/apps.js";
-import { apps } from "../steps/apps.js";
-import { auth0Step } from "../steps/auth0.step.js";
-import { postgresStep } from "../steps/postgres.step.js";
-import { usersStep } from "../steps/users.step.js";
-import { WorkspaceChanges } from "../templates/workspace-changes.js";
+import { Auth0Step } from "../steps/auth0-step.service.js";
+import { PostgresStep } from "../steps/postgres-step.service.js";
+import { UsersStep } from "../steps/users-step.service.js";
+import { type AppTarget, WorkspaceApp } from "../steps/workspace-app.model.js";
+import { WorkspaceChanges } from "../templates/workspace-changes.model.js";
 import { CreateCliError, isDecohereWorkspace, listExistingApiNames } from "./api-name.js";
 import { configureTenant, createAdminUser } from "./auth0-commands.js";
 import { webapiPort } from "./const.js";
 import type { Orm } from "./database-provider.js";
 import { formatScaffoldedFiles } from "./format-files.js";
-import { printByHand } from "./print-by-hand.js";
 
 export type AddStepOptions = {
 	/** List what would change, and change nothing (Auth0 included). */
@@ -45,17 +43,19 @@ function finish(changes: WorkspaceChanges, options: AddStepOptions): void {
 		if (written.length > 0) formatScaffoldedFiles(changes.root, written);
 		for (const path of written) console.log(`  ✓ ${path}`);
 	}
-	printByHand(changes);
+	changes.printByHand();
 }
 
 /** Apps with both Postgres and Auth0 but no local users yet: `add users` is the next step. */
 function suggestUsers(changes: WorkspaceChanges, targets: AppTarget[]): void {
-	const without = targets.filter(
-		({ name }) =>
-			apps.ormOf(changes, name) != null &&
-			apps.hasAuth(changes, name) &&
-			changes.read(`projects/${name}/src/services/user.service.ts`) == null,
-	);
+	const without = targets.filter(({ name }) => {
+		const app = new WorkspaceApp(changes, name);
+		return (
+			app.orm != null &&
+			app.hasAuth &&
+			changes.read(`projects/${name}/src/services/user.service.ts`) == null
+		);
+	});
 	if (without.length === 0) return;
 	console.log("\n  With Postgres and Auth0, each user can have a local profile:");
 	console.log("\n    pnpm decohere add users\n");
@@ -65,7 +65,11 @@ function suggestUsers(changes: WorkspaceChanges, targets: AppTarget[]): void {
 export function runAddPostgres(directory = ".", options: AddStepOptions & { orm?: Orm } = {}) {
 	const workspace = openWorkspace(directory);
 	const changes = new WorkspaceChanges(workspace.targetDir);
-	postgresStep.apply(changes, workspace.name, workspace.targets, options.orm ?? "mikro-orm");
+	new PostgresStep(changes).apply(
+		workspace.name,
+		workspace.targets,
+		options.orm ?? "mikro-orm",
+	);
 	finish(changes, options);
 	suggestUsers(changes, workspace.targets);
 }
@@ -77,7 +81,7 @@ export function runAddAuth0(directory = ".", options: AddStepOptions = {}): void
 		? {}
 		: configureTenant(workspace.targetDir, workspace.name, workspace.targets.length);
 	const changes = new WorkspaceChanges(workspace.targetDir);
-	auth0Step.apply(changes, workspace.name, workspace.targets, env);
+	new Auth0Step(changes).apply(workspace.name, workspace.targets, env);
 	finish(changes, options);
 	console.log(
 		"\n  ✓ Auth0 added. Every route now needs a token, unless it has @AllowAnonymous().",
@@ -101,7 +105,9 @@ export function runAddUsers(
 ) {
 	const workspace = openWorkspace(directory);
 	const changes = new WorkspaceChanges(workspace.targetDir);
-	const ready = usersStep.check(new WorkspaceChanges(workspace.targetDir), workspace.targets);
+	const ready = new UsersStep(new WorkspaceChanges(workspace.targetDir)).check(
+		workspace.targets,
+	);
 	const env =
 		options.dryRun || ready.size === 0
 			? {}
@@ -110,6 +116,6 @@ export function runAddUsers(
 					options.admin ?? "admin",
 					process.env.DECOHERE_ADMIN_PASSWORD,
 				);
-	usersStep.apply(changes, workspace.name, workspace.targets, env);
+	new UsersStep(changes).apply(workspace.name, workspace.targets, env);
 	finish(changes, options);
 }

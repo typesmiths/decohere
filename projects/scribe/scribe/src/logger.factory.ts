@@ -69,6 +69,18 @@ export class scribe implements AsyncDisposable {
 	}
 
 	/**
+	 * Write every entry through `adapter` from now on, in place of the one in use:
+	 * `scribe.use(pino())`, `scribe.use(new JsonConsoleAdapter(), { logLevel: "debug" })`.
+	 * Loggers made before the call follow it.
+	 */
+	public static use<T extends string = never, CustomOnly extends true | false = false>(
+		adapter: LoggerAdapter,
+		{ tap, ...options }: ScribeOptions<T, CustomOnly> & { tap?: LogTap } = {},
+	) {
+		return scribe.configure<T, CustomOnly>({ adapter, options, tap });
+	}
+
+	/**
 	 * Add fields to every line a `scribe.logger(...)` handle writes while
 	 * `source` returns them: `@decohere/http` adds the request id this way.
 	 * Adding the same source twice adds it once. Returns a function that
@@ -263,8 +275,8 @@ export class scribe implements AsyncDisposable {
 		// console.warn, not the stderr stream: the facade runs in browsers and Workers too.
 		console.warn(
 			"[scribe] No logger adapter configured; using the default ConsoleAdapter. " +
-				"Configure an adapter at your composition root (for production, prefer " +
-				"@decohere/scribe-pino → JSON on stdout). See " +
+				"Add one at your composition root (for production, `scribe.use(pino())` " +
+				"from @decohere/scribe-pino: JSON on stdout). See " +
 				"https://github.com/typesmiths/decohere/blob/main/projects/scribe/README.md",
 		);
 	}

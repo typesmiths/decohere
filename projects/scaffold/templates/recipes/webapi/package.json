@@ -11,6 +11,7 @@
     "@decohere/core": "*",
     "@decohere/crucible": "*",
     "@decohere/http": "*",
+    "@decohere/http-fastify": "*",
     "@decohere/scribe": "*",
     "@decohere/scribe-pino": "*",
     "pino-pretty": "^13.0.0",

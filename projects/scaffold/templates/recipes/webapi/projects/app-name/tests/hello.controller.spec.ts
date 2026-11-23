@@ -1,5 +1,6 @@
 import { config, EnvDataSource } from "@decohere/config";
 import { bootModule } from "@decohere/http/testing";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { afterEach, expect, it, vi } from "vitest";
 import { HelloController } from "../src/controllers/hello.controller.js";
 import { SampleService } from "../src/services/sample.service.js";
@@ -13,6 +14,7 @@ afterEach(() => {
 it("GET /hello answers with the greeting from config", async () => {
 	vi.stubEnv("SAMPLE__GREETING", "Hello from a test");
 	await using api = await bootModule({
+		provider: FastifyProvider,
 		controllers: [HelloController],
 		services: (services) => {
 			services.registerSingleton(SampleService);

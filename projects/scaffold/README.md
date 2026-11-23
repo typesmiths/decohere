@@ -27,30 +27,30 @@ templates/
     users-typeorm/
 ```
 
-- **A recipe is a working app.** `tests/recipes.spec.ts` imports each recipe's `createApp()` from where it sits, starts it and calls `GET /hello`; its own `tests/` run in `pnpm test`; the repo type-checks and lints it like any other code. A second recipe (another HTTP provider, or a worker with no HTTP) is another folder under `recipes/`.
-- **A step is the files it adds**, plus its edits to `app.ts` in `src/steps/<name>.step.ts`. Its files are parts of an app, not whole ones, so the repo's `tsc` and `pnpm test` leave `templates/steps/` out. `e2e/generated-app-types.e2e.spec.ts` generates an app with every step on top of the recipe, once per ORM, and type-checks it against the release build.
+- **A recipe is a working app.** `src/templates/recipes.spec.ts` imports each recipe's `createApp()` from where it sits, starts it and calls `GET /hello`; its own `tests/` run in `pnpm test`; the repo type-checks and lints it like any other code. A second recipe (another HTTP provider, or a worker with no HTTP) is another folder under `recipes/`.
+- **A step is the files it adds**, plus its edits to `app.ts` in `src/steps/<name>-step.service.ts`. Its files are parts of an app, not whole ones, so the repo's `tsc` and `pnpm test` leave `templates/steps/` out. `e2e/generated-app-types.e2e.spec.ts` generates an app with every step on top of the recipe, once per ORM, and type-checks it against the release build.
 - **Placeholders are names that still compile.** In paths and text, `workspace-name`, `app-name` and `app-port` become the project's name, the app's folder and its port; `workspace_name` and `app_name` the same as Postgres identifiers; `APP_NAME` the app's environment prefix; `decohere-devcontainer-image` the Dev Container image at this version. Every `@decohere/*` dependency in a template `package.json` gets this package's version, so `"*"` is fine there. `_gitignore` and `_env` land as `.gitignore` and `.env`, which npm and git would drop from the package.
 - **A step's migration** is named `00000000-000000-<name>.ts`. It is written once per app, stamped with the time, and the app's `src/migrations/index.ts` is rewritten to list every migration in the folder, as the db commands do.
 
 ## Applying a template
 
-`templates.apply` (`src/templates/templates.ts`) copies one folder for one app into a `WorkspaceChanges`, which holds every write in memory until `commit()`, so `--dry-run` can list them. For each file:
+`Templates.apply` (`src/templates/templates.service.ts`) copies one folder for one app into a `WorkspaceChanges`, which holds every write in memory until `commit()`, so `--dry-run` can list them. For each file:
 
 | The workspace | What happens |
 |---|---|
 | doesn't have it | written |
-| has it, and it's JSON, YAML, `.env`, an ignore list, Markdown, or `.devcontainer/Dockerfile` | merged by `src/templates/merge.ts`, which only adds: keys and list items it lacks (YAML list items with a `name` match by it), variables, lines, `##` sections, Docker steps before the last `USER` |
+| has it, and it's JSON, YAML, `.env`, an ignore list, Markdown, or `.devcontainer/Dockerfile` | merged by `FileMerge` (`src/templates/file-merge.service.ts`), which only adds: keys and list items it lacks (YAML list items with a `name` match by it), variables, lines, `##` sections, Docker steps before the last `USER` |
 | has it, it's source, and it's exactly what a folder in the step's `replaces` writes | replaced |
 | has it otherwise | left alone; the user is told where the step's version is |
 
-Edits to `app.ts` (`src/steps/app-source.ts`) each say whether they are done, how to make them in the shape the recipe generates, and what to add by hand. A file gets all of a step's edits or none, and the user gets every missing line.
+Edits to `app.ts` (`AppSource`, `src/steps/app-source.model.ts`) each say whether they are done, how to make them in the shape the recipe generates, and what to add by hand. A file gets all of a step's edits or none, and the user gets every missing line.
 
 ## Adding a step
 
 1. Put its files under `templates/steps/<name>/`, laid out as in a workspace, with a `projects/app-name/package.json` that records `"decohere": { "steps": ["<name>"] }`.
-2. Write `src/steps/<name>.step.ts`: apply its folders for each app, then its `app.ts` edits.
+2. Write `src/steps/<name>-step.service.ts`: a class that applies its folders for each app, then its `app.ts` edits.
 3. Add the command in `src/program.ts` and the `add` module, and a `create` option if new projects should be able to start with it.
-4. Test it once on top of the recipe in `tests/add-steps.integration.spec.ts` (what it adds, that a second run changes nothing, `--dry-run`, a hand-edited `app.ts`), and add it to the apps `generated-app-types.e2e` type-checks.
+4. Test it once on top of the recipe in `src/steps/add-steps.integration.spec.ts` (what it adds, that a second run changes nothing, `--dry-run`, a hand-edited `app.ts`), and add it to the apps `generated-app-types.e2e` type-checks.
 
 ## Shipping the templates
 

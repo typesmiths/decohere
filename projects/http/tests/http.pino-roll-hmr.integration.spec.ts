@@ -3,18 +3,18 @@ import { ServiceContainerBuilder } from "@decohere/crucible";
 /**
  * Reproduces Flux hot-reload + pino-roll: App.dispose must finish so reboot can listen again.
  *
- * Scaffold pattern: scribe.withPinoPretty().and.withPinoRoll({ file }) then export default app.
+ * Scaffold pattern: scribe.use(pino({ pretty: true, roll: { file } })) then export default app.
  * Flux disposeEntry → App.dispose → container asyncDispose → scribe.stop() must not hang on ThreadStream.end().
  */
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import "@decohere/scribe-pino";
 import { scribe } from "@decohere/scribe";
+import { pino } from "@decohere/scribe-pino";
 import axios from "axios";
 import { afterEach, describe, expect, it } from "vitest";
 import { realFs } from "../../../vitest.setup.js";
 import { type App, Builder } from "@decohere/core/hosting";
-import { FastifyProvider } from "../src/providers/fastify.provider.js";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { Controller, Get } from "../src/routing/index.js";
 import { startTestApp } from "../src/testing/index.js";
 
@@ -27,13 +27,9 @@ class FundingArbStubController {
 }
 
 async function bootWithPinoRoll(logFile: string): Promise<App> {
-	scribe.withPinoPretty().and.withPinoRoll({
-		file: logFile,
-		when: "always",
-		size: "1m",
-		keep: 2,
-		mkdir: true,
-	});
+	scribe.use(
+		pino({ pretty: true, roll: { file: logFile, size: "1m", keep: 2, mkdir: true } }),
+	);
 	return Builder.create(new ServiceContainerBuilder())
 		.use(http(FastifyProvider, { controllers: [FundingArbStubController] }))
 		.build();
@@ -54,7 +50,7 @@ describe("Flux-style reboot with pino-roll", () => {
 		}
 	});
 
-	it("listens again after App.dispose + withPinoRoll reconfigure (HMR cycle)", async () => {
+	it("listens again after App.dispose and a new pino roll (HMR cycle)", async () => {
 		logDir = realFs.mkdtempSync(join(tmpdir(), "http-pino-roll-hmr-"));
 		const logFile = join(logDir, "funding-fee.api.log");
 

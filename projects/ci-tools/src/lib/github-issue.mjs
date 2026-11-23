@@ -37,25 +37,8 @@ export function pickIssue(issues, title) {
 export function upsertIssue(options, run = gh) {
 	const { title, body, assignees = [] } = options;
 	const repo = options.repo ? ["--repo", options.repo] : [];
-	const issues = JSON.parse(
-		run([
-			"issue",
-			"list",
-			...repo,
-			"--state",
-			"all",
-			"--limit",
-			"200",
-			"--search",
-			// Quoted: GitHub's search can't match a title like `security(ci): …` unquoted.
-			// The exact-title match in pickIssue still decides.
-			`"${title.replaceAll('"', "")}" in:title`,
-			"--json",
-			"number,title,state,url",
-		]),
-	);
 	const assign = assignees.flatMap((login) => ["--add-assignee", login]);
-	const existing = pickIssue(issues, title);
+	const existing = pickIssue(listIssues(title, repo, run), title);
 	if (existing != null) {
 		if (existing.state !== "OPEN") {
 			run(["issue", "reopen", String(existing.number), ...repo]);
@@ -72,4 +55,47 @@ export function upsertIssue(options, run = gh) {
 	).trim();
 	const number = Number(url.split("/").pop());
 	return { number, url, created: true };
+}
+
+/**
+ * Close the open issue titled `title`, saying why, once its subject is gone: the next upsert
+ * reopens it if it comes back.
+ *
+ * @param {{ title: string, comment: string, repo?: string }} options
+ * @param {typeof gh} [run]
+ * @returns {number | null} the issue closed, if one was open
+ */
+export function resolveIssue(options, run = gh) {
+	const { title, comment } = options;
+	const repo = options.repo ? ["--repo", options.repo] : [];
+	const open = pickIssue(listIssues(title, repo, run), title);
+	if (open == null || open.state !== "OPEN") return null;
+	run(["issue", "close", String(open.number), ...repo, "--comment", comment]);
+	return open.number;
+}
+
+/**
+ * @param {string} title
+ * @param {string[]} repo
+ * @param {typeof gh} run
+ * @returns {{ number: number, title: string, state: string, url: string }[]}
+ */
+function listIssues(title, repo, run) {
+	return JSON.parse(
+		run([
+			"issue",
+			"list",
+			...repo,
+			"--state",
+			"all",
+			"--limit",
+			"200",
+			"--search",
+			// Quoted: GitHub's search can't match a title like `security(ci): …` unquoted.
+			// The exact-title match in pickIssue still decides.
+			`"${title.replaceAll('"', "")}" in:title`,
+			"--json",
+			"number,title,state,url",
+		]),
+	);
 }

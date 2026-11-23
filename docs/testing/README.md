@@ -27,15 +27,16 @@ Test what the program does for its users (files written, HTTP responses, exit co
 | Concern | Canonical behavior suite | Units only for |
 |---|---|---|
 | scaffolder tree | `projects/scaffold/tests/cli.integration.spec.ts` | contract edges |
-| a recipe runs as it is | `projects/scaffold/tests/recipes.spec.ts`, plus each recipe's own `tests/` | none |
-| each `decohere add` step, once on a recipe | `projects/scaffold/tests/add-steps.integration.spec.ts` | Auth0 setup in `auth.wiring.spec.ts` |
+| a recipe runs as it is | `projects/scaffold/src/templates/recipes.spec.ts`, plus each recipe's own `tests/` | none |
+| each `decohere add` step, once on a recipe | `projects/scaffold/src/steps/add-steps.integration.spec.ts` | Auth0 setup in `auth.wiring.spec.ts` |
 | a generated app's types | `projects/scaffold/e2e/generated-app-types.e2e.spec.ts`, against the release build, in CI's `package` job on PRs | none |
 | what a user installs | `projects/create/e2e/real-install.e2e.spec.ts`, against a temporary registry, in CI's `verify-release` job on `main` | `runInBuilder` and argv in `projects/create/tests/runner.spec.ts` |
 | product CLI shape | `projects/cli/tests/product.integration.spec.ts` | per-module forge, flux and create suites |
 | forge CLI | `projects/cli/tests/forge.integration.spec.ts` | action edges the CLI cannot see |
 | flux CLI | `projects/cli/tests/flux.integration.spec.ts` | HotReloadServer edges in `projects/flux/tests/hmr.server.spec.ts` |
-| HTTP | `projects/http/tests/*.integration.spec.ts` | crypto, SSRF and `*.pentest.spec.ts` edges |
-| data's unit of work, on every provider | `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, against Postgres, MikroORM's writes snapshotted as the reference | the query types in `projects/data/data/tests/query.types.spec.ts`; configuration checks in `projects/data/data/tests/data-sources.spec.ts`; database setup and roles in `projects/data/data-postgres/tests/` |
+| HTTP | `projects/http/tests/*.integration.spec.ts`, on `FastifyProvider` | crypto, SSRF and `*.pentest.spec.ts` edges |
+| HTTP on Fastify (compression, static files) | `projects/http-fastify/tests/*.integration.spec.ts` | none |
+| data's unit of work, on every provider | the cases in `projects/data/data/tests/contract/cases.ts`: on the SQL providers in `unit-of-work.contract.docker.spec.ts`, against Postgres, MikroORM's writes snapshotted as the reference; on the memory provider in `unit-of-work.contract.spec.ts` | the query types in `projects/data/data/tests/query.types.spec.ts`; what `typeOrm()` takes as entities in `projects/data/data-typeorm/src/database-options.types.spec.ts`; configuration checks in `projects/data/data/tests/data-sources.spec.ts`; database setup and roles in `projects/data/data-postgres/tests/`; the memory store's keys, locks and copies in `projects/data/data-memory/tests/` |
 | scribe facade | `projects/scribe/scribe/tests/scribe.integration.spec.ts` | env helpers, console edge cases |
 | scribe + pino | `projects/scribe/scribe-pino/tests/scribe-pino.integration.spec.ts` | `pinoRecipe.transport` plan shapes, transport guard |
 | scribe + JSON console | `projects/scribe/scribe-console/tests/json-console.adapter.integration.spec.ts` | none |

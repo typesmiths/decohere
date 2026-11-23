@@ -147,10 +147,12 @@ builder.override.registerTransient(SampleService);
 | Lifetime | Cached |
 |---|---|
 | Singleton | On the root container — shared with every nested scope |
-| Request | On the current scope — new instance per `beginScope` |
+| Request | On the current scope — new instance per `beginScope`. Never on the root: resolving one there throws |
 | Transient | Never — new instance every `resolve` |
 
 A singleton may not depend on a request-scoped service, directly or through transients: it would keep the first request's instance forever (a "captive dependency", e.g. one database connection for the life of the process). Resolving one throws `ResolveError` naming the chain. Make the consumer request-scoped, or inject `LifetimeScopeToken` and resolve the request-scoped service per request. `LifetimeScopeToken` itself is allowed: a singleton gets the root container.
+
+The root is never a scope for request-scoped services: it lives as long as the process, so one instance kept there would be shared by every request. Resolving one from the root (`container.resolve(UnitOfWork)`, or a singleton calling `resolve` on the `LifetimeScopeToken` it was given) throws `ResolveError`. Begin a scope and resolve it there, or make it a singleton.
 
 A dependency cycle (`A → B → A`) throws `ResolveError` listing the cycle.
 
@@ -246,7 +248,8 @@ export class ExceptionFilterHost {
 
 ```ts
 builder.registerRequestScoped("connection", () => createConnection());
-const connection = container.resolve("connection");
+using scope = container.beginScope();
+const connection = scope.resolve("connection");
 ```
 
 Arrow factories are called as functions (not `new`). Use them when construction needs arguments the container should not know about.
@@ -272,7 +275,7 @@ export class App {
 import { Builder } from "@decohere/core/hosting";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { http } from "@decohere/http";
-import { FastifyProvider } from "@decohere/http/providers";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { SampleService } from "./services/sample.service.js";
 import { HelloController } from "./controllers/hello.controller.js";
 

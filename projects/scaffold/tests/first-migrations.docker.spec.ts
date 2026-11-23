@@ -27,7 +27,7 @@ import {
 	type PostgresContainer,
 	startPostgres,
 } from "../../data/data-postgres/tests/postgres-container.js";
-import { templates } from "../src/templates/templates.js";
+import { Templates } from "../src/templates/templates.service.js";
 import type { Orm } from "../src/webapi/database-provider.js";
 
 class StaticConfig implements IConfigurationService {
@@ -64,7 +64,8 @@ async function load(path: string): Promise<Record<string, unknown>> {
 	return (await import(pathToFileURL(path).href)) as Record<string, unknown>;
 }
 
-const src = (step: string) => join(templates.dir(), "steps", step, "projects/app-name/src");
+const src = (step: string) =>
+	join(new Templates().dir, "steps", step, "projects/app-name/src");
 
 const cases: { orm: Orm; tables: Table[] }[] = [
 	{ orm: "mikro-orm", tables: [table("mikro-orm", "mikro-orm", "sample")] },

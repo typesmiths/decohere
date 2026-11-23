@@ -3,7 +3,7 @@ import type { Type } from "../reflection/types/reflection.types.js";
 export type ExtensionOptions = {
 	/**
 	 * Also install the method on the constructor. Use for singleton facades
-	 * (`scribe.withPinoPretty()`) whose instance lives at `ctor.instance`.
+	 * (a static facade class) whose instance lives at `ctor.instance`.
 	 */
 	static?: boolean;
 };

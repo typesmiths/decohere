@@ -44,9 +44,27 @@ exports[`unit of work contract > a key the database generates is set on the enti
 ]
 `;
 
+exports[`unit of work contract > a query sees the database: an entity added and not yet committed is in it after commit 1`] = `
+[
+  "begin",
+  "insert orders ×1",
+  "commit",
+]
+`;
+
 exports[`unit of work contract > a re-query returns the instance already loaded, with its unsaved changes 1`] = `[]`;
 
 exports[`unit of work contract > a row loaded twice is one instance, read once 1`] = `[]`;
+
+exports[`unit of work contract > an added entity is found by its key with its children as added, and not after it is removed 1`] = `[]`;
+
+exports[`unit of work contract > an entity added and not yet committed is found by its key, and committed once 1`] = `
+[
+  "begin",
+  "insert orders ×1",
+  "commit",
+]
+`;
 
 exports[`unit of work contract > children two deep load, change and insert 1`] = `
 [

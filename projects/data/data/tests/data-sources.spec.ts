@@ -21,83 +21,98 @@ const source = (overrides: Partial<ConnectionInfo> = {}): ConnectionInfo => ({
 	...overrides,
 });
 
-describe("dataSources.prepare", () => {
-	it("refuses a data source that asks to be set up when the provider was given no bootstrap", async () => {
-		await expect(
-			dataSources.prepare(
+describe("dataSources.check", () => {
+	it("refuses a data source that asks to be set up when the provider was given no bootstrap", () => {
+		expect(() =>
+			dataSources.check(
 				[source({ bootstrap: true, adminUser: "postgres", adminPassword: "pw" })],
-				{
-					applicationName: "api",
-				},
+				{},
 			),
-		).rejects.toThrow(
+		).toThrow(
 			new DataConfigurationError(
 				'Data source "api" asks to be set up at startup (bootstrap), but the provider was given no bootstrap. Install the package for its database and pass it to the provider: database: postgres, from @decohere/data-postgres. Or set bootstrap: false.',
 			),
 		);
 	});
 
-	it("counts an admin user in development as asking", async () => {
-		await expect(
-			dataSources.prepare(
+	it("counts an admin user in development as asking", () => {
+		expect(() =>
+			dataSources.check(
 				[source({ adminUser: "postgres", auth: "trust", password: undefined })],
 				{
-					applicationName: "api",
 					nodeEnv: "development",
 				},
 			),
-		).rejects.toThrow(/asks to be set up/);
+		).toThrow(/asks to be set up/);
 	});
 
-	it("runs the bootstrap it was given, with every data source", async () => {
-		const bootstrap = vi.fn().mockResolvedValue(undefined);
-		const sources = [source({ bootstrap: true, adminUser: "postgres", adminPassword: "pw" })];
+	it("passes when the provider was given a bootstrap", () => {
+		expect(() =>
+			dataSources.check(
+				[source({ bootstrap: true, adminUser: "postgres", adminPassword: "pw" })],
+				{ bootstrap: vi.fn(), nodeEnv: "production" },
+			),
+		).not.toThrow();
+	});
 
-		await dataSources.prepare(sources, {
+	it("needs no bootstrap when nothing asks for one", () => {
+		expect(() => dataSources.check([source()], { nodeEnv: "production" })).not.toThrow();
+	});
+
+	it("still refuses synchronize outside development, with or without a bootstrap", () => {
+		expect(() =>
+			dataSources.check([source({ synchronize: true })], {
+				nodeEnv: "production",
+			}),
+		).toThrow(/sets synchronize/);
+	});
+
+	it("refuses migrateOnStart outside development: a release step migrates there", () => {
+		expect(() =>
+			dataSources.check([source({ migrateOnStart: true })], {
+				nodeEnv: "production",
+			}),
+		).toThrow(
+			'Data source "api" sets migrateOnStart, which is allowed only in development (NODE_ENV is "production"). Run db migrate as a release step instead.',
+		);
+	});
+
+	it("refuses migrateOnStart with synchronize", () => {
+		expect(() =>
+			dataSources.check([source({ migrateOnStart: true, synchronize: true })], {
+				nodeEnv: "development",
+			}),
+		).toThrow(/sets both migrateOnStart and synchronize/);
+	});
+});
+
+describe("dataSources.open", () => {
+	it("runs the bootstrap once with every data source, then connects each", async () => {
+		const steps: string[] = [];
+		const bootstrap = vi.fn(async () => {
+			steps.push("bootstrap");
+		});
+		const opening = (name: string) => ({
+			connection: source({ name }),
+			connect: async () => {
+				steps.push(`connect ${name}`);
+			},
+			synchronize: async () => {},
+			seed: async () => {},
+		});
+		const sources = [opening("orders"), opening("audit")];
+
+		await dataSources.open(sources, {
 			applicationName: "api",
 			bootstrap,
 			nodeEnv: "production",
 		});
 
-		expect(bootstrap).toHaveBeenCalledWith(sources, {
-			applicationName: "api",
-			nodeEnv: "production",
-		});
-	});
-
-	it("needs no bootstrap when nothing asks for one", async () => {
-		await expect(
-			dataSources.prepare([source()], { applicationName: "api", nodeEnv: "production" }),
-		).resolves.toBeUndefined();
-	});
-
-	it("still refuses synchronize outside development, with or without a bootstrap", async () => {
-		await expect(
-			dataSources.prepare([source({ synchronize: true })], {
-				applicationName: "api",
-				nodeEnv: "production",
-			}),
-		).rejects.toThrow(/sets synchronize/);
-	});
-
-	it("refuses migrateOnStart outside development: a release step migrates there", async () => {
-		await expect(
-			dataSources.prepare([source({ migrateOnStart: true })], {
-				applicationName: "api",
-				nodeEnv: "production",
-			}),
-		).rejects.toThrow(
-			'Data source "api" sets migrateOnStart, which is allowed only in development (NODE_ENV is "production"). Run db migrate as a release step instead.',
+		expect(bootstrap).toHaveBeenCalledWith(
+			sources.map((s) => s.connection),
+			{ applicationName: "api", nodeEnv: "production" },
 		);
-	});
-
-	it("refuses migrateOnStart with synchronize", async () => {
-		await expect(
-			dataSources.prepare([source({ migrateOnStart: true, synchronize: true })], {
-				applicationName: "api",
-				nodeEnv: "development",
-			}),
-		).rejects.toThrow(/sets both migrateOnStart and synchronize/);
+		expect(steps).toEqual(["bootstrap", "connect orders", "connect audit"]);
 	});
 });
 
@@ -111,6 +126,7 @@ describe("dataSources.start", () => {
 			dataSource: "api",
 			source: { connection, migrations: [], applicationName: "api" },
 			migrator,
+			open: async () => {},
 			diff: async () => ({ up: [], down: [] }),
 		};
 		return {
@@ -118,6 +134,7 @@ describe("dataSources.start", () => {
 			source: {
 				connection,
 				migrations: target,
+				connect: async () => {},
 				synchronize: async () => {
 					steps.push("synchronize");
 				},

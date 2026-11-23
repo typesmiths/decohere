@@ -52,6 +52,7 @@ function target(
 		dataSource: name,
 		source: { connection: connection(name), migrations, applicationName: "shop.api" },
 		migrator,
+		open: vi.fn(async () => {}),
 		diff: async () => diff,
 	};
 }
@@ -84,6 +85,25 @@ describe("db.run", () => {
 			}),
 		);
 		expect(out).toEqual(["Nothing to apply"]);
+	});
+
+	it("opens the data source first, bootstrapping it, for every command but new", async () => {
+		const opened: string[] = [];
+		const migrator = fakeMigrator();
+		vi.mocked(migrator.status).mockImplementation(async () => {
+			opened.push("status");
+			return [];
+		});
+		const shop = target("shop", migrator);
+		vi.mocked(shop.open).mockImplementation(async () => {
+			opened.push("open");
+		});
+		const app = appWith(shop);
+
+		await db.run(app, ["status"], options());
+		await db.run(app, ["new", "add-expiry"], options());
+
+		expect(opened).toEqual(["open", "status"]);
 	});
 
 	it("asks which data source when the app has several, and uses the one named", async () => {

@@ -1,16 +1,22 @@
-import "@decohere/scribe-pino";
 import { config, EnvDataSource, YamlDataSource } from "@decohere/config";
 import { Builder } from "@decohere/core/hosting";
 import { ServiceContainerBuilder } from "@decohere/crucible";
 import { health, http } from "@decohere/http";
-import { FastifyProvider } from "@decohere/http/providers";
+import { FastifyProvider } from "@decohere/http-fastify";
 import { scribe } from "@decohere/scribe";
+import { pino } from "@decohere/scribe-pino";
 import { HelloController } from "./controllers/hello.controller.js";
 import { SampleService } from "./services/sample.service.js";
 
 /** Builds the app and starts nothing: main.ts starts it, and tests and tools use it as built. */
 export function createApp() {
-	scribe.withPinoPretty().and.withPinoRoll({ file: "logs/workspace-name.app-name.log" });
+	// Pretty lines and rolling files on a developer's machine; JSON on stdout in production.
+	const development = process.env.NODE_ENV !== "production";
+	scribe.use(
+		pino(
+			development ? { pretty: true, roll: { file: "logs/workspace-name.app-name.log" } } : {},
+		),
+	);
 	return Builder.create(new ServiceContainerBuilder(), {
 		applicationName: "workspace-name.app-name",
 	})

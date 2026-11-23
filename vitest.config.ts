@@ -1,3 +1,4 @@
+import { availableParallelism } from "node:os";
 import { defineConfig } from "vitest/config";
 import "./tools/register.mjs";
 
@@ -7,6 +8,9 @@ const { forgeBuild } = await import("@decohere/forge/vitest");
 export default defineConfig({
 	plugins: [forgeBuild({ logLevel: "silent" })],
 	test: {
+		// At most 8 workers, not Vitest's one per core less one (23 on a 24-core machine): more add
+		// memory but not speed, and two sessions' runs at 23 each swap the machine. CI's 4 cores keep 3.
+		maxWorkers: Math.max(1, Math.min(8, availableParallelism() - 1)),
 		// Spies keep their call history otherwise: restoreAllMocks() doesn't clear it.
 		clearMocks: true,
 		// Run one with `--project <name>`. `pnpm test` runs "unit"; the scripts in package.json run the others.

@@ -16,18 +16,21 @@ builder.use(
 );
 ```
 
-`mikroOrm()` reads the `database` config section, like `typeOrm()`. When the app is built, for each data source it:
+`mikroOrm()` reads the `database` config section, like `typeOrm()`. When the app is built, it connects to nothing; for each data source it:
 
-- checks the data source's `auth`, `synchronize` and `migrateOnStart`, and creates its database, least-privilege roles and schema when the config asks, with the `database` you pass;
-- opens one MikroORM instance as the app role, named for the app in `application_name`;
+- checks the data source's `auth`, `synchronize` and `migrateOnStart`;
+- creates one MikroORM instance as the app role, named for the app in `application_name`, not yet connected;
 - registers a unit of work per request (`@injectUnitOfWork()`), the instance itself (`@injectMikroOrm()`) and a readiness check;
 - registers the data source's migrations and schema diff for the db commands, when given a `database`.
 
 When the app starts, before hosted services and the server, it:
 
+- creates the database, least-privilege roles and schema when the config asks, with the `database` you pass, then connects each instance;
 - applies pending migrations when `migrateOnStart` is on (development only);
 - creates missing tables when `synchronize` is on (development only), never dropping any;
 - runs `seed(orm)` when `seed` is on.
+
+If the database is down, that step is retried until it isn't, holding back the hosted services; until then a request for the unit of work answers 503 ([data](../data/README.md#setting-up-the-database)).
 
 `db generate` takes MikroORM's schema diff, connected as the migrate role. MikroORM proposes dropping every table it sees and doesn't map, so the role's reach to its own schema is what keeps another app's tables out of the diff. The history table is skipped by name, and `create schema` and `drop schema` are left out: schemas are the bootstrap's. `synchronize` leaves out `create schema` for the same reason: the app role may not run it even when the schema exists.
 

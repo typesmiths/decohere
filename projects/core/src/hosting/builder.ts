@@ -6,7 +6,7 @@ import {
 } from "../configuration/index.js";
 import type { Constructable } from "../reflection/index.js";
 import { App } from "./app.js";
-import { HostedServiceHostToken, type StartStep, StartStepsToken } from "./const.js";
+import { HostedServiceHostToken, type StartStep } from "./const.js";
 import type { HostedService } from "./hosted-service.js";
 import { HostedServiceHost } from "./hosted-service-host.js";
 
@@ -41,7 +41,6 @@ export class Builder<T extends App = App> {
 		containerBuilder: ContainerBuilder,
 	) => Promise<void> | void)[] = [];
 	private postBuildSteps: ((container: IContainer) => Promise<void> | void)[] = [];
-	private readonly startSteps: StartStep[] = [];
 	private readonly hostedServices = new HostedServiceHost();
 
 	public constructor(containerBuilder: ContainerBuilder, options?: BuilderOptions) {
@@ -84,13 +83,14 @@ export class Builder<T extends App = App> {
 	}
 
 	/**
-	 * Run `step` when the app starts, in registration order, before its hosted services start and
-	 * its server listens. For work that changes the world outside the process, such as bringing a
-	 * database's schema up to date: an app that is only built, by a tool or a test, does none of it.
-	 * A throw fails `app.start()`.
+	 * Run `step` when the app starts, in registration order, before its hosted services start. For
+	 * work that changes the world outside the process, such as bringing a database's schema up to
+	 * date: an app that is only built, by a tool or a test, does none of it. A throw is retried with
+	 * the hosted services' backoff, and the hosted services wait until it succeeds (with
+	 * `startRetry: false`, it fails `app.start()`). `name` is what logs and `/ready` call it.
 	 */
-	public registerStartStep(step: StartStep) {
-		this.startSteps.push(step);
+	public registerStartStep(step: StartStep, name?: string) {
+		this.hostedServices.addStep(step, name);
 	}
 
 	public async buildAndStart<T extends App>(type?: Constructable<T>): Promise<T | App> {
@@ -136,7 +136,6 @@ export class Builder<T extends App = App> {
 
 	private configureApp(type: Constructable) {
 		this.containerBuilder.registerSingleton(HostedServiceHostToken, this.hostedServices);
-		this.containerBuilder.registerSingleton(StartStepsToken, { steps: this.startSteps });
 		this.containerBuilder.registerSingleton(type ?? App);
 	}
 

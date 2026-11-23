@@ -67,30 +67,30 @@ export type DataSourceBootstrap = (
 	options: { applicationName: string; nodeEnv?: string },
 ) => Promise<void>;
 
-export type PrepareOptions = {
-	applicationName: string;
+export type CheckOptions = {
+	/** The bootstrap the provider was given, if any. */
 	bootstrap?: DataSourceBootstrap;
 	/** Defaults to `process.env.NODE_ENV`. */
 	nodeEnv?: string;
 };
 
+export type OpenOptions = CheckOptions & { applicationName: string };
+
 /**
- * What every provider runs before it connects. It checks each data source's `auth` and
- * `synchronize` for the environment, then runs the bootstrap it was given. A data source that
- * asks to be set up (`bootstrap: true`, or an admin user in development) with no bootstrap given
- * is an error, rather than a login failure later.
+ * What every provider checks when the app is built, before anything connects: each data source's
+ * `auth`, `synchronize` and `migrateOnStart` for the environment. A data source that asks to be
+ * set up (`bootstrap: true`, or an admin user in development) with no bootstrap given is an
+ * error now, rather than a login failure later. A mistake here won't fix itself, so it fails the
+ * build instead of being retried at start.
  */
-async function prepare(sources: readonly ConnectionInfo[], options: PrepareOptions) {
+function check(sources: readonly ConnectionInfo[], options: CheckOptions = {}) {
 	const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV;
 	for (const info of sources) {
 		assertDataSourceAuth(info, nodeEnv);
 		assertSynchronizeAllowed(info, nodeEnv);
 		assertMigrateOnStartAllowed(info, nodeEnv);
 	}
-	if (options.bootstrap) {
-		await options.bootstrap(sources, { applicationName: options.applicationName, nodeEnv });
-		return;
-	}
+	if (options.bootstrap) return;
 	const asking = sources.filter((info) => shouldBootstrapDatabase(info, nodeEnv));
 	if (asking.length === 0) return;
 	const names = asking.map((info) => `"${info.name}"`).join(", ");
@@ -99,18 +99,36 @@ async function prepare(sources: readonly ConnectionInfo[], options: PrepareOptio
 	);
 }
 
-/** One opened data source, as {@link start} sees it: the provider supplies how to synchronize and seed. */
+/** A data source, as {@link open} and {@link start} see it: the provider supplies how to connect, synchronize and seed. */
 export type StartingDataSource = {
 	connection: ConnectionInfo;
 	/** Present when the provider was given a `database` with a migrator. */
 	migrations?: MigrationTarget;
+	/** Connect, if not connected yet. Throws while the database can't be reached. */
+	connect(): Promise<void>;
 	synchronize(): Promise<void>;
 	seed(): Promise<void>;
 };
 
 /**
- * What every provider does for a data source when the app starts (a start step, so an app built by
- * a tool or a test changes nothing): apply pending migrations when `migrateOnStart` is on, bring the
+ * Bring a provider's data sources up: run the bootstrap it was given (once for all of them, so data
+ * sources sharing a database don't race to create it), then connect each. The app's start step
+ * does this, and is retried while the database is down; the db commands do it before they run.
+ * Safe to run again: the bootstrap creates only what is missing, and a connected data source stays
+ * as it is.
+ */
+async function open(sources: readonly StartingDataSource[], options: OpenOptions) {
+	const nodeEnv = options.nodeEnv ?? process.env.NODE_ENV;
+	await options.bootstrap?.(
+		sources.map((source) => source.connection),
+		{ applicationName: options.applicationName, nodeEnv },
+	);
+	for (const source of sources) await source.connect();
+}
+
+/**
+ * What every provider does for a data source when the app starts, once {@link open} has connected
+ * it (a start step, so an app built by a tool or a test changes nothing): apply pending migrations when `migrateOnStart` is on, bring the
  * tables to the mappings when `synchronize` is on, then seed when `seed` is on.
  */
 async function start(
@@ -137,4 +155,4 @@ async function start(
 	if (connection.seed) await source.seed();
 }
 
-export const dataSources = { prepare, resolve, start };
+export const dataSources = { check, open, resolve, start };

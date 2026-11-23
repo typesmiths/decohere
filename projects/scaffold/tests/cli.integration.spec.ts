@@ -142,9 +142,15 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	// The app spells out its composition, so it can swap any part.
 	expect(app).toContain("http(FastifyProvider, {");
 	expect(app).toContain("controllers: [HelloController],");
+	expect(app).toContain('import { FastifyProvider } from "@decohere/http-fastify";');
+	const apiManifest = JSON.parse(
+		readFileSync(join(root, "projects/api/package.json"), "utf8"),
+	);
+	expect(apiManifest.dependencies).toHaveProperty("@decohere/http-fastify");
 	expect(app).toContain('.use(config(new YamlDataSource({ app: "api" }), EnvDataSource))');
 	expect(app).toContain(".use(health())");
-	expect(app).toContain("scribe.withPinoPretty().and.withPinoRoll");
+	expect(app).toContain("scribe.use(");
+	expect(app).toContain('development ? { pretty: true, roll: { file: "logs/');
 	expect(app).not.toContain("webApi");
 	const main = readFileSync(join(root, "projects/api/src/main.ts"), "utf8");
 	expect(main.trimEnd().split("\n").length, main).toBeLessThanOrEqual(5);
@@ -152,6 +158,8 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	expect(main).toContain("export default app;");
 	const spec = readFileSync(join(root, "projects/api/tests/hello.controller.spec.ts"), "utf8");
 	expect(spec).toContain('import { bootModule } from "@decohere/http/testing";');
+	expect(spec).toContain('import { FastifyProvider } from "@decohere/http-fastify";');
+	expect(spec).toContain("provider: FastifyProvider,");
 	expect(spec).toContain("controllers: [HelloController]");
 	expect(spec).toContain("await fetch(`${api.baseUrl}/hello`)");
 	expect(spec).toContain("expect(response.status).toBe(200);");

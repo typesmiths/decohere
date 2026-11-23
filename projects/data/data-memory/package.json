@@ -1,0 +1,38 @@
+{
+  "name": "@decohere/data-memory",
+  "version": "0.0.1-dev.5",
+  "description": "In-memory provider for @decohere/data: repositories and the unit of work with no database, for tests and local runs",
+  "keywords": [
+    "typescript",
+    "in-memory",
+    "testing",
+    "data-access",
+    "decohere"
+  ],
+  "homepage": "https://github.com/typesmiths/decohere/tree/main/projects/data/data-memory#readme",
+  "bugs": {
+    "url": "https://github.com/typesmiths/decohere/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/typesmiths/decohere.git",
+    "directory": "projects/data/data-memory"
+  },
+  "license": "ISC",
+  "author": "Typesmiths",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./types/src/index.d.ts",
+      "import": "./es6/src/index.js"
+    }
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@decohere/core": "0.0.1-dev.5",
+    "@decohere/data": "0.0.1-dev.5"
+  },
+  "devDependencies": {}
+}

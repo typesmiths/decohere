@@ -23,9 +23,9 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { auth0Step } from "../src/steps/auth0.step.js";
-import { usersStep } from "../src/steps/users.step.js";
-import { WorkspaceChanges } from "../src/templates/workspace-changes.js";
+import { Auth0Step } from "../src/steps/auth0-step.service.js";
+import { UsersStep } from "../src/steps/users-step.service.js";
+import { WorkspaceChanges } from "../src/templates/workspace-changes.model.js";
 
 const REPO = fileURLToPath(new URL("../../../", import.meta.url));
 const RELEASE = join(REPO, "dist/release/projects");
@@ -131,8 +131,8 @@ function generate(root: string, database: string) {
 function addAuth0AndUsers(app: string) {
 	const changes = new WorkspaceChanges(app);
 	const targets = [{ name: "api", port: 3000 }];
-	auth0Step.apply(changes, "orders", targets, {});
-	usersStep.apply(changes, "orders", targets, {});
+	new Auth0Step(changes).apply("orders", targets, {});
+	new UsersStep(changes).apply("orders", targets, {});
 	changes.commit();
 	expect(changes.byHand).toEqual([]);
 }

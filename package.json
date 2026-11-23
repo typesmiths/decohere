@@ -18,7 +18,7 @@
     "forge:build": "pnpm forge build",
     "forge:build:watch": "pnpm forge build --watch",
     "lint": "oxlint --fix && prettier --write .",
-    "lint:check": "oxlint --deny-warnings && prettier --check . && pnpm -s forge paths --check",
+    "lint:check": "oxlint --deny-warnings && prettier --check . && pnpm -s forge paths --check && pnpm -s design:check",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "qa": "pnpm run lint:check && pnpm run typecheck && pnpm run test",
     "test": "vitest run --project unit --silent=passed-only",
@@ -33,7 +33,7 @@
     "changeset:check": "node projects/ci-tools/src/changeset/check-status.mjs",
     "version:aggregate": "node projects/ci-tools/src/changeset/aggregate-changelog.mjs",
     "npm:bootstrap": "node projects/ci-tools/src/github/npm-bootstrap.mjs",
-    "npm:trust-promote": "node projects/ci-tools/src/github/npm-trust-promote.mjs",
+    "design:check": "node projects/ci-tools/src/design/design-check.mjs",
     "forge": "node --import ./tools/register.mjs projects/cli/src/forge.ts",
     "flux": "node --import ./tools/register.mjs projects/cli/src/flux.ts",
     "test:docker": "vitest run --project docker --silent=passed-only"
@@ -61,6 +61,7 @@
     "pino": "^10.3.0",
     "pino-pretty": "^13.2.0",
     "reflect-metadata": "^0.2.2",
+    "semver": "^7.7.4",
     "typeorm": "^1.1.2",
     "typescript": "^6.0.3",
     "yaml": "^2.9.1"
@@ -72,6 +73,7 @@
     "@types/node": "^22.15.0",
     "@types/pg": "^8.16.0",
     "@types/picomatch": "^4.0.0",
+    "@types/semver": "^7.8.0",
     "@vitest/coverage-v8": "^4.1.12",
     "axios": "^1.16.0",
     "memfs": "^4.17.0",
