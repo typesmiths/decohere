@@ -116,7 +116,9 @@ describe("typeOrm() with the database down", () => {
 		const initialize = vi
 			.spyOn(DataSource.prototype, "initialize")
 			.mockImplementation(async function (this: DataSource) {
-				if (!reachable) throw new Error("connect ECONNREFUSED 127.0.0.1:5432");
+				if (!reachable) {
+					throw new Error("connect ECONNREFUSED 127.0.0.1:5432");
+				}
 				Object.assign(this, { isInitialized: true });
 				return this;
 			});

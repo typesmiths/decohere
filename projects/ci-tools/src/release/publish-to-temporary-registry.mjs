@@ -20,13 +20,17 @@ import { pathToFileURL } from "node:url";
 export function findPublicPackages(dir) {
 	const found = [];
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
-		if (entry.name === "node_modules") continue;
+		if (entry.name === "node_modules") {
+			continue;
+		}
 		const path = join(dir, entry.name);
 		if (entry.isDirectory()) {
 			found.push(...findPublicPackages(path));
 		} else if (entry.name === "package.json") {
 			const pkg = JSON.parse(readFileSync(path, "utf8"));
-			if (pkg.name?.startsWith("@decohere/") && pkg.private !== true) found.push(dir);
+			if (pkg.name?.startsWith("@decohere/") && pkg.private !== true) {
+				found.push(dir);
+			}
 		}
 	}
 	return found;

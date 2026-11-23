@@ -63,7 +63,9 @@ function fail(message: string): never {
 
 /** Throw if the `auth0` binary is missing. */
 export function requireInstalled(): void {
-	if (auth0Cli.isInstalled()) return;
+	if (auth0Cli.isInstalled()) {
+		return;
+	}
 	fail(AUTH0_CLI_INSTALL_MESSAGE);
 }
 
@@ -79,7 +81,9 @@ export function ensureLoggedIn(): auth0Cli.Auth0Tenant {
 	if (tenants.length === 0) {
 		process.stdout.write(" not logged in.\n");
 		console.log("  Logging in to Auth0 (open the URL in your browser)...");
-		if (!auth0Cli.login()) fail("Auth0 login failed.");
+		if (!auth0Cli.login()) {
+			fail("Auth0 login failed.");
+		}
 		tenants = auth0Cli.listTenants();
 	}
 
@@ -90,23 +94,31 @@ export function ensureLoggedIn(): auth0Cli.Auth0Tenant {
 		if (err instanceof auth0Cli.Auth0AuthError) {
 			process.stdout.write(" token expired.\n");
 			console.log("  Re-authenticating (open the URL in your browser)...");
-			if (!auth0Cli.login()) fail("Auth0 login failed.");
+			if (!auth0Cli.login()) {
+				fail("Auth0 login failed.");
+			}
 			tenants = auth0Cli.listTenants();
 		}
 	}
 
 	const active = tenants.find((t) => t.active) ?? tenants[0];
-	if (active == null) fail("No Auth0 tenant after login.");
+	if (active == null) {
+		fail("No Auth0 tenant after login.");
+	}
 	return active;
 }
 
 export function runAuth0Login(): void {
 	requireInstalled();
 	console.log("  Logging in to Auth0 (open the URL in your browser)...");
-	if (!auth0Cli.login()) fail("Auth0 login failed.");
+	if (!auth0Cli.login()) {
+		fail("Auth0 login failed.");
+	}
 	const tenants = auth0Cli.listTenants();
 	const active = tenants.find((t) => t.active) ?? tenants[0];
-	if (active == null) fail("No Auth0 tenant after login.");
+	if (active == null) {
+		fail("No Auth0 tenant after login.");
+	}
 	console.log(`\n  ✓ Auth0 tenant: https://${active.name}`);
 	console.log("    Tokens are stored in ~/.config/auth0.");
 	console.log("    Next: pnpm decohere auth0 configure");
@@ -171,7 +183,9 @@ export function configureTenant(
 		try {
 			existingScopes = auth0Cli.listApiScopes(known);
 		} catch (err) {
-			if (err instanceof auth0Cli.Auth0AuthError) throw err;
+			if (err instanceof auth0Cli.Auth0AuthError) {
+				throw err;
+			}
 		}
 	}
 	const apiScopes = resolveApiScopes(discovered, existingScopes);
@@ -239,7 +253,9 @@ function resolveLoginClientId(
 			return kept;
 		}
 		// Application-limit messages already say what to do.
-		if (auth0Cli.isAuth0EntityLimitError(err)) throw new Error(detail);
+		if (auth0Cli.isAuth0EntityLimitError(err)) {
+			throw new Error(detail);
+		}
 		throw new Error(`Failed to create the Auth0 login app: ${detail}`);
 	}
 }
@@ -287,23 +303,33 @@ export function runAuth0Token(directory = "."): void {
 	try {
 		token = requestToken();
 	} catch (err) {
-		if (!(err instanceof auth0Cli.Auth0AuthError)) throw err;
+		if (!(err instanceof auth0Cli.Auth0AuthError)) {
+			throw err;
+		}
 		// A new Dev Container starts logged out. Only the token may go to stdout.
 		console.error("  Logging in to Auth0 (open the URL in your browser)...");
-		if (!auth0Cli.login()) fail("Auth0 login failed.");
+		if (!auth0Cli.login()) {
+			fail("Auth0 login failed.");
+		}
 		token = requestToken();
 	}
 	process.stdout.write(`${token}\n`);
 }
 
 export function readEnvFile(path: string): Record<string, string> {
-	if (!existsSync(path)) return {};
+	if (!existsSync(path)) {
+		return {};
+	}
 	const out: Record<string, string> = {};
 	for (const line of readFileSync(path, "utf8").split("\n")) {
 		const trimmed = line.trim();
-		if (trimmed === "" || trimmed.startsWith("#")) continue;
+		if (trimmed === "" || trimmed.startsWith("#")) {
+			continue;
+		}
 		const eq = line.indexOf("=");
-		if (eq <= 0) continue;
+		if (eq <= 0) {
+			continue;
+		}
 		out[line.slice(0, eq).trim()] = line.slice(eq + 1);
 	}
 	return out;
@@ -327,13 +353,17 @@ export function upsertEnv(path: string, entries: Record<string, string>): void {
 			text = `${text}${text === "" || text.endsWith("\n") ? "" : "\n"}${key}=${value}\n`;
 		}
 	}
-	if (text !== "" && !text.endsWith("\n")) text = `${text}\n`;
+	if (text !== "" && !text.endsWith("\n")) {
+		text = `${text}\n`;
+	}
 	writeFileSync(path, text);
 }
 
 /** An admin's email: the username if it is one, else one on the project's example.com domain. */
 function adminEmail(projectName: string, username: string): string {
-	if (username.includes("@")) return username;
+	if (username.includes("@")) {
+		return username;
+	}
 	const slug = projectName.toLowerCase().replace(/[^a-z0-9-]/g, "-");
 	return `${username}@${slug}.example.com`;
 }

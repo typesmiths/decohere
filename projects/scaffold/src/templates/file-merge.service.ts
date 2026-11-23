@@ -32,7 +32,9 @@ function addJson(into: Json, from: Json): boolean {
 }
 
 function sortKeys(map: Json | undefined): Json | undefined {
-	if (!isObject(map)) return map;
+	if (!isObject(map)) {
+		return map;
+	}
 	return Object.fromEntries(Object.entries(map).sort(([a], [b]) => a.localeCompare(b, "en")));
 }
 
@@ -44,10 +46,14 @@ function mergeJson(existing: string, incoming: string, path: string): string | u
 		// Not plain JSON (comments, a typo): the user adds it by hand.
 		return undefined;
 	}
-	if (!addJson(into, JSON.parse(incoming) as Json)) return existing;
+	if (!addJson(into, JSON.parse(incoming) as Json)) {
+		return existing;
+	}
 	if (posix.basename(path) === "package.json" && isObject(into)) {
 		for (const key of ["dependencies", "devDependencies"]) {
-			if (into[key] !== undefined) into[key] = sortKeys(into[key]) ?? null;
+			if (into[key] !== undefined) {
+				into[key] = sortKeys(into[key]) ?? null;
+			}
 		}
 	}
 	return `${JSON.stringify(into, null, 2)}\n`;
@@ -97,8 +103,12 @@ function addYaml(into: Node, from: Node): boolean {
 function yaml(existing: string, incoming: string): string | undefined {
 	const into = parseDocument(existing);
 	const from = parseDocument(incoming);
-	if (into.errors.length > 0) return undefined;
-	if (from.contents == null) return existing;
+	if (into.errors.length > 0) {
+		return undefined;
+	}
+	if (from.contents == null) {
+		return existing;
+	}
 	if (into.contents == null) {
 		into.contents = from.contents;
 		if (from.commentBefore != null) {
@@ -115,7 +125,9 @@ function lines(existing: string, incoming: string): string {
 	const missing = incoming
 		.split("\n")
 		.filter((line) => line.trim() !== "" && !have.has(line.trim()));
-	if (missing.length === 0) return existing;
+	if (missing.length === 0) {
+		return existing;
+	}
 	const separator = existing === "" || existing.endsWith("\n") ? "" : "\n";
 	return `${existing}${separator}${missing.join("\n")}\n`;
 }
@@ -143,16 +155,22 @@ function markdown(existing: string, incoming: string): string {
 		const heading = section.split("\n")[0]?.trim() ?? "";
 		return !existing.split("\n").some((line) => line.trim() === heading);
 	});
-	if (missing.length === 0) return existing;
+	if (missing.length === 0) {
+		return existing;
+	}
 	return `${existing.trimEnd()}\n\n${missing.map((section) => section.trim()).join("\n\n")}\n`;
 }
 
 /** A Dockerfile: adds the steps it doesn't have, before it hands back to the last USER. */
 function dockerfile(existing: string, incoming: string): string {
 	const block = incoming.trim();
-	if (existing.includes(block)) return existing;
+	if (existing.includes(block)) {
+		return existing;
+	}
 	const lastUser = [...existing.matchAll(/^USER .*$/gm)].at(-1);
-	if (lastUser == null) return `${existing.trimEnd()}\n\n${block}\n`;
+	if (lastUser == null) {
+		return `${existing.trimEnd()}\n\n${block}\n`;
+	}
 	return `${existing.slice(0, lastUser.index)}${block}\n\n${existing.slice(lastUser.index)}`;
 }
 
@@ -166,14 +184,28 @@ const LINE_FILES = new Set([".gitignore", ".prettierignore", ".dockerignore"]);
 export class FileMerge {
 	/** `existing` with what `incoming` adds, or `undefined` if the file can't be merged. */
 	public merge(path: string, existing: string, incoming: string): string | undefined {
-		if (existing === incoming) return existing;
+		if (existing === incoming) {
+			return existing;
+		}
 		const name = posix.basename(path);
-		if (name.endsWith(".json")) return mergeJson(existing, incoming, path);
-		if (name.endsWith(".yaml") || name.endsWith(".yml")) return yaml(existing, incoming);
-		if (name.endsWith(".md")) return markdown(existing, incoming);
-		if (name === ".env") return env(existing, incoming);
-		if (LINE_FILES.has(name)) return lines(existing, incoming);
-		if (path === ".devcontainer/Dockerfile") return dockerfile(existing, incoming);
+		if (name.endsWith(".json")) {
+			return mergeJson(existing, incoming, path);
+		}
+		if (name.endsWith(".yaml") || name.endsWith(".yml")) {
+			return yaml(existing, incoming);
+		}
+		if (name.endsWith(".md")) {
+			return markdown(existing, incoming);
+		}
+		if (name === ".env") {
+			return env(existing, incoming);
+		}
+		if (LINE_FILES.has(name)) {
+			return lines(existing, incoming);
+		}
+		if (path === ".devcontainer/Dockerfile") {
+			return dockerfile(existing, incoming);
+		}
 		return undefined;
 	}
 

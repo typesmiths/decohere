@@ -37,11 +37,17 @@ function finish(changes: WorkspaceChanges, options: AddStepOptions): void {
 	if (options.dryRun) {
 		const changed = changes.changedFiles();
 		console.log(changed.length > 0 ? "\n  Would change:" : "\n  Nothing to change.");
-		for (const path of changed) console.log(`    ${path}`);
+		for (const path of changed) {
+			console.log(`    ${path}`);
+		}
 	} else {
 		const written = changes.commit();
-		if (written.length > 0) formatScaffoldedFiles(changes.root, written);
-		for (const path of written) console.log(`  ✓ ${path}`);
+		if (written.length > 0) {
+			formatScaffoldedFiles(changes.root, written);
+		}
+		for (const path of written) {
+			console.log(`  ✓ ${path}`);
+		}
 	}
 	changes.printByHand();
 }
@@ -56,7 +62,9 @@ function suggestUsers(changes: WorkspaceChanges, targets: AppTarget[]): void {
 			changes.read(`projects/${name}/src/services/user.service.ts`) == null
 		);
 	});
-	if (without.length === 0) return;
+	if (without.length === 0) {
+		return;
+	}
 	console.log("\n  With Postgres and Auth0, each user can have a local profile:");
 	console.log("\n    pnpm decohere add users\n");
 }

@@ -64,7 +64,9 @@ class StaticConfig implements IConfigurationService {
 	public constructor(private readonly connection: ConnectionInfo) {}
 	public async get<T extends object>(type: Constructable<T> | string): Promise<T> {
 		const config = new DatabaseConfig();
-		if (type === DatabaseConfig) config.dataSources = [this.connection];
+		if (type === DatabaseConfig) {
+			config.dataSources = [this.connection];
+		}
 		return config as unknown as T;
 	}
 }
@@ -92,10 +94,14 @@ function schemaMigration(id: string, diff: SchemaDiff): Migration {
 	return {
 		id,
 		async up({ sql }) {
-			for (const statement of diff.up) await sql(statement);
+			for (const statement of diff.up) {
+				await sql(statement);
+			}
 		},
 		async down({ sql }) {
-			for (const statement of diff.down) await sql(statement);
+			for (const statement of diff.down) {
+				await sql(statement);
+			}
 		},
 	};
 }

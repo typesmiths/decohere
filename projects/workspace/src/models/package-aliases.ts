@@ -48,18 +48,24 @@ function resolvePath(
 	paths: Record<string, string[]>,
 	baseUrl: string,
 ): string | null {
-	if (!isBareSpecifier(specifier)) return null;
+	if (!isBareSpecifier(specifier)) {
+		return null;
+	}
 
 	const resolvedBase = path.resolve(baseUrl);
 	const keys = Object.keys(paths).sort((a, b) => b.length - a.length);
 
 	for (const key of keys) {
 		const target = paths[key]?.[0];
-		if (target == null) continue;
+		if (target == null) {
+			continue;
+		}
 
 		if (key.endsWith("/*")) {
 			const prefix = key.slice(0, -1);
-			if (!specifier.startsWith(prefix)) continue;
+			if (!specifier.startsWith(prefix)) {
+				continue;
+			}
 			const mappedRoot = target.endsWith("/*") ? target.slice(0, -2) : target;
 			const subpath = specifier.slice(prefix.length);
 			return subpathSource(path.resolve(resolvedBase, mappedRoot, subpath));
@@ -81,13 +87,17 @@ function conventionAliasPaths(
 
 	for (const project of projects) {
 		const name = project.name;
-		if (name.length === 0) continue;
+		if (name.length === 0) {
+			continue;
+		}
 
 		const entry = path.resolve(project.getSourceEntryPath());
 		// A package with no root entry (only subpaths, like core) gets no bare alias, and its
 		// subpaths resolve under `src/`.
 		const hasEntry = existsSync(entry);
-		if (hasEntry) aliases[name] = [toPosixRelative(baseUrl, entry)];
+		if (hasEntry) {
+			aliases[name] = [toPosixRelative(baseUrl, entry)];
+		}
 		const subpathRoot = hasEntry
 			? path.dirname(entry)
 			: path.resolve(project.rootDir, project.projectDirectory, "src");
@@ -106,7 +116,9 @@ function conventionAliasPaths(
 
 function toPosixRelative(from: string, to: string): string {
 	const relative = path.relative(from, to);
-	if (relative === "") return ".";
+	if (relative === "") {
+		return ".";
+	}
 	return relative.split(path.sep).join("/");
 }
 
@@ -121,8 +133,12 @@ function subpathSource(candidate: string): string {
 	const directory = candidate.replace(/\.([mc]?[jt]sx?)$/, "");
 	const indexes = sourceExtensions.candidates(path.join(directory, "index"));
 	const found = [...files, ...indexes].find((file) => existsSync(file));
-	if (found != null) return found;
-	if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+	if (found != null) {
+		return found;
+	}
+	if (existsSync(candidate) && statSync(candidate).isFile()) {
+		return candidate;
+	}
 	return toTsSourcePath(candidate);
 }
 

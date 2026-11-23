@@ -20,7 +20,9 @@ export function defineAbilitiesFor(principal: Principal) {
 	}
 	for (const scope of principal.scopes ?? []) {
 		const [action, subject] = scope.split(":");
-		if (action && subject) can(action, subject);
+		if (action && subject) {
+			can(action, subject);
+		}
 	}
 	return build();
 }

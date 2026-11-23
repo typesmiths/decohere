@@ -66,9 +66,17 @@ export function mapEntity<T extends object>(
 	}));
 	const isReference = (prop: string) => references.some((r) => r.prop === prop);
 	const fields = new Set<string>(options.fields);
-	for (const prop of key) if (!isReference(prop)) fields.add(prop);
-	if (options.version) fields.add(options.version);
-	if (options.generated) fields.add(options.generated);
+	for (const prop of key) {
+		if (!isReference(prop)) {
+			fields.add(prop);
+		}
+	}
+	if (options.version) {
+		fields.add(options.version);
+	}
+	if (options.generated) {
+		fields.add(options.generated);
+	}
 	return {
 		type,
 		name: type.name,

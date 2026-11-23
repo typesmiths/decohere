@@ -18,7 +18,9 @@ export class FileEx implements File {
 		return this.relativePath;
 	}
 	public async getContent() {
-		if (this.#content != null) return this.#content;
+		if (this.#content != null) {
+			return this.#content;
+		}
 		return readFile(this.fullPath);
 	}
 }

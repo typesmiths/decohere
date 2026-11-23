@@ -25,8 +25,12 @@ export function resolveRebootDebounceMs(value: number | undefined): number {
 }
 
 function formatTriggerList(triggers: readonly string[]): string | undefined {
-	if (triggers.length === 0) return undefined;
-	if (triggers.length <= MAX_REBOOT_TRIGGER_PATHS) return triggers.join(", ");
+	if (triggers.length === 0) {
+		return undefined;
+	}
+	if (triggers.length <= MAX_REBOOT_TRIGGER_PATHS) {
+		return triggers.join(", ");
+	}
 	return `${triggers.slice(0, MAX_REBOOT_TRIGGER_PATHS).join(", ")}, +${triggers.length - MAX_REBOOT_TRIGGER_PATHS}`;
 }
 
@@ -161,7 +165,9 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 	}
 
 	public async dispose() {
-		if (this.disposed) return;
+		if (this.disposed) {
+			return;
+		}
 		this.disposed = true;
 		this.rebootDebounceGen += 1;
 		this.watchSubscription?.unsubscribe();
@@ -182,7 +188,9 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 
 	private async bootEntry(entryPath: string) {
 		const state = this.entries.get(entryPath);
-		if (state == null) return;
+		if (state == null) {
+			return;
+		}
 		try {
 			const mod = (await this.loader.importEntry(entryPath)) as {
 				default?: AsyncDisposable;
@@ -202,18 +210,24 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 	private bindScheduleReboot(delayMs: number) {
 		const gen = ++this.rebootDebounceGen;
 		this.scheduleReboot = debounce(async () => {
-			if (this.disposed || gen !== this.rebootDebounceGen) return;
+			if (this.disposed || gen !== this.rebootDebounceGen) {
+				return;
+			}
 			this.requestReboot();
 		}, delayMs);
 	}
 
 	private requestReboot() {
-		if (this.disposed) return;
+		if (this.disposed) {
+			return;
+		}
 		if (this.rebootInFlight) {
 			this.rebootFollowUp = true;
 			return;
 		}
-		if (this.rebootQueued) return;
+		if (this.rebootQueued) {
+			return;
+		}
 		this.rebootQueued = true;
 		this.rebootTail = this.rebootTail.then(
 			() => this.runReboot(),
@@ -223,12 +237,16 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 
 	private async runReboot() {
 		this.rebootQueued = false;
-		if (this.disposed) return;
+		if (this.disposed) {
+			return;
+		}
 		this.rebootInFlight = true;
 		try {
 			do {
 				this.rebootFollowUp = false;
-				if (this.disposed) return;
+				if (this.disposed) {
+					return;
+				}
 				const toReboot =
 					this.pendingEntryReboots.size > 0
 						? [...this.pendingEntryReboots]
@@ -250,7 +268,9 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 			const needsFollowUp = this.rebootFollowUp && !this.disposed;
 			this.rebootFollowUp = false;
 			this.rebootInFlight = false;
-			if (needsFollowUp) this.requestReboot();
+			if (needsFollowUp) {
+				this.requestReboot();
+			}
 		}
 	}
 
@@ -262,7 +282,9 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 		const paths = entryPath != null ? [entryPath] : [...this.entries.keys()];
 		for (const p of paths) {
 			const state = this.entries.get(p);
-			if (state == null) continue;
+			if (state == null) {
+				continue;
+			}
 			const entry = state.module;
 			state.module = undefined;
 			try {
@@ -369,7 +391,9 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 		}
 
 		// change
-		if (!project.isSourceFile(file)) return;
+		if (!project.isSourceFile(file)) {
+			return;
+		}
 		this.loader.invalidateTranspile(fullPath);
 		this.reloadIfAffected(fullPath);
 		this.retryFailedEntries(fullPath);
@@ -382,7 +406,9 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 	 */
 	private retryFailedEntries(fullPath: string) {
 		const failed = [...this.entries.values()].filter((entry) => entry.failed);
-		if (failed.length === 0) return;
+		if (failed.length === 0) {
+			return;
+		}
 		for (const entry of failed) {
 			// New URL version: Node caches the failed load and would replay the same error.
 			this.invalidateModuleCaches(entry.path);
@@ -426,22 +452,29 @@ export class HotReloadServer extends EventEmitter<HotReloadServerEvents> {
 	 * once: import graphs share modules (diamonds) and may legally contain cycles.
 	 */
 	private getDependencyGraph(moduleId: string): string[] {
-		if (this.isSelf(moduleId)) return [];
+		if (this.isSelf(moduleId)) {
+			return [];
+		}
 		const found = new Set<string>();
 		const queue = [moduleId];
 		for (let next = queue.shift(); next != null; next = queue.shift()) {
 			for (const importer of this.dependencies.get(next) ?? []) {
-				if (found.has(importer)) continue;
+				if (found.has(importer)) {
+					continue;
+				}
 				found.add(importer);
-				if (this.loader.hasSourceFile(importer) && !this.isSelf(importer))
+				if (this.loader.hasSourceFile(importer) && !this.isSelf(importer)) {
 					queue.push(importer);
+				}
 			}
 		}
 		return [...found];
 	}
 
 	private trackDependency(filePath: string, parentPath: string) {
-		if (!parentPath) return;
+		if (!parentPath) {
+			return;
+		}
 		const deps = this.dependencies.get(filePath) ?? [];
 		const updatedDeps = new Set([...deps, parentPath]);
 		this.dependencies.set(filePath, [...updatedDeps]);

@@ -23,18 +23,24 @@ export function discoverAuthorizeScopes(rootDir: string): string[] {
 }
 
 function collectFromDir(dir: string, scopes: Set<string>): void {
-	if (!existsSync(dir)) return;
+	if (!existsSync(dir)) {
+		return;
+	}
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
 		const path = join(dir, entry.name);
 		if (entry.isDirectory()) {
 			collectFromDir(path, scopes);
 			continue;
 		}
-		if (!entry.isFile() || !isAppSource(entry.name)) continue;
+		if (!entry.isFile() || !isAppSource(entry.name)) {
+			continue;
+		}
 		const text = readFileSync(path, "utf8");
 		for (const match of text.matchAll(AUTHORIZE_RE)) {
 			const action = match[2];
-			if (action == null || action === "") continue;
+			if (action == null || action === "") {
+				continue;
+			}
 			const subject = match[4] ?? "all";
 			scopes.add(`${action}:${subject}`);
 		}

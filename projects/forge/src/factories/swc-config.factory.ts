@@ -95,7 +95,9 @@ export class SwcConfigFactory {
 	private static nonemptyPaths(
 		paths: Record<string, string[]> | undefined,
 	): Record<string, string[]> | undefined {
-		if (paths == null || Object.keys(paths).length === 0) return undefined;
+		if (paths == null || Object.keys(paths).length === 0) {
+			return undefined;
+		}
 		return paths;
 	}
 
@@ -119,7 +121,9 @@ export class SwcConfigFactory {
 	/** Resolves tsconfig baseUrl to an absolute path. Returns undefined if not set. */
 	private static getBaseUrl(tsConfig: Tsconfig | undefined): string | undefined {
 		const baseUrl = tsConfig?.compilerOptions?.baseUrl;
-		if (baseUrl == null) return undefined;
+		if (baseUrl == null) {
+			return undefined;
+		}
 		return path.resolve(baseUrl);
 	}
 }

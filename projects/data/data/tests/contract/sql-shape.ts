@@ -12,17 +12,27 @@ const table = (name: string) => name.replace(/"/g, "").split(".").pop();
 /** How many rows a WHERE names: the length of an `in (…)` list (of values or key tuples), the number of `or`ed keys, or one. */
 function rowsIn(where: string): number {
 	const tuples = where.match(/ in \((\(.*\))\)/);
-	if (tuples) return tuples[1].split(/\)\s*,\s*\(/).length;
+	if (tuples) {
+		return tuples[1].split(/\)\s*,\s*\(/).length;
+	}
 	const list = where.match(/ in \(([^)]*)\)/);
-	if (list) return list[1].split(",").length;
+	if (list) {
+		return list[1].split(",").length;
+	}
 	return where.split(" or ").length;
 }
 
 function one(sql: string): string {
 	const s = flat(sql);
-	if (/^(begin|start transaction)\b/.test(s)) return "begin";
-	if (s.startsWith("commit")) return "commit";
-	if (s.startsWith("rollback")) return "rollback";
+	if (/^(begin|start transaction)\b/.test(s)) {
+		return "begin";
+	}
+	if (s.startsWith("commit")) {
+		return "commit";
+	}
+	if (s.startsWith("rollback")) {
+		return "rollback";
+	}
 	const insert = s.match(/^insert into ([^ (]+) ?\(([^)]*)\) values (.*?)(?: returning .*)?$/);
 	if (insert) {
 		const rows = insert[3].split(/\)\s*,\s*\(/).length;
@@ -37,10 +47,15 @@ function one(sql: string): string {
 		return `update ${table(update[1])} (${columns.sort().join(", ")}) ×${rowsIn(update[3])}`;
 	}
 	const del = s.match(/^delete from ([^ ]+)(?: as [^ ]+)? where (.*)$/);
-	if (del) return `delete ${table(del[1])} ×${rowsIn(del[2])}`;
-	if (s.startsWith("select"))
+	if (del) {
+		return `delete ${table(del[1])} ×${rowsIn(del[2])}`;
+	}
+	if (s.startsWith("select")) {
 		return s.includes(" for update") ? "select for update" : "select";
-	if (s.startsWith("with ")) return "select";
+	}
+	if (s.startsWith("with ")) {
+		return "select";
+	}
 	return s;
 }
 

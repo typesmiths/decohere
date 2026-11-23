@@ -101,7 +101,9 @@ function timeParts() {
  */
 async function sample(): Promise<Sample> {
 	const root = process.env.BENCH_ROOT;
-	if (root == null) throw new Error("BENCH_ROOT is not set");
+	if (root == null) {
+		throw new Error("BENCH_ROOT is not set");
+	}
 	{
 		const entry = path.join(root, "projects", `lib-${defaultShape.libs - 1}`, "src/index.ts");
 		const workspace = await createWorkspace({ rootDir: root });
@@ -120,13 +122,17 @@ async function sample(): Promise<Sample> {
 			const importStarted = performance.now();
 			await loader.importEntry(entry);
 			const importMs = performance.now() - importStarted;
-			if (timer != null) parts = timer.stop(importMs);
+			if (timer != null) {
+				parts = timer.stop(importMs);
+			}
 			return performance.now() - started;
 		};
 		let parts: Parts | undefined;
 		const cold = await load(1, true);
 		const warm = await load(2);
-		if (parts == null) throw new Error("the cold load finished without timing its parts");
+		if (parts == null) {
+			throw new Error("the cold load finished without timing its parts");
+		}
 		return { files: [...loader.sourceFilePaths()].length, cold, warm, parts };
 	}
 }
@@ -142,7 +148,9 @@ if (process.argv.includes("--sample")) {
 			[...process.execArgv, fileURLToPath(import.meta.url), "--sample"],
 			{ encoding: "utf8", env: { ...process.env, ...env } },
 		);
-		if (child.status !== 0) throw new Error(`sample failed:\n${child.stderr}`);
+		if (child.status !== 0) {
+			throw new Error(`sample failed:\n${child.stderr}`);
+		}
 		const last = child.stdout.trim().split("\n").at(-1) ?? "";
 		return JSON.parse(last) as Sample;
 	};

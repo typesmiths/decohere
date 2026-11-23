@@ -55,7 +55,9 @@ async function run(argv: string[]): Promise<void> {
 		await launch(argv);
 	} catch (reason) {
 		// process.exit throws in tests; anything else is a real failure.
-		if (!String(reason).includes("process.exit(")) throw reason;
+		if (!String(reason).includes("process.exit(")) {
+			throw reason;
+		}
 	}
 }
 
@@ -73,7 +75,9 @@ function dockerCalls(command: string): string[][] {
 
 function createArgs(): string[] {
 	const [args] = dockerCalls("create");
-	if (args == null) throw new Error("Expected docker create to be called");
+	if (args == null) {
+		throw new Error("Expected docker create to be called");
+	}
 	return args;
 }
 
@@ -97,7 +101,9 @@ beforeEach(() => {
 		exitCode = typeof code === "number" ? code : 0;
 		throw new Error(`process.exit(${exitCode})`);
 	});
-	for (const mock of Object.values(mocks)) mock.mockReset();
+	for (const mock of Object.values(mocks)) {
+		mock.mockReset();
+	}
 	mocks.execFileSync.mockReturnValue(Buffer.from(""));
 	mocks.spawnSync.mockReturnValue({ status: 0 });
 	mocks.spawn.mockImplementation(() => {
@@ -594,7 +600,9 @@ describe("launch inside a container with Decohere's tools", () => {
 
 	function scaffoldCall(): { args: string[]; cwd: string; env: NodeJS.ProcessEnv } {
 		const call = mocks.spawnSync.mock.calls.find((c) => c[0] === "npx");
-		if (call == null) throw new Error("Expected the scaffolder to run with npx");
+		if (call == null) {
+			throw new Error("Expected the scaffolder to run with npx");
+		}
 		return { args: call[1], cwd: call[2].cwd, env: call[2].env };
 	}
 

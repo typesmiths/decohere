@@ -27,7 +27,9 @@ function init() {
 }
 
 afterEach(() => {
-	if (repo) rmSync(repo, { recursive: true, force: true });
+	if (repo) {
+		rmSync(repo, { recursive: true, force: true });
+	}
 });
 
 // Publish decides whether a push carries code by diffing it against this base. The merge queue

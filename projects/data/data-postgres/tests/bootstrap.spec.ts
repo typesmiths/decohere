@@ -62,10 +62,12 @@ describe("bootstrapDataSources", () => {
 		queryMock.mockReset();
 		privilegesHeld = false;
 		queryMock.mockImplementation(async (sql: string) => {
-			if (sql.includes("datdba"))
+			if (sql.includes("datdba")) {
 				return { rowCount: 1, rows: [{ owner: "decohere_bootstrap" }] };
-			if (sql.includes("AS granted"))
+			}
+			if (sql.includes("AS granted")) {
 				return { rowCount: 1, rows: [{ granted: privilegesHeld }] };
+			}
 			return { rowCount: 0, rows: [] };
 		});
 	});
@@ -142,10 +144,15 @@ describe("bootstrapDataSources", () => {
 
 	it("explains when the admin cannot act as the database owner", async () => {
 		queryMock.mockImplementation(async (sql: string) => {
-			if (sql.includes("datdba")) return { rowCount: 1, rows: [{ owner: "postgres" }] };
-			if (sql.includes("AS granted")) return { rowCount: 1, rows: [{ granted: false }] };
-			if (sql.startsWith('GRANT "postgres"'))
+			if (sql.includes("datdba")) {
+				return { rowCount: 1, rows: [{ owner: "postgres" }] };
+			}
+			if (sql.includes("AS granted")) {
+				return { rowCount: 1, rows: [{ granted: false }] };
+			}
+			if (sql.startsWith('GRANT "postgres"')) {
 				throw new Error('permission denied to grant role "postgres"');
+			}
 			return { rowCount: 0, rows: [] };
 		});
 

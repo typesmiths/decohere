@@ -13,7 +13,9 @@ export class OutputCache {
 	public record(responses: TransformResponse[]): void {
 		const bySource = new Map<string, TransformResponse[]>();
 		for (const response of responses) {
-			if (response.outcome !== "success") continue;
+			if (response.outcome !== "success") {
+				continue;
+			}
 			const group = bySource.get(response.file.fullPath) ?? [];
 			group.push(response);
 			bySource.set(response.file.fullPath, group);
@@ -26,7 +28,9 @@ export class OutputCache {
 	/** Deletes the files a source built to and forgets them. */
 	public delete(sourcePath: string): void {
 		const outputs = this.#bySource.get(sourcePath);
-		if (outputs == null) return;
+		if (outputs == null) {
+			return;
+		}
 		for (const response of outputs) {
 			if (response.outputPath != null) {
 				void io.deleteFile(response.outputPath);

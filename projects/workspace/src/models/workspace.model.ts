@@ -168,7 +168,9 @@ export class Workspace extends mixwith(HasPackageJson, HasTsConfig) {
 	private async sourcePathsOf(project: Project): Promise<Set<string>> {
 		const files = await project.getAllFiles();
 		const cached = this.#sourcePaths.get(files);
-		if (cached != null) return cached;
+		if (cached != null) {
+			return cached;
+		}
 		const paths = new Set(files.map((file) => file.fullPath));
 		this.#sourcePaths.set(files, paths);
 		return paths;

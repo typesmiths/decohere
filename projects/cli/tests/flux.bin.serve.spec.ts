@@ -156,7 +156,9 @@ export default {
 
 		function writeApp() {
 			write("projects/app/src/lib.ts", lib("oldName"));
-			for (const i of [0, 1, 2]) write(`projects/app/src/c${i}.ts`, caller(i, "oldName"));
+			for (const i of [0, 1, 2]) {
+				write(`projects/app/src/c${i}.ts`, caller(i, "oldName"));
+			}
 			write(
 				"projects/app/src/main.ts",
 				`import { v0 } from "./c0.js";

@@ -53,7 +53,9 @@ export function restampBuild({ dir, from, to }) {
 				}
 			}
 			const output = `${JSON.stringify(manifest, null, 2)}\n`;
-			if (output.includes(from)) elsewhere.push(relative(dir, file));
+			if (output.includes(from)) {
+				elsewhere.push(relative(dir, file));
+			}
 			stamped.push({ file, name: manifest.name, output });
 		} else if (text.includes(from)) {
 			elsewhere.push(relative(dir, file));

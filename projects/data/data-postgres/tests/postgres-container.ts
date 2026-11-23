@@ -76,7 +76,9 @@ function address(containerId: string): { host: string; port: number } {
 			],
 			{ encoding: "utf8" },
 		).trim();
-		if (ip.length === 0) throw new Error(`Container ${containerId} has no bridge address`);
+		if (ip.length === 0) {
+			throw new Error(`Container ${containerId} has no bridge address`);
+		}
 		return { host: ip, port: 5432 };
 	}
 	const portMap = execFileSync("docker", ["port", containerId, "5432/tcp"], {

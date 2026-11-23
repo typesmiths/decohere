@@ -186,7 +186,9 @@ export class TokenService {
 	}
 
 	private mapPrincipal(payload: JWTPayload): Principal {
-		if (this.principalMapper) return this.principalMapper(payload as Record<string, unknown>);
+		if (this.principalMapper) {
+			return this.principalMapper(payload as Record<string, unknown>);
+		}
 		return createPrincipalFromPayload(payload as Record<string, unknown>);
 	}
 }

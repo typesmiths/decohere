@@ -35,7 +35,9 @@ async function fluxOptions(root: string): Promise<{ options: Options; sources: S
 	const workspace = await createWorkspace({ rootDir: root });
 	const projects = workspace.getProjects("debug");
 	const project = projects[0];
-	if (project == null) throw new Error(`no projects found under ${root}`);
+	if (project == null) {
+		throw new Error(`no projects found under ${root}`);
+	}
 	const base = new SwcTranspiler().createBaseConfig(BuildTargets.es6, {
 		tsConfig: project.getTsConfigSync(),
 		userConfig: project.getSwcConfigSync(),
@@ -57,7 +59,9 @@ function strategies(options: Options): Strategy[] {
 		({ ...options, filename: source.fullPath, sourceMaps }) satisfies Options;
 	const sync = (sourceMaps: Options["sourceMaps"]) => (sources: Source[]) => {
 		const optionsFor = withMaps(sourceMaps);
-		for (const source of sources) transformSync(source.code, optionsFor(source));
+		for (const source of sources) {
+			transformSync(source.code, optionsFor(source));
+		}
 	};
 	return [
 		{
@@ -98,7 +102,9 @@ try {
 			const started = performance.now();
 			await strategy.run(sources);
 			const elapsed = performance.now() - started;
-			if (round > 0) timings.get(strategy.id)?.push(elapsed);
+			if (round > 0) {
+				timings.get(strategy.id)?.push(elapsed);
+			}
 		}
 	}
 	benchStats.report(

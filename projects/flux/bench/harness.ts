@@ -107,7 +107,9 @@ function touchModel(root: string, lib: number, file: number, revision: number) {
 }
 
 function percentile(values: readonly number[], fraction: number): number {
-	if (values.length === 0) return Number.NaN;
+	if (values.length === 0) {
+		return Number.NaN;
+	}
 	const sorted = [...values].sort((a, b) => a - b);
 	const index = Math.min(sorted.length - 1, Math.ceil(fraction * sorted.length) - 1);
 	return sorted[Math.max(0, index)] ?? Number.NaN;

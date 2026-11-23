@@ -12,8 +12,9 @@ function getOwn(
 	name: string,
 ): string | undefined {
 	const command = scripts?.[name];
-	if (command == null || command.trim() === "" || DECOHERE_TOOL.test(command))
+	if (command == null || command.trim() === "" || DECOHERE_TOOL.test(command)) {
 		return undefined;
+	}
 	return command;
 }
 

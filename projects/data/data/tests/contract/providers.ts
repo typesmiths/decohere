@@ -68,16 +68,22 @@ export type SqlProvider = OpenProvider & {
 
 /** MikroORM: the entity manager, in the unit of work's transaction. */
 async function mikroOrmStatement(uow: IUnitOfWork, sql: string, params: unknown[]) {
-	if (!(uow instanceof MikroOrmUnitOfWork)) throw new Error("Not MikroORM's unit of work");
+	if (!(uow instanceof MikroOrmUnitOfWork)) {
+		throw new Error("Not MikroORM's unit of work");
+	}
 	const em = await uow.transaction();
 	return em.execute(sql, params);
 }
 
 /** TypeORM: the row store's query runner, in the unit of work's transaction. */
 async function typeOrmStatement(uow: IUnitOfWork, sql: string, params: unknown[]) {
-	if (!(uow instanceof TrackingUnitOfWork)) throw new Error("Not the tracking unit of work");
+	if (!(uow instanceof TrackingUnitOfWork)) {
+		throw new Error("Not the tracking unit of work");
+	}
 	const store = await uow.transaction();
-	if (!(store instanceof TypeOrmRowStore)) throw new Error("Not TypeORM's row store");
+	if (!(store instanceof TypeOrmRowStore)) {
+		throw new Error("Not TypeORM's row store");
+	}
 	let n = 0;
 	return store.queryRunner.query(
 		sql.replace(/\?/g, () => `$${++n}`),

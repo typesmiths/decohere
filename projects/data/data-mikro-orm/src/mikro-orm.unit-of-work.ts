@@ -90,7 +90,9 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 		query: Query<T> = {},
 	): Promise<T[]> {
 		this.assertUsable();
-		if (query.lock && !this.em.isInTransaction()) await this.em.begin();
+		if (query.lock && !this.em.isInTransaction()) {
+			await this.em.begin();
+		}
 		const populate: readonly Path<T>[] = [...(query.include ?? []), ...(query.load ?? [])];
 		const options = {
 			orderBy: query.orderBy,
@@ -138,15 +140,21 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 			.returning([...new Set([...meta.primaryKeys, ...generated.map((p) => p.name)])])
 			.execute("run");
 		const [inserted] = result.rows ?? [];
-		if (inserted === undefined) return false;
-		for (const prop of generated) entity[String(prop.name)] = inserted[prop.fieldNames[0]];
+		if (inserted === undefined) {
+			return false;
+		}
+		for (const prop of generated) {
+			entity[String(prop.name)] = inserted[prop.fieldNames[0]];
+		}
 		// Its children are new: written on commit, with the rest of the unit of work. Taken before the
 		// merge, which attaches the entity as it is in the database: with no children.
 		const children = meta.relations
 			.filter((prop) => prop.kind === ReferenceKind.ONE_TO_MANY)
 			.flatMap((prop) => [...((entity[prop.name] as Iterable<object> | undefined) ?? [])]);
 		em.merge(entity);
-		for (const child of children) em.persist(child);
+		for (const child of children) {
+			em.persist(child);
+		}
 		return true;
 	}
 
@@ -157,7 +165,9 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 
 	public async beginTransaction() {
 		this.assertUsable();
-		if (!this.em.isInTransaction()) await this.em.begin();
+		if (!this.em.isInTransaction()) {
+			await this.em.begin();
+		}
 	}
 
 	public async commit() {
@@ -166,15 +176,21 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 			if (this.options.outbox) {
 				const uow = this.em.getUnitOfWork();
 				const entities = [...uow.getIdentityMap().values(), ...uow.getPersistStack()];
-				for (const row of domainEvents.collect(entities, this.options.outbox))
+				for (const row of domainEvents.collect(entities, this.options.outbox)) {
 					this.em.persist(row);
+				}
 			}
 			// em.commit() flushes, then commits; outside a transaction, flush opens and commits its own.
-			if (this.em.isInTransaction()) await this.em.commit();
-			else await this.em.flush();
+			if (this.em.isInTransaction()) {
+				await this.em.commit();
+			} else {
+				await this.em.flush();
+			}
 		} catch (err) {
 			this.failure = err;
-			if (this.em.isInTransaction()) await this.em.rollback();
+			if (this.em.isInTransaction()) {
+				await this.em.rollback();
+			}
 			if (err instanceof MikroOptimisticLockError) {
 				throw new OptimisticLockError(err.message, { cause: err });
 			}
@@ -183,17 +199,23 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 	}
 
 	public async [Symbol.asyncDispose]() {
-		if (this.disposed) return;
+		if (this.disposed) {
+			return;
+		}
 		this.disposed = true;
 		try {
-			if (this.em.isInTransaction()) await this.em.rollback();
+			if (this.em.isInTransaction()) {
+				await this.em.rollback();
+			}
 		} finally {
 			this.em.clear();
 		}
 	}
 
 	private assertUsable() {
-		if (this.disposed) throw new DataError("This unit of work was disposed");
+		if (this.disposed) {
+			throw new DataError("This unit of work was disposed");
+		}
 		if (this.failure !== undefined) {
 			throw new DataError(
 				"A commit failed in this unit of work, so it was rolled back: start a new one",
@@ -215,7 +237,9 @@ function toFilter(where: Record<string, unknown>): Record<string, unknown> {
 	return Object.fromEntries(
 		Object.entries(where).map(([prop, condition]) => {
 			const operator = comparison.operatorOf(condition);
-			if (!operator) return [prop, condition];
+			if (!operator) {
+				return [prop, condition];
+			}
 			const [op, operand] = operator;
 			return [prop, { [`$${op}`]: operand }];
 		}),

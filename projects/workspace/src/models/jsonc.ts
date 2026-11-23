@@ -3,7 +3,9 @@
  * `{}`, as tsc reads it. Throws a `SyntaxError` on anything else that isn't valid JSON.
  */
 export function parseJsonc(text: string): unknown {
-	if (text.trim() === "") return {};
+	if (text.trim() === "") {
+		return {};
+	}
 	return JSON.parse(stripJsonc(text));
 }
 
@@ -22,13 +24,17 @@ function stripJsonc(text: string): string {
 			i = end === -1 ? text.length : end;
 		} else if (char === "/" && next === "*") {
 			const end = text.indexOf("*/", i + 2);
-			if (end === -1) throw new SyntaxError("Unterminated comment in JSON");
+			if (end === -1) {
+				throw new SyntaxError("Unterminated comment in JSON");
+			}
 			out += " ";
 			i = end + 2;
 		} else if (char === "}" || char === "]") {
 			// Drop a trailing comma before the closing bracket.
 			out = out.trimEnd();
-			if (out.endsWith(",")) out = out.slice(0, -1);
+			if (out.endsWith(",")) {
+				out = out.slice(0, -1);
+			}
 			out += char;
 			i++;
 		} else {
@@ -43,9 +49,13 @@ function stripJsonc(text: string): string {
 function stringEnd(text: string, start: number): number {
 	let i = start + 1;
 	while (i < text.length) {
-		if (text[i] === "\\") i += 2;
-		else if (text[i] === '"') return i + 1;
-		else i++;
+		if (text[i] === "\\") {
+			i += 2;
+		} else if (text[i] === '"') {
+			return i + 1;
+		} else {
+			i++;
+		}
 	}
 	return text.length;
 }

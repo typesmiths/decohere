@@ -16,9 +16,15 @@ function toMessage(item: unknown): SseMessage {
 function formatMessage(item: unknown): string {
 	const { data, event, id, retry } = toMessage(item);
 	let frame = "";
-	if (id != null) frame += `id: ${singleLine(String(id))}\n`;
-	if (event != null) frame += `event: ${singleLine(event)}\n`;
-	if (retry != null && Number.isFinite(retry)) frame += `retry: ${Math.trunc(retry)}\n`;
+	if (id != null) {
+		frame += `id: ${singleLine(String(id))}\n`;
+	}
+	if (event != null) {
+		frame += `event: ${singleLine(event)}\n`;
+	}
+	if (retry != null && Number.isFinite(retry)) {
+		frame += `retry: ${Math.trunc(retry)}\n`;
+	}
 	const text = typeof data === "string" ? data : (JSON.stringify(data) ?? "");
 	for (const line of text.split(/\r\n|\r|\n/)) {
 		frame += `data: ${line}\n`;

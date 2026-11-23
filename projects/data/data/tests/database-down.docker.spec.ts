@@ -61,7 +61,9 @@ class StaticConfig implements IConfigurationService {
 	public constructor(private readonly connection: ConnectionInfo) {}
 	public async get<T extends object>(type: Constructable<T> | string): Promise<T> {
 		const config = new DatabaseConfig();
-		if (type === DatabaseConfig) config.dataSources = [this.connection];
+		if (type === DatabaseConfig) {
+			config.dataSources = [this.connection];
+		}
 		return config as unknown as T;
 	}
 }
@@ -103,7 +105,9 @@ const providers: ProviderCase[] = [
 async function until(condition: () => boolean, timeoutMs = 20_000) {
 	const deadline = Date.now() + timeoutMs;
 	while (!condition()) {
-		if (Date.now() > deadline) throw new Error("Timed out waiting");
+		if (Date.now() > deadline) {
+			throw new Error("Timed out waiting");
+		}
 		await new Promise((resolve) => setTimeout(resolve, 25));
 	}
 }

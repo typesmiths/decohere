@@ -25,8 +25,12 @@ export class WorkspaceApp {
 		const text = this.changes.read(`projects/${this.name}/package.json`);
 		const dependencies =
 			text == null ? {} : ((JSON.parse(text) as Manifest).dependencies ?? {});
-		if ("@decohere/data-mikro-orm" in dependencies) return "mikro-orm";
-		if ("@decohere/data-typeorm" in dependencies) return "typeorm";
+		if ("@decohere/data-mikro-orm" in dependencies) {
+			return "mikro-orm";
+		}
+		if ("@decohere/data-typeorm" in dependencies) {
+			return "typeorm";
+		}
 		return undefined;
 	}
 
@@ -45,7 +49,9 @@ export class WorkspaceApp {
 			.listFiles(dir)
 			.filter((file) => /^\d{8}-\d{6}-.+\.ts$/.test(file))
 			.map((file) => file.slice(0, -".ts".length));
-		if (ids.length === 0) return;
+		if (ids.length === 0) {
+			return;
+		}
 		const imports = ids.map((id) => `import ${identifier(id)} from "./${id}.js";\n`).join("");
 		this.changes.write(
 			`${dir}/index.ts`,

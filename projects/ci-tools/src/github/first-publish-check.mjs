@@ -48,7 +48,9 @@ export async function checkFirstPublish(options) {
 			if (!response.ok && response.status !== 404) {
 				throw new Error(`Could not check ${name} on npm: ${response.status}`);
 			}
-			if (response.status === 404) return { name, missing: true, fromCi: false };
+			if (response.status === 404) {
+				return { name, missing: true, fromCi: false };
+			}
 			return { name, missing: false, fromCi: publishedFromCi(await response.json()) };
 		}),
 	);

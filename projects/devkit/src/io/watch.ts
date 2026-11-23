@@ -146,9 +146,13 @@ export function watch(directory: string, options: WatchOptions = { cwd: "." }) {
 			return;
 		}
 		for (const [relativePath, entry] of found) {
-			if (snapshot.has(relativePath)) continue;
+			if (snapshot.has(relativePath)) {
+				continue;
+			}
 			snapshot.set(relativePath, entry);
-			if (entry.isDirectory) watchDirectory(relativePath);
+			if (entry.isDirectory) {
+				watchDirectory(relativePath);
+			}
 			emit(entry.isDirectory ? "addDir" : "add", relativePath);
 		}
 	};
@@ -181,12 +185,16 @@ export function watch(directory: string, options: WatchOptions = { cwd: "." }) {
 
 			if (previous == null) {
 				emit(current.isDirectory ? "addDir" : "add", relativePath);
-				if (current.isDirectory) addDirectory(relativePath);
+				if (current.isDirectory) {
+					addDirectory(relativePath);
+				}
 				return;
 			}
 
 			if (previous.isDirectory !== current.isDirectory) {
-				if (previous.isDirectory) removeDirectoryContents(relativePath);
+				if (previous.isDirectory) {
+					removeDirectoryContents(relativePath);
+				}
 				emit(previous.isDirectory ? "unlinkDir" : "unlink", relativePath);
 				emit(current.isDirectory ? "addDir" : "add", relativePath);
 				return;
@@ -212,7 +220,9 @@ export function watch(directory: string, options: WatchOptions = { cwd: "." }) {
 
 	watchDirectory("");
 	for (const [relativePath, entry] of snapshot) {
-		if (entry.isDirectory) watchDirectory(relativePath);
+		if (entry.isDirectory) {
+			watchDirectory(relativePath);
+		}
 	}
 
 	const watchApi: Watcher = {

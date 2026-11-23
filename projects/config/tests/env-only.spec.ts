@@ -13,7 +13,9 @@ describe("config reads configuration from the environment only", () => {
 	afterEach(() => {
 		process.chdir(originalCwd);
 		delete process.env[sentinel];
-		if (dir) realFs.rmSync(dir, { recursive: true, force: true });
+		if (dir) {
+			realFs.rmSync(dir, { recursive: true, force: true });
+		}
 		dir = undefined;
 	});
 

@@ -10,7 +10,9 @@ export const MikroOrmToken = Symbol("MikroORM");
  * app, a unit of work as long as a request.
  */
 export function mikroOrmToken(name?: string | symbol): symbol {
-	if (name == null || name === DEFAULT_DATA_SOURCE) return MikroOrmToken;
+	if (name == null || name === DEFAULT_DATA_SOURCE) {
+		return MikroOrmToken;
+	}
 	return Symbol.for(`decohere:mikro-orm:${String(name)}`);
 }
 

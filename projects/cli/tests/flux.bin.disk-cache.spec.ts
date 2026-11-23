@@ -41,7 +41,9 @@ function fluxRun(): Promise<{ code: number | null; output: string }> {
 
 function entries(): string[] {
 	const fluxDir = join(cacheDir, "flux");
-	if (!realFs.existsSync(fluxDir)) return [];
+	if (!realFs.existsSync(fluxDir)) {
+		return [];
+	}
 	return realFs
 		.readdirSync(fluxDir, { recursive: true })
 		.map(String)

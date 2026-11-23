@@ -12,7 +12,9 @@ export abstract class HasTsConfig {
 	@memoize()
 	public async getTsConfig() {
 		for (const configPath of this.tsConfigPaths) {
-			if (await io.fileExists(configPath)) return Tsconfig.parse(configPath);
+			if (await io.fileExists(configPath)) {
+				return Tsconfig.parse(configPath);
+			}
 		}
 		return Tsconfig.default();
 	}
@@ -20,7 +22,9 @@ export abstract class HasTsConfig {
 	@memoize()
 	public getTsConfigSync() {
 		const configPath = this.findTsConfigPath();
-		if (configPath != null) return Tsconfig.parseSync(configPath);
+		if (configPath != null) {
+			return Tsconfig.parseSync(configPath);
+		}
 		return Tsconfig.default();
 	}
 

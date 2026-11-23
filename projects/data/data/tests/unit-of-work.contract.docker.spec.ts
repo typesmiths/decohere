@@ -31,7 +31,9 @@ describe("unit of work contract", () => {
 	});
 
 	afterAll(async () => {
-		for (const p of providers ?? []) await p.close();
+		for (const p of providers ?? []) {
+			await p.close();
+		}
 		await pg?.stop();
 	});
 
@@ -42,7 +44,9 @@ describe("unit of work contract", () => {
 				await pg.superuser.query(
 					`truncate ${TABLES.map((t) => `${SCHEMA}.${t}`).join(", ")} restart identity`,
 				);
-				if (seed) await seed(p);
+				if (seed) {
+					await seed(p);
+				}
 				p.take();
 				await run(p);
 				const statements = p.take();

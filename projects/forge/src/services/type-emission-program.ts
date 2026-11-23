@@ -106,7 +106,9 @@ export class TypeEmissionProgram {
 
 	public addFile(file: FileEx, project: Project): void {
 		const groupProject = this.#group.find((g) => g.project === project);
-		if (groupProject == null) return;
+		if (groupProject == null) {
+			return;
+		}
 
 		groupProject.files.push(file);
 		this.#allFiles.push(file);

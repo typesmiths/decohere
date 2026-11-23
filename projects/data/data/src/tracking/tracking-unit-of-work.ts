@@ -90,14 +90,18 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		// Added and not yet committed: found by its key with no query, its children as they are, as
 		// with MikroORM. Queries still see only the database.
 		const added = this.addedWithKey(model, wanted);
-		if (added) return added as T;
+		if (added) {
+			return added as T;
+		}
 		const hit = this.identity.get(type)?.get(wanted);
 		const snapshot = hit && this.snapshots.get(hit);
 		const loaded =
 			snapshot &&
 			load.every((field) => !snapshot.unloaded.has(field)) &&
 			include.every((path) => this.isLoaded(type, [hit], path));
-		if (loaded) return hit as T;
+		if (loaded) {
+			return hit as T;
+		}
 		return this.findOne(type, { where, include, load } as Query<T>);
 	}
 
@@ -111,7 +115,9 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		query: Query<T> = {},
 	): Promise<T[]> {
 		this.assertUsable();
-		if (query.lock && !this.store.inTransaction()) await this.store.begin();
+		if (query.lock && !this.store.inTransaction()) {
+			await this.store.begin();
+		}
 		const model = this.store.model(type);
 		const rows = await this.store.select(type, {
 			where: this.rowWhere(model, query.where ?? {}),
@@ -121,14 +127,20 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 			load: query.load,
 		});
 		const roots = rows.map((row) => this.hydrate(model, row)) as T[];
-		for (const path of query.include ?? []) await this.loadPath(type, roots, path);
+		for (const path of query.include ?? []) {
+			await this.loadPath(type, roots, path);
+		}
 		return roots;
 	}
 
 	public add(entity: object) {
 		this.assertUsable();
-		if (this.removed.delete(entity)) return;
-		if (!this.snapshots.has(entity)) this.added.add(entity);
+		if (this.removed.delete(entity)) {
+			return;
+		}
+		if (!this.snapshots.has(entity)) {
+			this.added.add(entity);
+		}
 	}
 
 	public async addIfAbsent(entity: object): Promise<boolean> {
@@ -142,12 +154,18 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		}
 		await this.beginTransaction();
 		const generated = await this.store.insertIfAbsent(type, this.insertRow(model, entity, []));
-		if (generated === null) return false;
+		if (generated === null) {
+			return false;
+		}
 		Object.assign(entity, generated);
 		this.instances(type).set(this.keyOf(model, entity), entity);
 		// Its children are new too: recorded as loaded and empty, the commit inserts what it holds.
 		const children = new Map<string, object[]>();
-		for (const spec of model.children) if (entity[spec.prop]) children.set(spec.prop, []);
+		for (const spec of model.children) {
+			if (entity[spec.prop]) {
+				children.set(spec.prop, []);
+			}
+		}
 		this.snapshots.set(entity, {
 			values: this.values(model, entity),
 			children,
@@ -158,13 +176,17 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 
 	public remove(entity: object) {
 		this.assertUsable();
-		if (this.added.delete(entity)) return;
+		if (this.added.delete(entity)) {
+			return;
+		}
 		this.removed.add(entity);
 	}
 
 	public async beginTransaction() {
 		this.assertUsable();
-		if (!this.store.inTransaction()) await this.store.begin();
+		if (!this.store.inTransaction()) {
+			await this.store.begin();
+		}
 	}
 
 	/**
@@ -184,8 +206,12 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		try {
 			plan = await this.plan();
 			const empty = plan.inserts.length + plan.updates.length + plan.deletes.length === 0;
-			if (empty && !this.store.inTransaction()) return;
-			if (!this.store.inTransaction()) await this.store.begin();
+			if (empty && !this.store.inTransaction()) {
+				return;
+			}
+			if (!this.store.inTransaction()) {
+				await this.store.begin();
+			}
 			await this.write(plan);
 			await this.store.commit();
 		} catch (err) {
@@ -206,10 +232,14 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 	}
 
 	public async [Symbol.asyncDispose]() {
-		if (this.released) return;
+		if (this.released) {
+			return;
+		}
 		this.released = true;
 		try {
-			if (this.store.inTransaction()) await this.store.rollback();
+			if (this.store.inTransaction()) {
+				await this.store.rollback();
+			}
 		} finally {
 			await this.store.release();
 		}
@@ -227,16 +257,22 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		const snapshot = known && this.snapshots.get(known);
 		if (snapshot) {
 			for (const field of snapshot.unloaded) {
-				if (!(field in row)) continue;
+				if (!(field in row)) {
+					continue;
+				}
 				// A value assigned while it was unloaded is an unsaved change, and stays.
-				if (known[field] === undefined) known[field] = row[field];
+				if (known[field] === undefined) {
+					known[field] = row[field];
+				}
 				snapshot.values[field] = clone(row[field]);
 				snapshot.unloaded.delete(field);
 			}
 			return known;
 		}
 		const entity = known ?? Object.create(model.type.prototype);
-		for (const field of model.fields) entity[field] = row[field];
+		for (const field of model.fields) {
+			entity[field] = row[field];
+		}
 		const unloaded = new Set((model.lazy ?? []).filter((field) => !(field in row)));
 		for (const ref of model.references) {
 			const value = row[ref.prop];
@@ -260,7 +296,9 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		const field = this.singleKey(model);
 		const key = String(keyValue);
 		const known = this.instances(type).get(key);
-		if (known) return known;
+		if (known) {
+			return known;
+		}
 		const ref = Object.create(type.prototype);
 		const target = model.references.find((r) => r.prop === field);
 		ref[field] = target ? this.reference(target.target, keyValue) : keyValue;
@@ -274,7 +312,9 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		const children: object[] = [];
 		for (const root of roots) {
 			const loaded = this.snapshots.get(root)?.children.get(prop);
-			if (!loaded) return false;
+			if (!loaded) {
+				return false;
+			}
 			children.push(...(root[prop] as Iterable<object>));
 		}
 		return rest.length === 0 || this.isLoaded(spec.target, children, rest.join("."));
@@ -285,14 +325,20 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		const model = this.store.model(type);
 		const spec = this.childSpec(model, prop);
 		await this.loadChildren(model, spec, roots);
-		if (rest.length === 0) return;
+		if (rest.length === 0) {
+			return;
+		}
 		const children = roots.flatMap((root) => [...(root[prop] as Iterable<object>)]);
-		if (children.length > 0) await this.loadPath(spec.target, children, rest.join("."));
+		if (children.length > 0) {
+			await this.loadPath(spec.target, children, rest.join("."));
+		}
 	}
 
 	private async loadChildren(model: EntityModel, spec: ChildrenModel, roots: object[]) {
 		const pending = roots.filter((root) => !this.snapshots.get(root)?.children.has(spec.prop));
-		if (pending.length === 0) return;
+		if (pending.length === 0) {
+			return;
+		}
 		const childModel = this.store.model(spec.target);
 		const parentKeys = pending.map((root) => this.keyValue(model, root));
 		const rows = await this.store.select(spec.target, {
@@ -328,7 +374,9 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		const inserts = new Set<object>();
 		const deletes = new Set<object>();
 		const persist = (entity: object) => {
-			if (this.snapshots.has(entity) || inserts.has(entity)) return;
+			if (this.snapshots.has(entity) || inserts.has(entity)) {
+				return;
+			}
 			inserts.add(entity);
 			const model = this.store.model(entity.constructor as EntityClass);
 			for (const ref of model.references) {
@@ -344,7 +392,9 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 			}
 			for (const spec of model.children) {
 				const children = entity[spec.prop];
-				if (!children || children instanceof UnloadedChildren) continue;
+				if (!children || children instanceof UnloadedChildren) {
+					continue;
+				}
 				for (const child of children as Iterable<object>) {
 					child[spec.parentRef] = entity;
 					persist(child);
@@ -354,20 +404,28 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		// Children it loaded go first. Children it didn't load are the database's to cascade, as with
 		// MikroORM: a remove never loads more rows.
 		const remove = (entity: object) => {
-			if (deletes.has(entity) || inserts.has(entity)) return;
+			if (deletes.has(entity) || inserts.has(entity)) {
+				return;
+			}
 			deletes.add(entity);
 			for (const children of this.snapshots.get(entity)?.children.values() ?? []) {
-				for (const child of children) remove(child);
+				for (const child of children) {
+					remove(child);
+				}
 			}
 		};
 
-		for (const entity of this.added) persist(entity);
+		for (const entity of this.added) {
+			persist(entity);
+		}
 
 		// Children added, moved or dropped inside aggregates already loaded.
 		const claimed = new Set<object>();
 		const dropped: object[] = [];
 		for (const entity of managed) {
-			if (this.removed.has(entity)) continue;
+			if (this.removed.has(entity)) {
+				continue;
+			}
 			const model = this.store.model(entity.constructor as EntityClass);
 			const snapshot = this.snapshots.get(entity);
 			for (const [prop, before] of snapshot?.children ?? []) {
@@ -378,24 +436,40 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 					child[spec.parentRef] = entity;
 					persist(child);
 				}
-				for (const child of before) if (!after.includes(child)) dropped.push(child);
+				for (const child of before) {
+					if (!after.includes(child)) {
+						dropped.push(child);
+					}
+				}
 			}
 		}
-		for (const child of dropped) if (!claimed.has(child)) remove(child);
-		for (const entity of this.removed) remove(entity);
+		for (const child of dropped) {
+			if (!claimed.has(child)) {
+				remove(child);
+			}
+		}
+		for (const entity of this.removed) {
+			remove(entity);
+		}
 
 		const updates: Plan["updates"] = [];
 		for (const entity of this.managed()) {
-			if (deletes.has(entity)) continue;
+			if (deletes.has(entity)) {
+				continue;
+			}
 			const model = this.store.model(entity.constructor as EntityClass);
 			// A field never loaded is in neither: it is written only once something assigns it.
 			const before = this.snapshots.get(entity)?.values ?? {};
 			const now = this.values(model, entity);
 			const changes: Row = {};
 			for (const [prop, value] of Object.entries(now)) {
-				if (prop !== model.version && !same(value, before[prop])) changes[prop] = value;
+				if (prop !== model.version && !same(value, before[prop])) {
+					changes[prop] = value;
+				}
 			}
-			if (Object.keys(changes).length > 0) updates.push({ entity, changes });
+			if (Object.keys(changes).length > 0) {
+				updates.push({ entity, changes });
+			}
 		}
 		return { inserts: [...inserts], updates, deletes: [...deletes] };
 	}
@@ -425,12 +499,18 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 			let wrote = false;
 			for (const type of order) {
 				const batch = [...pending].filter((e) => e.constructor === type && ready(e));
-				if (batch.length === 0) continue;
+				if (batch.length === 0) {
+					continue;
+				}
 				await this.insert(type, batch, deferred);
-				for (const e of batch) pending.delete(e);
+				for (const e of batch) {
+					pending.delete(e);
+				}
 				wrote = true;
 			}
-			if (wrote) continue;
+			if (wrote) {
+				continue;
+			}
 			const breakable = [...pending].flatMap((entity) =>
 				this.store
 					.model(entity.constructor as EntityClass)
@@ -483,7 +563,9 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 
 		for (const type of [...order].reverse()) {
 			const batch = plan.deletes.filter((e) => e.constructor === type);
-			if (batch.length === 0) continue;
+			if (batch.length === 0) {
+				continue;
+			}
 			const model = this.store.model(type);
 			await this.store.delete(
 				type,
@@ -509,10 +591,15 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		entity: object,
 		deferred: { entity: object; prop: string }[],
 	): Row {
-		if (model.version && entity[model.version] == null) entity[model.version] = 1;
+		if (model.version && entity[model.version] == null) {
+			entity[model.version] = 1;
+		}
 		const row: Row = {};
-		for (const field of model.fields)
-			if (entity[field] !== undefined) row[field] = entity[field];
+		for (const field of model.fields) {
+			if (entity[field] !== undefined) {
+				row[field] = entity[field];
+			}
+		}
 		for (const ref of model.references) {
 			const target = entity[ref.prop];
 			const skip = deferred.some((d) => d.entity === entity && d.prop === ref.prop);
@@ -534,13 +621,16 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		for (const entity of [...this.managed(), ...plan.inserts]) {
 			const model = this.store.model(entity.constructor as EntityClass);
 			const before = this.snapshots.get(entity)?.values;
-			if (before) this.instances(model.type).delete(this.keyOf(model, before));
+			if (before) {
+				this.instances(model.type).delete(this.keyOf(model, before));
+			}
 			this.instances(model.type).set(this.keyOf(model, entity), entity);
 			const children = new Map<string, object[]>();
 			for (const spec of model.children) {
 				const list = entity[spec.prop];
-				if (list && !(list instanceof UnloadedChildren))
+				if (list && !(list instanceof UnloadedChildren)) {
 					children.set(spec.prop, [...(list as Iterable<object>)]);
+				}
 			}
 			const unloaded = this.stillUnloaded(entity, this.snapshots.get(entity));
 			this.snapshots.set(entity, {
@@ -558,15 +648,21 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		const types = [...new Set(entities.map((e) => e.constructor as EntityClass))];
 		const sorted: EntityClass[] = [];
 		const visit = (type: EntityClass, path: Set<EntityClass>) => {
-			if (sorted.includes(type) || path.has(type)) return;
+			if (sorted.includes(type) || path.has(type)) {
+				return;
+			}
 			path.add(type);
 			for (const ref of this.store.model(type).references) {
-				if (types.includes(ref.target)) visit(ref.target, path);
+				if (types.includes(ref.target)) {
+					visit(ref.target, path);
+				}
 			}
 			path.delete(type);
 			sorted.push(type);
 		};
-		for (const type of types) visit(type, new Set());
+		for (const type of types) {
+			visit(type, new Set());
+		}
 		return sorted;
 	}
 
@@ -581,9 +677,15 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 	/** An entity given to {@link add}, not yet committed, of this class and with this key. */
 	private addedWithKey(model: EntityModel, key: string): object | undefined {
 		for (const entity of this.added) {
-			if (entity.constructor !== model.type) continue;
-			if (model.key.some((k) => entity[k] == null)) continue;
-			if (this.keyOf(model, entity) === key) return entity;
+			if (entity.constructor !== model.type) {
+				continue;
+			}
+			if (model.key.some((k) => entity[k] == null)) {
+				continue;
+			}
+			if (this.keyOf(model, entity) === key) {
+				return entity;
+			}
 		}
 		return undefined;
 	}
@@ -616,7 +718,9 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 	private values(model: EntityModel, entity: object, unloaded?: ReadonlySet<string>): Row {
 		const values: Row = {};
 		for (const field of model.fields) {
-			if (!unloaded?.has(field)) values[field] = clone(entity[field]);
+			if (!unloaded?.has(field)) {
+				values[field] = clone(entity[field]);
+			}
 		}
 		for (const ref of model.references) {
 			const target = entity[ref.prop];
@@ -656,7 +760,9 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 	}
 
 	private keyWhere(model: EntityModel, key: unknown): Row {
-		if (key !== null && typeof key === "object") return key as Row;
+		if (key !== null && typeof key === "object") {
+			return key as Row;
+		}
 		return { [this.singleKey(model)]: key };
 	}
 
@@ -672,15 +778,23 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 	/** A query's conditions, with entities in it replaced by their keys. */
 	private rowWhere(model: EntityModel, where: Record<string, unknown>): RowQuery["where"] {
 		const toKey = (value: unknown) => {
-			if (value === null || typeof value !== "object" || value instanceof Date) return value;
+			if (value === null || typeof value !== "object" || value instanceof Date) {
+				return value;
+			}
 			return this.keyValue(this.store.model(value.constructor as EntityClass), value);
 		};
 		return Object.fromEntries(
 			Object.entries(where).map(([prop, condition]) => {
-				if (!model.references.some((r) => r.prop === prop)) return [prop, condition];
-				if (condition === null) return [prop, null];
+				if (!model.references.some((r) => r.prop === prop)) {
+					return [prop, condition];
+				}
+				if (condition === null) {
+					return [prop, null];
+				}
 				const operator = comparison.operatorOf(condition);
-				if (!operator) return [prop, toKey(condition)];
+				if (!operator) {
+					return [prop, toKey(condition)];
+				}
 				const [op, operand] = operator;
 				return [
 					prop,
@@ -694,12 +808,16 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 
 	private childSpec(model: EntityModel, prop: string): ChildrenModel {
 		const spec = model.children.find((c) => c.prop === prop);
-		if (!spec) throw new DataError(`${model.name} has no child collection "${prop}"`);
+		if (!spec) {
+			throw new DataError(`${model.name} has no child collection "${prop}"`);
+		}
 		return spec;
 	}
 
 	private assertUsable() {
-		if (this.released) throw new DataError("This unit of work was disposed");
+		if (this.released) {
+			throw new DataError("This unit of work was disposed");
+		}
 		if (this.failure !== undefined) {
 			throw new DataError(
 				"A commit failed in this unit of work, so it was rolled back: start a new one",
@@ -712,13 +830,19 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 }
 
 function clone(value: unknown): unknown {
-	if (value instanceof Date) return new Date(value.getTime());
-	if (value !== null && typeof value === "object") return structuredClone(value);
+	if (value instanceof Date) {
+		return new Date(value.getTime());
+	}
+	if (value !== null && typeof value === "object") {
+		return structuredClone(value);
+	}
 	return value;
 }
 
 function same(a: unknown, b: unknown): boolean {
-	if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+	if (a instanceof Date && b instanceof Date) {
+		return a.getTime() === b.getTime();
+	}
 	if (a !== null && b !== null && typeof a === "object" && typeof b === "object") {
 		return JSON.stringify(a) === JSON.stringify(b);
 	}

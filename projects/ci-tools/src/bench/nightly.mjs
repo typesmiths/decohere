@@ -65,7 +65,9 @@ function benchRound(cwd, label, round, workDir) {
 		: join(cwd, "projects/ci-tools/dist/ci/bench/bench-history.json");
 	const saved = normalize(JSON.parse(readFileSync(file, "utf8")));
 	const newest = latestRun(saved);
-	if (newest == null) throw new Error(`${label} round ${round + 1} saved no run`);
+	if (newest == null) {
+		throw new Error(`${label} round ${round + 1} saved no run`);
+	}
 	return newest.results;
 }
 

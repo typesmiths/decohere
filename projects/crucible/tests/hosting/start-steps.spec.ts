@@ -65,7 +65,9 @@ describe("builder.registerStartStep", () => {
 		builder.registerStartStep(() => {
 			attempts += 1;
 			log.push(`migrate attempt ${attempts}`);
-			if (attempts < 3) throw new Error("database not reachable");
+			if (attempts < 3) {
+				throw new Error("database not reachable");
+			}
 		}, "migrations");
 		const app = await builder.build();
 

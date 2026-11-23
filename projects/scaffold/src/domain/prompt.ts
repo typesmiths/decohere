@@ -45,6 +45,8 @@ export async function pick<T>(
 	}
 	const answer = await readLine("  > ");
 	const idx = Number.parseInt(answer, 10);
-	if (Number.isNaN(idx) || idx < 1 || idx > items.length) return null;
+	if (Number.isNaN(idx) || idx < 1 || idx > items.length) {
+		return null;
+	}
 	return items[idx - 1];
 }

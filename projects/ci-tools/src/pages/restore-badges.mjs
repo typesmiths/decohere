@@ -15,8 +15,12 @@ const PAGES_URL = process.env.PAGES_URL ?? "https://typesmiths.github.io/decoher
 
 async function fetchOrNull(url) {
 	const response = await fetch(url);
-	if (response.status === 404) return null;
-	if (!response.ok) throw new Error(`GET ${url}: HTTP ${response.status}`);
+	if (response.status === 404) {
+		return null;
+	}
+	if (!response.ok) {
+		throw new Error(`GET ${url}: HTTP ${response.status}`);
+	}
 	return response;
 }
 
@@ -26,7 +30,9 @@ const badges = manifest != null ? (await manifest.json()).badges : [];
 let restored = 0;
 for (const badge of badges) {
 	const response = await fetchOrNull(`${PAGES_URL}/badges/${badge}`);
-	if (response == null) continue;
+	if (response == null) {
+		continue;
+	}
 	const file = path.join(BADGES_DIR, badge);
 	await mkdir(path.dirname(file), { recursive: true });
 	await writeFile(file, await response.text());

@@ -37,10 +37,18 @@ export class PinoTargets {
 	/** The Pino transport for these targets, or `undefined` for none (JSON on stdout). */
 	public get transport(): TransportSingleOptions | TransportMultiOptions | undefined {
 		const targets: TransportSingleOptions[] = [];
-		if (this.pretty != null) targets.push(this.prettyTarget(this.pretty));
-		if (this.roll != null) targets.push(this.rollTarget(this.roll));
-		if (targets.length === 0) return undefined;
-		if (targets.length === 1) return targets[0];
+		if (this.pretty != null) {
+			targets.push(this.prettyTarget(this.pretty));
+		}
+		if (this.roll != null) {
+			targets.push(this.rollTarget(this.roll));
+		}
+		if (targets.length === 0) {
+			return undefined;
+		}
+		if (targets.length === 1) {
+			return targets[0];
+		}
 		return { targets };
 	}
 

@@ -23,7 +23,9 @@ export class MemoryRowStore implements RowStore {
 	}
 
 	public async begin() {
-		if (this.transaction) throw new DataError("A transaction is already open");
+		if (this.transaction) {
+			throw new DataError("A transaction is already open");
+		}
 		this.transaction = this.store.begin();
 	}
 
@@ -36,7 +38,9 @@ export class MemoryRowStore implements RowStore {
 	}
 
 	public async release() {
-		if (this.transaction) await this.rollback();
+		if (this.transaction) {
+			await this.rollback();
+		}
 	}
 
 	public inTransaction() {
@@ -70,13 +74,17 @@ export class MemoryRowStore implements RowStore {
 
 	private end(): MemoryTransaction {
 		const tx = this.transaction;
-		if (tx == null) throw new DataError("No transaction is open");
+		if (tx == null) {
+			throw new DataError("No transaction is open");
+		}
 		this.transaction = undefined;
 		return tx;
 	}
 
 	private async run<R>(operation: (tx: MemoryTransaction) => Promise<R>): Promise<R> {
-		if (this.transaction) return operation(this.transaction);
+		if (this.transaction) {
+			return operation(this.transaction);
+		}
 		const tx = this.store.begin();
 		let result: R;
 		try {

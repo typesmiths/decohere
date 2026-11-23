@@ -250,7 +250,9 @@ export class Version implements Action<VersionOptions> {
 		for (const file of files) {
 			const content = await readFile(join(changesetDir, file), "utf8");
 			const match = content.match(/^---\n([\s\S]*?)\n---/);
-			if (!match) continue;
+			if (!match) {
+				continue;
+			}
 			for (const line of match[1].split("\n")) {
 				const bumpType = line.match(/^"[^"]+"\s*:\s*(\w+)/)?.[1] as VersionType | undefined;
 				const p = bumpType != null ? (precedence[bumpType] ?? -1) : -1;

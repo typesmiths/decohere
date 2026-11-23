@@ -32,14 +32,20 @@ function describeIssue(
 	{ instancePath, keyword, message, params }: ErrorObject,
 ) {
 	const path = instancePath.split("/").filter(Boolean);
-	if (keyword === "required") path.push(String(params.missingProperty));
-	if (keyword === "additionalProperties") path.push(String(params.additionalProperty));
+	if (keyword === "required") {
+		path.push(String(params.missingProperty));
+	}
+	if (keyword === "additionalProperties") {
+		path.push(String(params.additionalProperty));
+	}
 	return `  - ${[section, ...path].join(".")}: ${message ?? keyword}`;
 }
 
 function assertValid(section: string, schema: object, data: Tree): void {
 	const validate = ajv.compile(schema);
-	if (validate(data)) return;
+	if (validate(data)) {
+		return;
+	}
 	const issues = (validate.errors ?? []).map((issue) => describeIssue(section, issue));
 	throw new ConfigurationError(
 		`Invalid config in section "${section}":\n${issues.join("\n")}`,
@@ -91,7 +97,9 @@ export class ConfigurationService implements IConfigurationService {
 	}
 
 	private async ensureInitialized(): Promise<void> {
-		if (this.isInitialized) return;
+		if (this.isInitialized) {
+			return;
+		}
 		await this.initialize();
 	}
 
@@ -106,7 +114,9 @@ export class ConfigurationService implements IConfigurationService {
 		const defaults = Object.fromEntries(Object.entries(configObject));
 		const merged = structuredClone(withoutNulls(mergeTrees(defaults, data)));
 		const { schema } = type as WithSchema;
-		if (schema) assertValid(section, schema, merged);
+		if (schema) {
+			assertValid(section, schema, merged);
+		}
 		Object.assign(configObject, merged);
 		return configObject as T;
 	}

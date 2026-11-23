@@ -30,9 +30,15 @@ function escapeHtml(value) {
 }
 
 function fmtMs(ms) {
-	if (typeof ms !== "number" || Number.isNaN(ms)) return "–";
-	if (ms === 0) return "0 ms";
-	if (ms >= 100) return `${Math.round(ms)} ms`;
+	if (typeof ms !== "number" || Number.isNaN(ms)) {
+		return "–";
+	}
+	if (ms === 0) {
+		return "0 ms";
+	}
+	if (ms >= 100) {
+		return `${Math.round(ms)} ms`;
+	}
 	return `${ms.toFixed(1)} ms`;
 }
 
@@ -42,7 +48,9 @@ function fmtDate(iso) {
 }
 
 function commitLink(repoUrl, sha) {
-	if (sha == null) return "–";
+	if (sha == null) {
+		return "–";
+	}
 	return `<a href="${escapeHtml(`${repoUrl}/commit/${sha}`)}"><code>${escapeHtml(sha.slice(0, 7))}</code></a>`;
 }
 
@@ -81,8 +89,9 @@ function benchmarkIds(contexts) {
 			const time = new Date(run.date).getTime();
 			for (const result of run.results) {
 				const seen = newest.get(result.id);
-				if (seen == null || time > seen.time)
+				if (seen == null || time > seen.time) {
 					newest.set(result.id, { time, label: result.label });
+				}
 			}
 		}
 	}
@@ -111,7 +120,9 @@ export function trendSvg(lines) {
 	const height = 180;
 	const pad = { top: 12, right: 12, bottom: 24, left: 56 };
 	const points = lines.flatMap((line) => line.points);
-	if (points.length === 0) return "";
+	if (points.length === 0) {
+		return "";
+	}
 	const minTime = Math.min(...points.map((p) => p.time));
 	const maxTime = Math.max(...points.map((p) => p.time));
 	const maxValue = Math.max(...points.map((p) => p.p90 ?? p.median)) * 1.1 || 1;
@@ -159,10 +170,14 @@ export function trendSvg(lines) {
 function changeText(points) {
 	const last = points.at(-1);
 	const before = points.at(-2);
-	if (last == null || before == null || before.median === 0) return "";
+	if (last == null || before == null || before.median === 0) {
+		return "";
+	}
 	const percent = ((last.median - before.median) / before.median) * 100;
 	const direction = percent > 0 ? "slower" : "faster";
-	if (Math.abs(percent) < 0.5) return `<span class="change">no change</span>`;
+	if (Math.abs(percent) < 0.5) {
+		return `<span class="change">no change</span>`;
+	}
 	return `<span class="change ${percent > 0 ? "worse" : "better"}">${Math.abs(percent).toFixed(1)}% ${direction}</span>`;
 }
 
@@ -226,7 +241,9 @@ export function buildBenchmarkHtml(
 					const other = [...labels.keys()].filter(
 						(id) => !GROUPS.some((group) => id.startsWith(group.prefix)),
 					);
-					if (other.length > 0) grouped.push({ title: "Other", ids: other });
+					if (other.length > 0) {
+						grouped.push({ title: "Other", ids: other });
+					}
 					const sections = grouped
 						.filter((group) => group.ids.length > 0)
 						.map(

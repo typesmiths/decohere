@@ -33,8 +33,11 @@ export async function* encodeSse(
 	let onAbort: (() => void) | undefined;
 	const abortStep = new Promise<Step>((resolve) => {
 		onAbort = () => resolve({ kind: "abort" });
-		if (signal.aborted) onAbort();
-		else signal.addEventListener("abort", onAbort, { once: true });
+		if (signal.aborted) {
+			onAbort();
+		} else {
+			signal.addEventListener("abort", onAbort, { once: true });
+		}
 	});
 	let pending: Promise<Step> | undefined;
 	try {
@@ -56,20 +59,28 @@ export async function* encodeSse(
 			} finally {
 				clearTimeout(timer);
 			}
-			if (step.kind === "abort") return;
+			if (step.kind === "abort") {
+				return;
+			}
 			if (step.kind === "heartbeat") {
 				yield sseWire.formatComment("heartbeat");
 				continue;
 			}
 			pending = undefined;
-			if (step.result.done) return;
+			if (step.result.done) {
+				return;
+			}
 			yield sseWire.formatMessage(step.result.value);
 		}
 	} catch (error) {
 		// Headers are already sent, so the only honest thing left is to log and end the stream.
-		if (!signal.aborted) logger.error("SSE producer failed", error);
+		if (!signal.aborted) {
+			logger.error("SSE producer failed", error);
+		}
 	} finally {
-		if (onAbort) signal.removeEventListener("abort", onAbort);
+		if (onAbort) {
+			signal.removeEventListener("abort", onAbort);
+		}
 		// If the producer has not answered its last `next()`, `return()` waits behind it. That is
 		// why handlers must pass the signal to whatever they wait on.
 		options.onProducerStopped(
@@ -78,7 +89,9 @@ export async function* encodeSse(
 				.then(
 					() => undefined,
 					(error: unknown) => {
-						if (!signal.aborted) logger.error("SSE producer failed while stopping", error);
+						if (!signal.aborted) {
+							logger.error("SSE producer failed while stopping", error);
+						}
 					},
 				),
 		);

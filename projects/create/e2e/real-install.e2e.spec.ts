@@ -227,7 +227,9 @@ describe.skipIf(!registry || !version)(
 					try {
 						expect(await waitForHealth(port)).toBe(200);
 					} finally {
-						if (server.pid != null) process.kill(-server.pid, "SIGTERM");
+						if (server.pid != null) {
+							process.kill(-server.pid, "SIGTERM");
+						}
 					}
 				});
 			});
@@ -444,7 +446,9 @@ async function waitForHealth(port: number): Promise<number> {
 	while (Date.now() < deadline) {
 		try {
 			const response = await fetch(`http://localhost:${port}/health`);
-			if (response.ok) return response.status;
+			if (response.ok) {
+				return response.status;
+			}
 			lastError = new Error(`/health answered ${response.status}`);
 		} catch (error) {
 			lastError = error;

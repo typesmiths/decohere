@@ -10,12 +10,17 @@ describe("YAML config: merge the files first, then resolve ${VAR}", () => {
 
 	function setEnv(name: string, value: string | undefined) {
 		touched.push(name);
-		if (value === undefined) delete process.env[name];
-		else process.env[name] = value;
+		if (value === undefined) {
+			delete process.env[name];
+		} else {
+			process.env[name] = value;
+		}
 	}
 
 	afterEach(() => {
-		for (const name of touched.splice(0)) delete process.env[name];
+		for (const name of touched.splice(0)) {
+			delete process.env[name];
+		}
 	});
 
 	it("lets a later file replace a ${VAR} without that variable being set", () => {
@@ -232,8 +237,11 @@ describe("YamlDataSource reads config.yaml then config.<env>.yaml", () => {
 	afterEach(() => {
 		vol.reset();
 		for (const [key, value] of Object.entries(saved)) {
-			if (value === undefined) delete process.env[key];
-			else process.env[key] = value;
+			if (value === undefined) {
+				delete process.env[key];
+			} else {
+				process.env[key] = value;
+			}
 		}
 	});
 

@@ -90,9 +90,13 @@ function check(sources: readonly ConnectionInfo[], options: CheckOptions = {}) {
 		assertSynchronizeAllowed(info, nodeEnv);
 		assertMigrateOnStartAllowed(info, nodeEnv);
 	}
-	if (options.bootstrap) return;
+	if (options.bootstrap) {
+		return;
+	}
 	const asking = sources.filter((info) => shouldBootstrapDatabase(info, nodeEnv));
-	if (asking.length === 0) return;
+	if (asking.length === 0) {
+		return;
+	}
 	const names = asking.map((info) => `"${info.name}"`).join(", ");
 	throw new DataConfigurationError(
 		`Data source ${names} asks to be set up at startup (bootstrap), but the provider was given no bootstrap. Install the package for its database and pass it to the provider: database: postgres, from @decohere/data-postgres. Or set bootstrap: false.`,
@@ -123,7 +127,9 @@ async function open(sources: readonly StartingDataSource[], options: OpenOptions
 		sources.map((source) => source.connection),
 		{ applicationName: options.applicationName, nodeEnv },
 	);
-	for (const source of sources) await source.connect();
+	for (const source of sources) {
+		await source.connect();
+	}
 }
 
 /**
@@ -151,8 +157,12 @@ async function start(
 			log,
 		});
 	}
-	if (connection.synchronize) await source.synchronize();
-	if (connection.seed) await source.seed();
+	if (connection.synchronize) {
+		await source.synchronize();
+	}
+	if (connection.seed) {
+		await source.seed();
+	}
 }
 
 export const dataSources = { check, open, resolve, start };

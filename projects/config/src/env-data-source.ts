@@ -23,11 +23,17 @@ export function envToTree(env: Record<string, string | undefined>): Tree {
 	const tree: Tree = {};
 	const owners = new Map<string, string>();
 	for (const [name, value] of Object.entries(env)) {
-		if (value === undefined || !VARIABLE.test(name) || !name.includes("__")) continue;
+		if (value === undefined || !VARIABLE.test(name) || !name.includes("__")) {
+			continue;
+		}
 		const segments = name.split("__");
-		if (!segments.every((segment) => SEGMENT.test(segment))) continue;
+		if (!segments.every((segment) => SEGMENT.test(segment))) {
+			continue;
+		}
 		const keys = segments.map(toKey);
-		if (keys.some((key) => FORBIDDEN.has(key))) continue;
+		if (keys.some((key) => FORBIDDEN.has(key))) {
+			continue;
+		}
 		claim(owners, keys, name);
 
 		let node = tree;

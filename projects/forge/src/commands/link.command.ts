@@ -61,6 +61,8 @@ export class UnlinkCommand extends DecohereCommand<UnlinkActions> {
 		super(name ?? "unlink");
 		this.description("Remove workspace symlinks from a consumer project's node_modules");
 		this.option("--target-dir <dir>", "Path to the consumer project root");
-		if (handler) this.action(handler);
+		if (handler) {
+			this.action(handler);
+		}
 	}
 }

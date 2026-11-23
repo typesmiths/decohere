@@ -49,8 +49,9 @@ export function parseResults(output, suite) {
 		.split(/\r?\n/)
 		.reverse()
 		.find((candidate) => candidate.startsWith(RESULT_PREFIX));
-	if (line == null)
+	if (line == null) {
 		throw new Error(`suite "${suite}" printed no ${RESULT_PREFIX.trim()} line`);
+	}
 	return JSON.parse(line.slice(RESULT_PREFIX.length));
 }
 
@@ -70,7 +71,9 @@ export function fromVitest(vitestOutput) {
 		.flatMap((group) => group.benchmarks)
 		.map((benchmark) => {
 			const id = FORGE_BENCHMARKS.find(([prefix]) => benchmark.name.startsWith(prefix))?.[1];
-			if (id == null) throw new Error(`unknown forge benchmark "${benchmark.name}"`);
+			if (id == null) {
+				throw new Error(`unknown forge benchmark "${benchmark.name}"`);
+			}
 			const files = Number(benchmark.name.match(/\((\d+) files\)/)?.[1]);
 			return {
 				id,
@@ -102,13 +105,17 @@ export function assertValid(results) {
  * trend carries on; anything unrecognised starts empty rather than mixing formats.
  */
 export function normalize(raw) {
-	if (raw?.version === HISTORY_VERSION && raw.contexts != null) return raw;
+	if (raw?.version === HISTORY_VERSION && raw.contexts != null) {
+		return raw;
+	}
 	const contexts = {};
 	for (const [id, entry] of Object.entries(raw?.runs ?? {})) {
 		const runs = (entry.runs ?? [])
 			.filter((run) => run.vitestOutput != null)
 			.map((run) => ({ date: run.date, sha: null, results: fromVitest(run.vitestOutput) }));
-		if (runs.length > 0) contexts[id] = { context: entry.context, runs };
+		if (runs.length > 0) {
+			contexts[id] = { context: entry.context, runs };
+		}
 	}
 	return { version: HISTORY_VERSION, contexts };
 }
@@ -161,7 +168,9 @@ export function compare(results, previous) {
 	const before = new Map((previous?.results ?? []).map((result) => [result.id, result]));
 	return results.map((result) => {
 		const old = before.get(result.id);
-		if (old == null) return { id: result.id, current: result.median };
+		if (old == null) {
+			return { id: result.id, current: result.median };
+		}
 		const delta = result.median - old.median;
 		return {
 			id: result.id,
@@ -218,7 +227,9 @@ export const REGRESSION = { threshold: 0.2, rounds: 2 };
  */
 export function compareRounds(headRounds, baseRounds, options = REGRESSION) {
 	const rounds = Math.min(headRounds.length, baseRounds.length);
-	if (rounds < options.rounds) return [];
+	if (rounds < options.rounds) {
+		return [];
+	}
 	const medianIn = (results, id) => results.find((result) => result.id === id)?.median;
 	const regressions = [];
 	for (const head of headRounds[0]) {
@@ -229,9 +240,13 @@ export function compareRounds(headRounds, baseRounds, options = REGRESSION) {
 		const comparable = pairs.every(
 			(pair) => Number.isFinite(pair.head) && Number.isFinite(pair.base) && pair.base > 0,
 		);
-		if (!comparable) continue;
+		if (!comparable) {
+			continue;
+		}
 		const slower = pairs.every((pair) => pair.head > pair.base * (1 + options.threshold));
-		if (!slower) continue;
+		if (!slower) {
+			continue;
+		}
 		const mean = (values) => values.reduce((sum, value) => sum + value, 0) / values.length;
 		const headMs = mean(pairs.map((pair) => pair.head));
 		const baseMs = mean(pairs.map((pair) => pair.base));

@@ -600,7 +600,9 @@ describe("forge tag", () => {
 async function waitUntil(condition: () => boolean, timeoutMs = 5000): Promise<void> {
 	const start = Date.now();
 	while (!condition()) {
-		if (Date.now() - start > timeoutMs) throw new Error("waitUntil timed out");
+		if (Date.now() - start > timeoutMs) {
+			throw new Error("waitUntil timed out");
+		}
 		await new Promise((r) => setTimeout(r, 50));
 	}
 }

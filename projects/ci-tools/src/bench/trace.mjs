@@ -11,7 +11,9 @@ const TRACE_SPEC = "projects/cli/e2e/build.trace.e2e.spec.ts";
 const TRACE_LOG_DIR = join(WORKSPACE_ROOT, ".decohere", "logs");
 
 function truthy(value, defaultValue = false) {
-	if (value == null) return defaultValue;
+	if (value == null) {
+		return defaultValue;
+	}
 	return !["0", "false", "no", "off"].includes(String(value).toLowerCase());
 }
 
@@ -34,7 +36,9 @@ function parseTraceSamples(rawOutput) {
 	const samples = [];
 	for (const rawLine of rawOutput.split(/\r?\n/)) {
 		const line = rawLine.trim();
-		if (!line.startsWith("{")) continue;
+		if (!line.startsWith("{")) {
+			continue;
+		}
 
 		let parsed;
 		try {
@@ -43,12 +47,18 @@ function parseTraceSamples(rawOutput) {
 			continue;
 		}
 
-		if (typeof parsed?.name !== "string" || typeof parsed?.msg !== "string") continue;
+		if (typeof parsed?.name !== "string" || typeof parsed?.msg !== "string") {
+			continue;
+		}
 		const match = parsed.msg.match(/^(.*):\s+([0-9]+(?:\.[0-9]+)?)ms$/);
-		if (match == null) continue;
+		if (match == null) {
+			continue;
+		}
 
 		const durationMs = Number(match[2]);
-		if (!Number.isFinite(durationMs)) continue;
+		if (!Number.isFinite(durationMs)) {
+			continue;
+		}
 
 		samples.push({
 			className: parsed.name,
@@ -73,7 +83,9 @@ function aggregateSamples(samples, keyBuilder) {
 		};
 		current.hitCount += 1;
 		current.totalMs += sample.durationMs;
-		if (sample.durationMs > current.maxMs) current.maxMs = sample.durationMs;
+		if (sample.durationMs > current.maxMs) {
+			current.maxMs = sample.durationMs;
+		}
 		aggregates.set(key, current);
 	}
 	return [...aggregates.values()];
@@ -169,8 +181,12 @@ const result = spawnSync(
 
 const stdout = typeof result.stdout === "string" ? result.stdout : "";
 const stderr = typeof result.stderr === "string" ? result.stderr : "";
-if (stdout.length > 0) process.stdout.write(stdout);
-if (stderr.length > 0) process.stderr.write(stderr);
+if (stdout.length > 0) {
+	process.stdout.write(stdout);
+}
+if (stderr.length > 0) {
+	process.stderr.write(stderr);
+}
 
 const combined = `${stdout}${stderr.length > 0 ? `\n${stderr}` : ""}`;
 if (traceLogPath != null) {

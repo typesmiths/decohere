@@ -64,7 +64,9 @@ export class Builder<T extends App = App> {
 	 * Each is registered as a singleton, so other services can inject it by its class.
 	 */
 	public withHostedService(...types: Constructable<HostedService>[]): Builder<T> {
-		for (const type of types) this.containerBuilder.registerSingleton(type);
+		for (const type of types) {
+			this.containerBuilder.registerSingleton(type);
+		}
 		this.hostedServices.add(...types);
 		return this;
 	}

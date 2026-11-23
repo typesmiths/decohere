@@ -129,7 +129,9 @@ it("fires projectFileChanged$ when a source file is written after watch starts",
 
 	await new Promise<void>((resolve, reject) => {
 		const subscription = workspace.projectFileChanged$.subscribe((evt) => {
-			if (evt.file.relativePath !== "src/index.ts") return;
+			if (evt.file.relativePath !== "src/index.ts") {
+				return;
+			}
 			subscription.unsubscribe();
 			workspace.stopWatching();
 			resolve();

@@ -113,7 +113,9 @@ export class App {
 		this.hostedStarting = this.startHostedServices(retry);
 		await this.hostedStarting;
 		// The app was stopped while a hosted service was still starting.
-		if (this.disposing != null) return undefined;
+		if (this.disposing != null) {
+			return undefined;
+		}
 		return this.listen(options);
 	}
 
@@ -134,7 +136,9 @@ export class App {
 	private async listen(options?: StartOptions): Promise<AppServerStartResponse | undefined> {
 		const hasHostedServices = this.hostedServices != null && !this.hostedServices.isEmpty;
 		if (!this.server) {
-			if (hasHostedServices) this.stopOnSignals(options);
+			if (hasHostedServices) {
+				this.stopOnSignals(options);
+			}
 			return undefined;
 		}
 		const port = await this.getPort(options);
@@ -153,7 +157,9 @@ export class App {
 		retry: StartRetry | false,
 	): Promise<readonly HostedServiceStartTiming[]> {
 		const host = this.hostedServices;
-		if (host == null || host.isEmpty) return [];
+		if (host == null || host.isEmpty) {
+			return [];
+		}
 		const begun = performance.now();
 		await host.start(this.container, retry);
 		const timings = host.timings;
@@ -192,7 +198,9 @@ export class App {
 	public [Symbol.asyncDispose]() {
 		// The container holds this App too; when stop() disposes the container it lands
 		// here, and awaiting our own shutdown would deadlock.
-		if (this.disposingContainer) return Promise.resolve();
+		if (this.disposingContainer) {
+			return Promise.resolve();
+		}
 		return this.dispose();
 	}
 
@@ -224,7 +232,9 @@ export class App {
 	private stopOnSignals(options?: StartOptions) {
 		const signals = options?.shutdownSignals ?? DEFAULT_SHUTDOWN_SIGNALS;
 		const timeoutMs = options?.shutdownTimeoutMs ?? DEFAULT_SHUTDOWN_TIMEOUT_MS;
-		if (signals === false || signals.length === 0) return;
+		if (signals === false || signals.length === 0) {
+			return;
+		}
 		this.signalHandler = (signal) => {
 			this.logger.info(`Received ${signal}; finishing in-flight requests`);
 			// console.error, not the logger: scribe may be the thing that's stuck.
@@ -243,12 +253,18 @@ export class App {
 			);
 		};
 		this.shutdownSignals = signals;
-		for (const signal of signals) process.on(signal, this.signalHandler);
+		for (const signal of signals) {
+			process.on(signal, this.signalHandler);
+		}
 	}
 
 	private removeSignalHandlers() {
-		if (!this.signalHandler) return;
-		for (const signal of this.shutdownSignals) process.off(signal, this.signalHandler);
+		if (!this.signalHandler) {
+			return;
+		}
+		for (const signal of this.shutdownSignals) {
+			process.off(signal, this.signalHandler);
+		}
 	}
 
 	private async getPort(options?: StartOptions) {

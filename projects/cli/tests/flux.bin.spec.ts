@@ -87,7 +87,9 @@ describe("flux run (real process)", () => {
 		);
 		await new Promise<void>((resolve) => {
 			child.stdout?.on("data", (chunk: Buffer) => {
-				if (chunk.toString().includes("running")) resolve();
+				if (chunk.toString().includes("running")) {
+					resolve();
+				}
 			});
 		});
 		const exited = new Promise<{ code: number | null; signal: string | null }>((resolve) =>

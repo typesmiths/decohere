@@ -52,7 +52,9 @@ class Factory {
 
 	private async getPackageJson(rootDir: string) {
 		const packageJsonPath = path.join(rootDir, PACKAGE_JSON);
-		if (!(await io.fileExists(packageJsonPath))) return;
+		if (!(await io.fileExists(packageJsonPath))) {
+			return;
+		}
 		const data = await io.readJsonFile<Partial<PackageJson>>(packageJsonPath);
 		return new PackageJson(data);
 	}

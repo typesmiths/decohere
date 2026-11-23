@@ -108,7 +108,9 @@ export class SourceModuleLoader {
 	}
 
 	public registerHooks(): void {
-		if (this.hooksRegistered) return;
+		if (this.hooksRegistered) {
+			return;
+		}
 		this.hooksRegistered = true;
 		// Compiled code carries inline source maps; Node only applies them to stack traces when
 		// this is on. Without it, errors point at compiled line numbers.
@@ -119,7 +121,9 @@ export class SourceModuleLoader {
 				context: ResolveHookContext,
 				next: (specifier: string, context?: Partial<ResolveHookContext>) => ResolveFnOutput,
 			) => {
-				if (this.disposed) return next(specifier, context);
+				if (this.disposed) {
+					return next(specifier, context);
+				}
 				const parentUrl = context.parentURL ?? "";
 				const rewritten =
 					rewriteServeSpecifier({
@@ -139,7 +143,9 @@ export class SourceModuleLoader {
 				context: LoadHookContext,
 				next: (url: string, context?: Partial<LoadHookContext>) => LoadFnOutput,
 			): LoadFnOutput => {
-				if (this.disposed) return next(url, context);
+				if (this.disposed) {
+					return next(url, context);
+				}
 				const result = this.loadTs(url);
 				if (result != null) {
 					return { format: result.format, source: result.source, shortCircuit: true };
@@ -180,7 +186,9 @@ export class SourceModuleLoader {
 	 */
 	private sourceInfo(fullPath: string): FileInfo | null {
 		const fileInfo = this.fileInfoMap.get(fullPath);
-		if (fileInfo != null) return fileInfo;
+		if (fileInfo != null) {
+			return fileInfo;
+		}
 		const outsidePackages =
 			sourceExtensions.isSource(fullPath) &&
 			!fullPath.split(/[/\\]/).includes("node_modules") &&
@@ -218,12 +226,18 @@ export class SourceModuleLoader {
 				? [entryPath]
 				: [...reached].filter((fullPath) => !this.transpileCache.has(fullPath));
 		const seen = new Set(reached);
-		for (const start of starts) seen.delete(start);
+		for (const start of starts) {
+			seen.delete(start);
+		}
 		const visit = async (fullPath: string): Promise<void> => {
-			if (seen.has(fullPath)) return;
+			if (seen.has(fullPath)) {
+				return;
+			}
 			seen.add(fullPath);
 			const code = await this.compiledAhead(fullPath);
-			if (code == null) return;
+			if (code == null) {
+				return;
+			}
 			const parentUrl = pathToFileURL(fullPath).toString();
 			await Promise.all(
 				staticImports.scan(code).map((specifier) => {
@@ -239,23 +253,33 @@ export class SourceModuleLoader {
 	/** The file's compiled code, from the cache or compiled now; undefined if it isn't a source. */
 	private compiledAhead(fullPath: string): Promise<string | undefined> {
 		const fileInfo = this.sourceInfo(fullPath);
-		if (fileInfo == null) return Promise.resolve(undefined);
+		if (fileInfo == null) {
+			return Promise.resolve(undefined);
+		}
 		const cached = this.transpileCache.get(fullPath);
-		if (cached != null) return Promise.resolve(cached);
+		if (cached != null) {
+			return Promise.resolve(cached);
+		}
 		const inFlight = this.compilingAhead.get(fullPath);
-		if (inFlight != null) return inFlight;
+		if (inFlight != null) {
+			return inFlight;
+		}
 
 		const version = this.transpileVersions.get(fullPath);
 		const cache = this.transpileCache;
 		const compiling = this.compileAsync(fullPath, fileInfo.project)
 			.then((code) => {
-				if (code == null) return undefined;
+				if (code == null) {
+					return undefined;
+				}
 				// Saved, reconfigured or disposed while compiling: don't cache stale code.
 				const current =
 					!this.disposed &&
 					cache === this.transpileCache &&
 					version === this.transpileVersions.get(fullPath);
-				if (current) cache.set(fullPath, code);
+				if (current) {
+					cache.set(fullPath, code);
+				}
 				return code;
 			})
 			.finally(() => this.compilingAhead.delete(fullPath));
@@ -277,17 +301,23 @@ export class SourceModuleLoader {
 	}
 
 	private loadTs(url: string): { source: string; format: "module" | "commonjs" } | null {
-		if (!url.startsWith("file:")) return null;
+		if (!url.startsWith("file:")) {
+			return null;
+		}
 
 		// fileURLToPath, not URL.pathname: decodes %20 and gives Windows paths, so files
 		// whose path has a space still match the workspace's package list.
 		const cleanPath = fileURLToPath(url);
 		const fileInfo = this.sourceInfo(cleanPath);
-		if (fileInfo == null) return null;
+		if (fileInfo == null) {
+			return null;
+		}
 
 		const format = sourceExtensions.isCommonJs(cleanPath) ? "commonjs" : "module";
 		const cached = this.transpileCache.get(cleanPath);
-		if (cached != null) return { source: cached, format };
+		if (cached != null) {
+			return { source: cached, format };
+		}
 
 		const code = this.compileSync(cleanPath, fileInfo.project);
 		this.transpileCache.set(cleanPath, code);
@@ -310,7 +340,9 @@ export class SourceModuleLoader {
 		}
 		const key = this.diskCache?.keyFor(fullPath, source, baseConfig);
 		const hit = key == null ? undefined : this.diskCache?.readSync(key);
-		if (hit != null) return hit;
+		if (hit != null) {
+			return hit;
+		}
 
 		const response = this.transpiler.transformCodeSync(
 			source,
@@ -322,7 +354,9 @@ export class SourceModuleLoader {
 			this.logger.error(`Failed to transpile ${fullPath}`, response);
 			throw new Error(`Failed to transpile ${fullPath}`);
 		}
-		if (key != null) this.diskCache?.writeSync(key, response.code);
+		if (key != null) {
+			this.diskCache?.writeSync(key, response.code);
+		}
 		return response.code;
 	}
 
@@ -348,7 +382,9 @@ export class SourceModuleLoader {
 		}
 		const key = this.diskCache?.keyFor(fullPath, source, baseConfig);
 		const hit = key == null ? undefined : this.diskCache?.readSync(key);
-		if (hit != null) return hit;
+		if (hit != null) {
+			return hit;
+		}
 
 		const response = await this.transpiler.transformCode(
 			source,
@@ -356,8 +392,12 @@ export class SourceModuleLoader {
 			BuildTargets.es6,
 			baseConfig,
 		);
-		if (response.outcome !== "success") return undefined;
-		if (key != null) await this.diskCache?.write(key, response.code);
+		if (response.outcome !== "success") {
+			return undefined;
+		}
+		if (key != null) {
+			await this.diskCache?.write(key, response.code);
+		}
 		return response.code;
 	}
 
@@ -369,11 +409,15 @@ export class SourceModuleLoader {
 	 */
 	private swcConfigFor(project: Project | undefined, fullPath: string): SwcOptions {
 		const config = this.esModuleConfigFor(project);
-		if (!sourceExtensions.isCommonJs(fullPath)) return config;
+		if (!sourceExtensions.isCommonJs(fullPath)) {
+			return config;
+		}
 		// `.cts` is CommonJS: Node loads it with `require` semantics, so SWC emits CommonJS.
 		// Kept per project, like the ES module options, so the disk cache hashes them once.
 		const cached = this.commonJsConfigs.get(project);
-		if (cached != null) return cached;
+		if (cached != null) {
+			return cached;
+		}
 		const commonJs: SwcOptions = { ...config, module: { type: "commonjs" } };
 		this.commonJsConfigs.set(project, commonJs);
 		return commonJs;
@@ -382,7 +426,9 @@ export class SourceModuleLoader {
 	/** Forge's defaults when there is no project: decorators and their metadata on. */
 	private esModuleConfigFor(project: Project | undefined): SwcOptions {
 		const cached = this.swcConfigs.get(project);
-		if (cached != null) return cached;
+		if (cached != null) {
+			return cached;
+		}
 		const base = this.transpiler.createBaseConfig(BuildTargets.es6, {
 			tsConfig: project?.getTsConfigSync(),
 			userConfig: project?.getSwcConfigSync(),

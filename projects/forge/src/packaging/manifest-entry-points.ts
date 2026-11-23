@@ -15,8 +15,12 @@ type ReleaseManifest = {
 
 /** Every file an `exports` value names. `null` means a subpath is blocked, so it names none. */
 function exportsTargets(target: ExportsTarget | undefined): string[] {
-	if (target == null) return [];
-	if (typeof target === "string") return [target];
+	if (target == null) {
+		return [];
+	}
+	if (typeof target === "string") {
+		return [target];
+	}
 	return Object.values(target).flatMap(exportsTargets);
 }
 
@@ -25,7 +29,9 @@ function patternHasMatch(outDir: string, pattern: string): boolean {
 	const relative = path.normalize(pattern);
 	const [before, after] = relative.split("*") as [string, string];
 	const folder = path.join(outDir, path.dirname(`${before}x`));
-	if (!existsSync(folder)) return false;
+	if (!existsSync(folder)) {
+		return false;
+	}
 	const prefix = path.basename(`${before}x`).slice(0, -1);
 	return readdirSync(folder, { recursive: true, encoding: "utf8" }).some(
 		(file) => file.startsWith(prefix) && file.endsWith(after),
@@ -42,7 +48,9 @@ export function missingEntryPoints(outDir: string): {
 } {
 	const manifestPath = path.join(outDir, "package.json");
 	// npm reports a build that isn't there at all.
-	if (!existsSync(manifestPath)) return { name: undefined, missing: [] };
+	if (!existsSync(manifestPath)) {
+		return { name: undefined, missing: [] };
+	}
 
 	const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as ReleaseManifest;
 	const bin =

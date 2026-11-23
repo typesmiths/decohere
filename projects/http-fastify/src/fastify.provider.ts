@@ -123,7 +123,9 @@ export class FastifyProvider implements HttpProvider {
 	 */
 	private closeConnectionsWhileStopping() {
 		this.provider.addHook("onSend", async (_request, reply, payload) => {
-			if (this.closing) reply.header("connection", "close");
+			if (this.closing) {
+				reply.header("connection", "close");
+			}
 			return payload;
 		});
 	}
@@ -157,8 +159,12 @@ export class FastifyProvider implements HttpProvider {
 			...DEFAULT_HTTP_RATE_LIMIT,
 			...rateLimitOptions,
 			allowList: (request: FastifyRequest, key: string) => {
-				if (staticRoutes.has(request.routeOptions.url ?? "")) return true;
-				if (typeof userAllowList === "function") return userAllowList(request, key);
+				if (staticRoutes.has(request.routeOptions.url ?? "")) {
+					return true;
+				}
+				if (typeof userAllowList === "function") {
+					return userAllowList(request, key);
+				}
 				return Array.isArray(userAllowList) && userAllowList.includes(key);
 			},
 		});
@@ -408,7 +414,9 @@ export class FastifyProvider implements HttpProvider {
 		const controller = new AbortController();
 		httpRequest.signal = controller.signal;
 		if (isStream) {
-			if (this.closing) controller.abort(new Error("The app is stopping"));
+			if (this.closing) {
+				controller.abort(new Error("The app is stopping"));
+			}
 			this.openStreams.add(controller);
 		}
 		reply.raw.once("close", () => {
@@ -443,7 +451,9 @@ export class FastifyProvider implements HttpProvider {
 		})();
 		// Never pulled if the client left first, in which case nothing else would release the scope.
 		reply.raw.once("close", () => {
-			if (!started) release();
+			if (!started) {
+				release();
+			}
 		});
 		return (
 			reply

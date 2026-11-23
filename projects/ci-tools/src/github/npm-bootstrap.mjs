@@ -94,7 +94,9 @@ async function isOnBranch(name, root) {
 	const git = (/** @type {string[]} */ args) =>
 		spawnSync("git", args, { cwd: root, encoding: "utf8" });
 	const fetched = git(["fetch", "--quiet", "origin"]);
-	if (fetched.status !== 0) throw new Error(`git fetch origin failed: ${fetched.stderr}`);
+	if (fetched.status !== 0) {
+		throw new Error(`git fetch origin failed: ${fetched.stderr}`);
+	}
 	const refs = git(["for-each-ref", "--format=%(refname)", "refs/remotes/origin"])
 		.stdout.split("\n")
 		.filter((ref) => ref !== "" && !ref.endsWith("/HEAD"));
@@ -158,8 +160,12 @@ function registry({ token, otp, fetch }) {
 		/** @param {string} name */
 		async exists(name) {
 			const response = await fetch(`${REGISTRY}/${encoded(name)}`, { headers });
-			if (response.status === 404) return false;
-			if (!response.ok) throw new Error(`reading ${name}: ${response.status}`);
+			if (response.status === 404) {
+				return false;
+			}
+			if (!response.ok) {
+				throw new Error(`reading ${name}: ${response.status}`);
+			}
 			return true;
 		},
 		/** @param {string} name @returns {Promise<TrustEntry[]>} */
@@ -206,7 +212,9 @@ function runNpm(args, { capture = false, otp } = {}) {
  */
 function readLoginToken(npm) {
 	const userconfig = npm(["config", "get", "userconfig"], { capture: true }).output.trim();
-	if (userconfig.length === 0) return undefined;
+	if (userconfig.length === 0) {
+		return undefined;
+	}
 	const npmrc = readFileSync(userconfig, "utf8");
 	return /^\/\/registry\.npmjs\.org\/:_authToken=(.+)$/m.exec(npmrc)?.[1]?.trim();
 }
@@ -375,7 +383,9 @@ export async function runBootstrap(options = {}) {
 		}
 	}
 
-	if (dryRun) return 0;
+	if (dryRun) {
+		return 0;
+	}
 	log(
 		"\nDone: these packages can be published and promoted from CI. If Publish already failed on one, " +
 			"rerun it: `gh run rerun --failed <run-id>`. Otherwise add the PR to the merge queue.",

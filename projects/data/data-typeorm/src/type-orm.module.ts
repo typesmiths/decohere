@@ -90,7 +90,9 @@ export class TypeOrmModule {
 					connection: connectionInfo,
 					migrations,
 					connect: async () => {
-						if (!dataSource.isInitialized) await dataSource.initialize();
+						if (!dataSource.isInitialized) {
+							await dataSource.initialize();
+						}
 					},
 					synchronize: () => dataSource.synchronize(),
 					seed: async () => module.seed?.(dataSource),
@@ -155,7 +157,9 @@ function migrationTarget(
 	logger: Logger,
 	open: () => Promise<void>,
 ): MigrationTarget | undefined {
-	if (module.database == null) return undefined;
+	if (module.database == null) {
+		return undefined;
+	}
 	return {
 		dataSource: connection.name,
 		source: { connection, migrations: module.migrations ?? [], applicationName },
@@ -204,7 +208,9 @@ function createTypeOrmReadinessCheck(
 	return {
 		name: `typeorm:${String(name)}`,
 		async check() {
-			if (!dataSource.isInitialized) throw new Error("not connected yet");
+			if (!dataSource.isInitialized) {
+				throw new Error("not connected yet");
+			}
 			await dataSource.query("SELECT 1");
 		},
 	};

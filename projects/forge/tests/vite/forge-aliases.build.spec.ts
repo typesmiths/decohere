@@ -91,8 +91,9 @@ export const styles = theme;
 		);
 		// The workspace's paths, as `forge paths` writes them (Vite reads the site's tsconfig too).
 		const paths = run(ws, [join(repo, "projects/cli/src/forge.ts"), "paths"]);
-		if (paths.status !== 0)
+		if (paths.status !== 0) {
 			throw new Error(`forge paths failed: ${paths.stderr}${paths.stdout}`);
+		}
 	});
 
 	afterAll(() => {

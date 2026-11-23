@@ -89,7 +89,9 @@ async function history(session: Session): Promise<Map<string, Date>> {
 		"select to_regclass($1) as found",
 		[session.table],
 	);
-	if (exists.rows[0]?.found == null) return new Map();
+	if (exists.rows[0]?.found == null) {
+		return new Map();
+	}
 	const rows = await session.client.query<{ id: string; applied_at: Date }>(
 		`select id, applied_at from ${session.table}`,
 	);
@@ -99,7 +101,9 @@ async function history(session: Session): Promise<Map<string, Date>> {
 function inOrder(migrations: readonly Migration[]): Migration[] {
 	const seen = new Set<string>();
 	for (const { id } of migrations) {
-		if (seen.has(id)) throw new DataConfigurationError(`Two migrations have the id ${id}`);
+		if (seen.has(id)) {
+			throw new DataConfigurationError(`Two migrations have the id ${id}`);
+		}
 		seen.add(id);
 	}
 	return [...migrations].sort((a, b) => a.id.localeCompare(b.id));
@@ -114,7 +118,9 @@ function context(session: Session, container: MigrateOptions["container"]): Migr
 		async batch(select, size, each) {
 			for (;;) {
 				const rows = await sql(select, [size]);
-				if (rows.length === 0) return;
+				if (rows.length === 0) {
+					return;
+				}
 				await each(rows as never);
 			}
 		},
@@ -136,7 +142,9 @@ async function transaction(session: Session, id: string, work: () => Promise<voi
 
 /** The migrations up to and including `to` (all of them without it), refusing an id none has. */
 function selectUpTo(migrations: Migration[], to: string | undefined): Migration[] {
-	if (to == null) return migrations;
+	if (to == null) {
+		return migrations;
+	}
 	if (!migrations.some((m) => m.id === to)) {
 		throw new DataConfigurationError(`No migration has the id ${to}`);
 	}
@@ -150,7 +158,9 @@ async function migrate(source: MigrationSource, options: MigrateOptions): Promis
 		if (options.dryRun) {
 			const applied = await history(session);
 			const pending = migrations.filter((m) => !applied.has(m.id));
-			for (const m of pending) options.log?.(`would apply ${m.id}`);
+			for (const m of pending) {
+				options.log?.(`would apply ${m.id}`);
+			}
 			return pending.map((m) => m.id);
 		}
 		return locked(session, async () => {
@@ -158,7 +168,9 @@ async function migrate(source: MigrationSource, options: MigrateOptions): Promis
 			const applied = await history(session);
 			const done: string[] = [];
 			for (const m of migrations) {
-				if (applied.has(m.id)) continue;
+				if (applied.has(m.id)) {
+					continue;
+				}
 				const started = performance.now();
 				await transaction(session, m.id, async () => {
 					await m.up(context(session, options.container));
@@ -179,13 +191,17 @@ async function baseline(source: MigrationSource, options: BaselineOptions): Prom
 		if (options.dryRun) {
 			const applied = await history(session);
 			const unrecorded = migrations.filter((m) => !applied.has(m.id));
-			for (const m of unrecorded) options.log?.(`would record ${m.id}`);
+			for (const m of unrecorded) {
+				options.log?.(`would record ${m.id}`);
+			}
 			return unrecorded.map((m) => m.id);
 		}
 		return locked(session, async () => {
 			const applied = await history(session);
 			const unrecorded = migrations.filter((m) => !applied.has(m.id)).map((m) => m.id);
-			if (unrecorded.length === 0) return [];
+			if (unrecorded.length === 0) {
+				return [];
+			}
 			// One transaction: the history has every one of them, or none.
 			await transaction(session, options.to, async () => {
 				await session.client.query(
@@ -193,7 +209,9 @@ async function baseline(source: MigrationSource, options: BaselineOptions): Prom
 					[unrecorded],
 				);
 			});
-			for (const id of unrecorded) options.log?.(`recorded ${id}`);
+			for (const id of unrecorded) {
+				options.log?.(`recorded ${id}`);
+			}
 			return unrecorded;
 		});
 	});
@@ -210,7 +228,9 @@ async function revert(
 				`select id from ${session.table} order by applied_at desc, id desc limit 1`,
 			);
 			const id = last.rows[0]?.id;
-			if (id == null) return undefined;
+			if (id == null) {
+				return undefined;
+			}
 			const migration = migrations.find((m) => m.id === id);
 			if (migration == null) {
 				throw new MigrationError(
@@ -219,7 +239,9 @@ async function revert(
 				);
 			}
 			const { down } = migration;
-			if (down == null) throw new MigrationError(id, "has no down, so it can't be reverted");
+			if (down == null) {
+				throw new MigrationError(id, "has no down, so it can't be reverted");
+			}
 			await transaction(session, id, async () => {
 				await down(context(session, options.container));
 				await session.client.query(`delete from ${session.table} where id = $1`, [id]);
@@ -242,7 +264,9 @@ async function status(source: MigrationSource): Promise<MigrationState[]> {
 				: { id: m.id, state: "applied", appliedAt };
 		});
 		for (const [id, appliedAt] of applied) {
-			if (!known.has(id)) states.push({ id, state: "unknown", appliedAt });
+			if (!known.has(id)) {
+				states.push({ id, state: "unknown", appliedAt });
+			}
 		}
 		return states.sort((a, b) => a.id.localeCompare(b.id));
 	});

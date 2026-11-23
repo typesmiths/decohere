@@ -22,18 +22,26 @@ function isSource(file: string): boolean {
  * itself when it is already a source, else the same stem with each matching source extension.
  */
 function candidates(file: string): string[] {
-	if (isSource(file)) return [file];
+	if (isSource(file)) {
+		return [file];
+	}
 	const ext = path.extname(file);
 	const known = SOURCES_FOR[ext];
-	if (known == null) return [`${file}.ts`, `${file}.tsx`];
+	if (known == null) {
+		return [`${file}.ts`, `${file}.tsx`];
+	}
 	const stem = ext === "" ? file : file.slice(0, -ext.length);
 	return known.map((sourceExt) => `${stem}${sourceExt}`);
 }
 
 /** The extension a source builds to: `.mts` to `.mjs`, `.cts` to `.cjs`, the rest to `.js`. */
 function outputExtension(file: string): string {
-	if (file.endsWith(".mts")) return ".mjs";
-	if (file.endsWith(".cts")) return ".cjs";
+	if (file.endsWith(".mts")) {
+		return ".mjs";
+	}
+	if (file.endsWith(".cts")) {
+		return ".cjs";
+	}
 	return ".js";
 }
 

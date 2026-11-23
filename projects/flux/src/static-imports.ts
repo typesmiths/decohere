@@ -14,7 +14,9 @@ function scan(code: string): string[] {
 	for (const pattern of [STATIC, DYNAMIC]) {
 		for (const match of code.matchAll(pattern)) {
 			const specifier = match[1];
-			if (specifier != null) found.add(specifier);
+			if (specifier != null) {
+				found.add(specifier);
+			}
 		}
 	}
 	return [...found];

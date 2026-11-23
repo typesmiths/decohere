@@ -8,10 +8,18 @@
  * @returns {string}
  */
 export function getColor(percentage) {
-	if (percentage >= 90) return "#2ea043";
-	if (percentage >= 80) return "#3fb950";
-	if (percentage >= 70) return "#9a6700";
-	if (percentage >= 60) return "#db6d28";
+	if (percentage >= 90) {
+		return "#2ea043";
+	}
+	if (percentage >= 80) {
+		return "#3fb950";
+	}
+	if (percentage >= 70) {
+		return "#9a6700";
+	}
+	if (percentage >= 60) {
+		return "#db6d28";
+	}
 	return "#cf222e";
 }
 
@@ -43,10 +51,18 @@ export function createBadgeSvg(label, value, color) {
  * @returns {string}
  */
 export function statusToColor(status, conclusion) {
-	if (status === "in_progress" || status === "queued") return "#fb8500";
-	if (conclusion === "success") return "#2ea043";
-	if (conclusion === "failure") return "#cf222e";
-	if (conclusion === "cancelled") return "#6e7781";
+	if (status === "in_progress" || status === "queued") {
+		return "#fb8500";
+	}
+	if (conclusion === "success") {
+		return "#2ea043";
+	}
+	if (conclusion === "failure") {
+		return "#cf222e";
+	}
+	if (conclusion === "cancelled") {
+		return "#6e7781";
+	}
 	return "#6e7781";
 }
 
@@ -57,10 +73,20 @@ export function statusToColor(status, conclusion) {
  * @returns {string}
  */
 export function statusToText(status, conclusion) {
-	if (status === "in_progress") return "running";
-	if (status === "queued") return "queued";
-	if (conclusion === "success") return "passing";
-	if (conclusion === "failure") return "failing";
-	if (conclusion === "cancelled") return "cancelled";
+	if (status === "in_progress") {
+		return "running";
+	}
+	if (status === "queued") {
+		return "queued";
+	}
+	if (conclusion === "success") {
+		return "passing";
+	}
+	if (conclusion === "failure") {
+		return "failing";
+	}
+	if (conclusion === "cancelled") {
+		return "cancelled";
+	}
 	return "unknown";
 }

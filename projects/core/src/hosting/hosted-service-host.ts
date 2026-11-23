@@ -121,7 +121,9 @@ export class HostedServiceHost {
 			checks.push({ name, check: () => Promise.reject(new Error(reason)) });
 		}
 		for (const service of this.started) {
-			if (typeof service.check !== "function") continue;
+			if (typeof service.check !== "function") {
+				continue;
+			}
 			checks.push({
 				name: service.constructor.name,
 				check: () => service.check?.() ?? Promise.resolve(),
@@ -148,7 +150,9 @@ export class HostedServiceHost {
 	) {
 		const { signal } = this.controller;
 		for (let index = stepIndex; index < this.steps.length; index++) {
-			if (signal.aborted) return;
+			if (signal.aborted) {
+				return;
+			}
 			const step = this.steps[index];
 			const begun = performance.now();
 			try {
@@ -168,7 +172,9 @@ export class HostedServiceHost {
 			this.record(step.name, begun, true);
 		}
 		for (const type of this.types) {
-			if (signal.aborted) return;
+			if (signal.aborted) {
+				return;
+			}
 			const begun = performance.now();
 			const service = container.resolve(type);
 			try {
@@ -193,7 +199,9 @@ export class HostedServiceHost {
 	private record(name: string, begun: number, started: boolean) {
 		const ms = Math.round(performance.now() - begun);
 		this._timings.push({ name, ms, started });
-		if (started) this.logger.debug(`${name} started in ${ms} ms`);
+		if (started) {
+			this.logger.debug(`${name} started in ${ms} ms`);
+		}
 	}
 
 	/** Stop what started, then throw the start's error (with the stop's, if that failed too). */
@@ -256,7 +264,9 @@ export class HostedServiceHost {
 		};
 
 		const schedule = () => {
-			if (signal.aborted) return;
+			if (signal.aborted) {
+				return;
+			}
 			const cancel = () => clearTimeout(timer);
 			const timer = setTimeout(
 				() => {
@@ -281,7 +291,9 @@ export class HostedServiceHost {
 		this.failing.clear();
 		await Promise.allSettled([this.starting]);
 		// A retry that finishes now may resume a start, which adds more work: wait until none is left.
-		while (this.background.size > 0) await Promise.allSettled(this.background);
+		while (this.background.size > 0) {
+			await Promise.allSettled(this.background);
+		}
 		await this.stopStarted();
 	}
 
@@ -296,7 +308,9 @@ export class HostedServiceHost {
 				failures.push(error);
 			}
 		}
-		if (failures.length === 1) throw failures[0];
+		if (failures.length === 1) {
+			throw failures[0];
+		}
 		if (failures.length > 1) {
 			throw new AggregateError(failures, `${failures.length} hosted services failed to stop`);
 		}

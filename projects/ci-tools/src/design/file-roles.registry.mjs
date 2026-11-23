@@ -25,7 +25,9 @@ export class FileRoles {
 		this.roles = new Set();
 		for (const line of readFileSync(path, "utf8").split("\n")) {
 			const cell = ROW.exec(line)?.[1] ?? "";
-			for (const [, role] of cell.matchAll(ROLE)) this.roles.add(role);
+			for (const [, role] of cell.matchAll(ROLE)) {
+				this.roles.add(role);
+			}
 		}
 		if (this.roles.size === 0) {
 			throw new Error(

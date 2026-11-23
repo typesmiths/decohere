@@ -38,7 +38,9 @@ function fakeMigrator(states: MigrationState[] = []): Migrator {
 
 function appWith(...targets: MigrationTarget[]) {
 	const builder = new ServiceContainerBuilder();
-	for (const target of targets) builder.registerSingleton(MigrationTargetToken, target);
+	for (const target of targets) {
+		builder.registerSingleton(MigrationTargetToken, target);
+	}
 	return { services: builder.build() };
 }
 

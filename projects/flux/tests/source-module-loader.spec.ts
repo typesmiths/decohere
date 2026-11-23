@@ -29,7 +29,9 @@ beforeAll(() => {
 			JSON.stringify({ name: `@t/${name}`, type: "module", main: "src/index.ts" }),
 		);
 	}
-	for (const file of files) write(file, `export const value = ${JSON.stringify(file)};\n`);
+	for (const file of files) {
+		write(file, `export const value = ${JSON.stringify(file)};\n`);
+	}
 });
 
 afterAll(() => {

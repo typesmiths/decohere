@@ -14,16 +14,24 @@ const LOCKFILES: Array<[string, () => PackageManager]> = [
 
 function fromLockfile(cwd: string): PackageManager | undefined {
 	for (const [file, factory] of LOCKFILES) {
-		if (existsSync(join(cwd, file))) return factory();
+		if (existsSync(join(cwd, file))) {
+			return factory();
+		}
 	}
 	return undefined;
 }
 
 function fromUserAgent(): PackageManager | undefined {
 	const agent = process.env.npm_config_user_agent ?? "";
-	if (agent.startsWith("pnpm")) return new Pnpm();
-	if (agent.startsWith("yarn")) return new Yarn();
-	if (agent.startsWith("npm")) return new Npm();
+	if (agent.startsWith("pnpm")) {
+		return new Pnpm();
+	}
+	if (agent.startsWith("yarn")) {
+		return new Yarn();
+	}
+	if (agent.startsWith("npm")) {
+		return new Npm();
+	}
 	return undefined;
 }
 
@@ -32,8 +40,12 @@ export function detectPackageManager(cwd: string): PackageManager | undefined {
 }
 
 export function packageManagerFromString(name: string): PackageManager {
-	if (name === "yarn") return new Yarn();
-	if (name === "npm") return new Npm();
+	if (name === "yarn") {
+		return new Yarn();
+	}
+	if (name === "npm") {
+		return new Npm();
+	}
 	return new Pnpm();
 }
 

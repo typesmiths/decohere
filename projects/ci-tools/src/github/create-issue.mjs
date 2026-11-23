@@ -19,7 +19,9 @@ function parseArgs(argv) {
 			continue;
 		}
 		const next = args[index + 1];
-		if (next == null) throw new Error(`Missing value for ${arg}`);
+		if (next == null) {
+			throw new Error(`Missing value for ${arg}`);
+		}
 		switch (arg) {
 			case "--repo":
 				flags.repo = next;
@@ -46,16 +48,23 @@ function parseArgs(argv) {
 		}
 	}
 
-	if (!flags.title) throw new Error("Missing required argument: --title");
-	if (!flags.bodyFile) throw new Error("Missing required argument: --body-file");
-	if (!existsSync(flags.bodyFile)) throw new Error(`Body file not found: ${flags.bodyFile}`);
+	if (!flags.title) {
+		throw new Error("Missing required argument: --title");
+	}
+	if (!flags.bodyFile) {
+		throw new Error("Missing required argument: --body-file");
+	}
+	if (!existsSync(flags.bodyFile)) {
+		throw new Error(`Body file not found: ${flags.bodyFile}`);
+	}
 	return flags;
 }
 
 function runGh(args) {
 	const result = spawnSync("gh", args, { encoding: "utf8", env: process.env });
-	if (result.status !== 0)
+	if (result.status !== 0) {
 		throw new Error(result.stderr || result.stdout || `gh command failed: ${args.join(" ")}`);
+	}
 	return result.stdout;
 }
 
@@ -65,7 +74,9 @@ function runGhJson(args) {
 
 function splitRepo(repo) {
 	const [owner, name] = repo.split("/");
-	if (!owner || !name) throw new Error(`Invalid repo format: ${repo}. Expected owner/name`);
+	if (!owner || !name) {
+		throw new Error(`Invalid repo format: ${repo}. Expected owner/name`);
+	}
 	return { owner, name };
 }
 
@@ -101,7 +112,9 @@ function getRepositoryMetadata(repo, typeName) {
 		`name=${name}`,
 	]);
 	const repository = response?.data?.repository;
-	if (!repository?.id) throw new Error(`Repository not found: ${repo}`);
+	if (!repository?.id) {
+		throw new Error(`Repository not found: ${repo}`);
+	}
 	const typeMatch = repository.issueTypes?.nodes?.find((node) => node.name === typeName);
 	if (!typeMatch) {
 		const available = (repository.issueTypes?.nodes ?? []).map((node) => node.name).join(", ");
@@ -157,7 +170,9 @@ if (args.typeId) {
 		`name=${name}`,
 	]);
 	const repositoryId = response?.data?.repository?.id;
-	if (!repositoryId) throw new Error(`Repository not found: ${args.repo}`);
+	if (!repositoryId) {
+		throw new Error(`Repository not found: ${args.repo}`);
+	}
 	metadata = { repositoryId, issueTypeId: args.typeId };
 } else {
 	metadata = getRepositoryMetadata(args.repo, args.type);
@@ -169,5 +184,7 @@ const createdIssue = createIssue(
 	args.title,
 	body,
 );
-if (!createdIssue) throw new Error("Issue creation failed: API response missing issue data");
+if (!createdIssue) {
+	throw new Error("Issue creation failed: API response missing issue data");
+}
 console.log(`Created issue: #${createdIssue.number} ${createdIssue.url}`);

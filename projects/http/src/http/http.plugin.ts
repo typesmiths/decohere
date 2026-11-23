@@ -145,12 +145,24 @@ export function configureHttp(settings: HttpSettings): BuilderPlugin {
 				...settings.controllers,
 			]);
 		}
-		if (settings.globalPrefix !== undefined) options.globalPrefix = settings.globalPrefix;
-		if (settings.cors !== undefined) options.cors = settings.cors;
-		if (settings.helmet !== undefined) options.helmet = settings.helmet;
-		if (settings.rateLimit !== undefined) options.rateLimit = settings.rateLimit;
-		if (settings.compression !== undefined) options.compression = settings.compression;
-		if (settings.bodyLimit !== undefined) options.bodyLimit = settings.bodyLimit;
+		if (settings.globalPrefix !== undefined) {
+			options.globalPrefix = settings.globalPrefix;
+		}
+		if (settings.cors !== undefined) {
+			options.cors = settings.cors;
+		}
+		if (settings.helmet !== undefined) {
+			options.helmet = settings.helmet;
+		}
+		if (settings.rateLimit !== undefined) {
+			options.rateLimit = settings.rateLimit;
+		}
+		if (settings.compression !== undefined) {
+			options.compression = settings.compression;
+		}
+		if (settings.bodyLimit !== undefined) {
+			options.bodyLimit = settings.bodyLimit;
+		}
 		if (settings.middleware) {
 			options.middlewareTypes = [...options.middlewareTypes, ...settings.middleware];
 		}

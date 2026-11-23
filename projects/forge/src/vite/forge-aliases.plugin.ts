@@ -74,14 +74,22 @@ export function createAliasResolver(
 	let aliases: Promise<ReturnType<Workspace["getPackageAliases"]>> | undefined;
 	const registry = new Set(fromRegistry);
 	return async (source, importer) => {
-		if (importer == null || /[\\/]node_modules[\\/]/.test(importer)) return null;
+		if (importer == null || /[\\/]node_modules[\\/]/.test(importer)) {
+			return null;
+		}
 		const [specifier, query] = splitQuery(source);
-		if (!packageAliases.isBareSpecifier(specifier)) return null;
-		if (registry.has(packageNameOf(specifier))) return null;
+		if (!packageAliases.isBareSpecifier(specifier)) {
+			return null;
+		}
+		if (registry.has(packageNameOf(specifier))) {
+			return null;
+		}
 		aliases ??= workspace().then((w) => w.getPackageAliases("debug"));
 		const { paths, baseUrl } = await aliases;
 		const file = packageAliases.resolvePath(specifier, paths, baseUrl);
-		if (file == null || !existsSync(file)) return null;
+		if (file == null || !existsSync(file)) {
+			return null;
+		}
 		return file + query;
 	};
 }
@@ -92,7 +100,9 @@ export function createAliasResolver(
  */
 export function findWorkspaceRoot(from: string): string {
 	for (let dir = from; ; dir = path.dirname(dir)) {
-		if (existsSync(path.join(dir, WORKSPACE_CONFIG))) return dir;
+		if (existsSync(path.join(dir, WORKSPACE_CONFIG))) {
+			return dir;
+		}
 		const projects = path.join(dir, "projects");
 		if (
 			existsSync(path.join(dir, "package.json")) &&
@@ -101,7 +111,9 @@ export function findWorkspaceRoot(from: string): string {
 		) {
 			return dir;
 		}
-		if (path.dirname(dir) === dir) break;
+		if (path.dirname(dir) === dir) {
+			break;
+		}
 	}
 	throw new Error(
 		`forgeAliases: no Decohere workspace above ${from}. Expected a folder with ${WORKSPACE_CONFIG}, or one whose projects/ folder holds this project. Pass workspaceRoot to name it.`,

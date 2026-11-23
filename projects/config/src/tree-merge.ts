@@ -72,11 +72,17 @@ export function assertSafeKeys(value: unknown, source: string, path = ""): void 
  * fails. Without this, type coercion would turn it into 0, false or "".
  */
 export function withoutNulls<T>(value: T): T {
-	if (Array.isArray(value)) return value.map(withoutNulls) as T;
-	if (!isTree(value)) return value;
+	if (Array.isArray(value)) {
+		return value.map(withoutNulls) as T;
+	}
+	if (!isTree(value)) {
+		return value;
+	}
 	const kept: Tree = {};
 	for (const [key, item] of Object.entries(value)) {
-		if (item !== null) kept[key] = withoutNulls(item);
+		if (item !== null) {
+			kept[key] = withoutNulls(item);
+		}
 	}
 	return kept as T;
 }
