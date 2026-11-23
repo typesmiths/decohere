@@ -1,11 +1,18 @@
-// Opens each provider on the contract suite's schema, with the SQL it sends captured.
+// Opens each provider on the contract suite's schema, with the SQL it sends captured. TypeORM is
+// opened the way an app opens it, through `typeOrm()`.
 import "reflect-metadata";
-import { type IUnitOfWork, TrackingUnitOfWork } from "@decohere/data";
+import {
+	ConfigurationServiceToken,
+	type IConfigurationService,
+} from "@decohere/core/configuration";
+import { Builder } from "@decohere/core/hosting";
+import type { Constructable } from "@decohere/core/reflection";
+import { ServiceContainerBuilder } from "@decohere/crucible";
+import { DatabaseConfig, DEFAULT_DATA_SOURCE, type IUnitOfWork } from "@decohere/data";
 import { MikroOrmUnitOfWork } from "@decohere/data-mikro-orm";
-import { TypeOrmRowStore } from "@decohere/data-typeorm";
+import { typeOrm } from "@decohere/data-typeorm";
 import { MikroORM } from "@mikro-orm/postgresql";
 import pg from "pg";
-import { DataSource } from "typeorm";
 import { mikroOrmEntities } from "./mikro-orm.mapping.js";
 import { defineModel, type Model } from "./model.js";
 import { reads } from "./sql-shape.js";
@@ -65,21 +72,48 @@ export async function openMikroOrm(c: Connection): Promise<SqlProvider> {
 	};
 }
 
+/** Config with one data source, as an app's config file would give it. */
+function databaseConfig(c: Connection): IConfigurationService {
+	return {
+		dataSources: [],
+		async get<T extends object>(type: Constructable<T> | string): Promise<T> {
+			const config = new DatabaseConfig();
+			if (type === DatabaseConfig) {
+				config.dataSources = [
+					{
+						name: "contract",
+						provider: "postgres",
+						host: c.host,
+						port: c.port,
+						database: c.database,
+						username: c.user,
+						password: c.password,
+						synchronize: false,
+						seed: false,
+						bootstrap: false,
+					},
+				];
+			}
+			return config as unknown as T;
+		},
+	};
+}
+
+/** TypeORM as an app uses it: `typeOrm()` given the model's `EntitySchema` mapping. */
 export async function openTypeOrm(c: Connection): Promise<SqlProvider> {
 	const model = defineModel();
-	const dataSource = await new DataSource({
-		type: "postgres",
-		...c,
-		username: c.user,
-		entities: typeOrmEntities(model),
-	}).initialize();
+	const app = await Builder.create(new ServiceContainerBuilder())
+		.withServices((s) => s.registerSingleton(ConfigurationServiceToken, databaseConfig(c)))
+		.use(typeOrm({ entities: typeOrmEntities(model), outbox: model.toOutbox }))
+		.build();
+	await app.start({ port: 0, shutdownSignals: false, startRetry: false });
 	return {
 		name: "TypeORM",
 		model,
-		begin: () =>
-			new TrackingUnitOfWork(new TypeOrmRowStore(dataSource), { outbox: model.toOutbox }),
+		// One request per unit of work, as an app has.
+		begin: () => app.services.beginScope().resolve<IUnitOfWork>(DEFAULT_DATA_SOURCE),
 		take,
 		reads: countReads,
-		close: () => dataSource.destroy(),
+		close: () => app[Symbol.asyncDispose](),
 	};
 }
