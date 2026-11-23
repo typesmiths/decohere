@@ -4,7 +4,10 @@ import {
 	domainEvents,
 	type EntityClass,
 	type EntityKey,
+	type FieldKeys,
+	type FindByIdArgument,
 	type Include,
+	isIncludeList,
 	type IUnitOfWork,
 	OptimisticLockError,
 	type OutboxMapper,
@@ -22,6 +25,9 @@ import {
 	ReferenceKind,
 } from "@mikro-orm/core";
 import type { EntityManager } from "@mikro-orm/postgresql";
+
+/** A populate hint: a child collection to include, or a lazy field to load. MikroORM takes both as property paths. */
+type Path<T> = Include<T> | FieldKeys<T>;
 
 export type MikroOrmUnitOfWorkOptions = {
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
@@ -66,13 +72,18 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 	public findById<T extends object>(
 		type: EntityClass<T>,
 		key: EntityKey<T>,
-		include: readonly Include<T>[] = [],
+		options: FindByIdArgument<T> = {},
 	): Promise<T | null> {
 		this.assertUsable();
+		const { include = [], load = [] } = isIncludeList(options)
+			? { include: options }
+			: options;
 		const where = (
 			key !== null && typeof key === "object" ? toFilter(key as Where<T>) : key
 		) as FilterQuery<T>;
-		return this.em.findOne(entityName(type), where, { populate: include } as FindOptions<T>);
+		// MikroORM populates a lazy field as it does a collection.
+		const populate: readonly Path<T>[] = [...include, ...load];
+		return this.em.findOne(entityName(type), where, { populate } as FindOptions<T>);
 	}
 
 	public async find<T extends object>(
@@ -81,10 +92,11 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 	): Promise<T[]> {
 		this.assertUsable();
 		if (query.lock && !this.em.isInTransaction()) await this.em.begin();
+		const populate: readonly Path<T>[] = [...(query.include ?? []), ...(query.load ?? [])];
 		const options = {
 			orderBy: query.orderBy,
 			limit: query.limit,
-			populate: query.include ?? [],
+			populate,
 			...(query.lock ? { lockMode: LockMode.PESSIMISTIC_WRITE } : {}),
 		} as FindOptions<T>;
 		return this.em.find(

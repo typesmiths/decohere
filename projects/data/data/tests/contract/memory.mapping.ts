@@ -11,6 +11,7 @@ export function memoryEntities({
 	Member,
 	Tag,
 	Receipt,
+	Algo,
 	OutboxMessage,
 }: Model) {
 	return [
@@ -46,6 +47,7 @@ export function memoryEntities({
 		}),
 		mapEntity(Tag, { fields: ["label"], generated: "id" }),
 		mapEntity(Receipt, { fields: ["amount", "memo"] }),
+		mapEntity(Algo, { fields: ["name", "document"], lazy: ["document"], version: "version" }),
 		mapEntity(OutboxMessage, { fields: ["type", "payload"] }),
 	];
 }

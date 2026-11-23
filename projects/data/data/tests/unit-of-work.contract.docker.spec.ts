@@ -35,7 +35,7 @@ describe("unit of work contract", () => {
 		await pg?.stop();
 	});
 
-	for (const { name, seed, run, check } of [...cases, ...sqlCases]) {
+	for (const { name, seed, run, check, checkSql } of [...cases, ...sqlCases]) {
 		it(name, async () => {
 			const sent: Record<string, string[]> = {};
 			for (const p of providers) {
@@ -45,7 +45,9 @@ describe("unit of work contract", () => {
 				if (seed) await seed(p);
 				p.take();
 				await run(p);
-				sent[p.name] = shapes(p.take());
+				const statements = p.take();
+				checkSql?.(statements);
+				sent[p.name] = shapes(statements);
 				await check?.(p);
 			}
 			expect(sent.MikroORM).toMatchSnapshot();

@@ -37,6 +37,7 @@ There's no ORM to read a mapping from, so each class is mapped with `mapEntity(t
 | `children` | `{ prop, target, parentRef, orderBy? }`: a `Children<T>` collection, the rows of `target` whose `parentRef` references this one. |
 | `version` | A number checked and incremented on every update. |
 | `generated` | A key field numbered 1, 2, 3… when an insert leaves it empty, like a serial column. |
+| `lazy` | Fields loaded only when a query names them in `load`, like TypeORM's `select: false` ([data](../data/README.md#fields-loaded-only-on-request)). Each is one of `fields`, and not the key or the version. |
 
 The mapping is checked when the app is built, so a reference to a class that isn't mapped fails then.
 

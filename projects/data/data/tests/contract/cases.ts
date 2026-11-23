@@ -38,11 +38,28 @@ export type Case<P extends OpenProvider = OpenProvider> = {
 	run: (p: P) => Promise<void>;
 	/** Checks the outcome in a fresh unit of work; its SQL isn't compared. */
 	check?: (p: P) => Promise<void>;
+	/** On the SQL providers: checks the statements `run` sent. */
+	checkSql?: (statements: string[]) => void;
 };
 
 const R1 = "00000000-0000-4000-a000-0000000000f1";
 const R2 = "00000000-0000-4000-a000-0000000000f2";
 const R3 = "00000000-0000-4000-a000-0000000000f3";
+const ALPHA = "00000000-0000-4000-a000-0000000000a1";
+/** About 4 KB of JSON: the field a listing shouldn't load. */
+const DOCUMENT = {
+	steps: Array.from({ length: 100 }, (_, i) => ({ step: i, weight: i / 100 })),
+};
+
+/** Two algos, alpha with a large document and beta with an empty one. */
+async function seedAlgos(p: OpenProvider) {
+	await using uow = p.begin();
+	const alpha = new p.model.Algo("alpha", DOCUMENT);
+	alpha.id = ALPHA;
+	uow.add(alpha);
+	uow.add(new p.model.Algo("beta", { steps: [] }));
+	await uow.commit();
+}
 
 /** The cases every provider runs, memory included. */
 export const cases: Case[] = [
@@ -460,6 +477,66 @@ export const cases: Case[] = [
 			expect(order.note).toBe("added");
 			expect(skus(order)).toEqual(["apple"]);
 			expect(await uow.find(p.model.Tag)).toHaveLength(1);
+		},
+	},
+	{
+		name: "a field loaded on request is left out of a listing",
+		seed: seedAlgos,
+		async run(p) {
+			await using uow = p.begin();
+			const algos = await uow.find(p.model.Algo, { orderBy: { name: "asc" } });
+			expect(algos.map((a) => a.name)).toEqual(["alpha", "beta"]);
+			expect(algos.map((a) => a.document)).toEqual([undefined, undefined]);
+		},
+		checkSql(statements) {
+			const reads = statements.filter((s) => /"algo"/.test(s));
+			expect(reads).toHaveLength(1);
+			expect(reads[0]).not.toMatch(/document/);
+		},
+	},
+	{
+		name: "a field loaded on request is kept when an aggregate loaded with it, or without it, changes",
+		seed: seedAlgos,
+		async run(p) {
+			{
+				await using uow = p.begin();
+				const algo = await uow.findById(p.model.Algo, ALPHA, { load: ["document"] });
+				expect(algo.document).toEqual(DOCUMENT);
+				algo.name = "alpha 2";
+				await uow.commit();
+			}
+			await using uow = p.begin();
+			const algo = await uow.findById(p.model.Algo, ALPHA);
+			expect(algo.document).toBeUndefined();
+			algo.name = "alpha 3";
+			await uow.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			const algo = await uow.findById(p.model.Algo, ALPHA, { load: ["document"] });
+			expect(algo).toMatchObject({ name: "alpha 3", version: 3, document: DOCUMENT });
+		},
+	},
+	{
+		name: "asking for a field the loaded instance lacks loads it into that instance, by findById or find",
+		seed: seedAlgos,
+		async run(p) {
+			await using uow = p.begin();
+			const [alpha, beta] = await uow.find(p.model.Algo, { orderBy: { name: "asc" } });
+			expect(await uow.findById(p.model.Algo, ALPHA, { load: ["document"] })).toBe(alpha);
+			expect(alpha.document).toEqual(DOCUMENT);
+			const again = await uow.find(p.model.Algo, {
+				orderBy: { name: "asc" },
+				load: ["document"],
+			});
+			expect(again).toEqual([alpha, beta]);
+			expect(again[1]).toBe(beta);
+			expect(beta.document).toEqual({ steps: [] });
+			// Loaded now: answered from the identity map.
+			p.reads();
+			expect(await uow.findById(p.model.Algo, ALPHA, { load: ["document"] })).toBe(alpha);
+			expect(p.reads()).toBe(0);
+			await uow.commit();
 		},
 	},
 ];

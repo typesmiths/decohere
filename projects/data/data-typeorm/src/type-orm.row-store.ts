@@ -84,7 +84,10 @@ export class TypeOrmRowStore implements RowStore {
 
 	public async select(type: EntityClass, query: RowQuery): Promise<Row[]> {
 		const { model, meta, columns } = this.map(type);
-		const props = [...model.fields, ...model.references.map((r) => r.prop)];
+		const fields = model.fields.filter(
+			(field) => !model.lazy?.includes(field) || query.load?.includes(field),
+		);
+		const props = [...fields, ...model.references.map((r) => r.prop)];
 		const qb = this.runner.manager.createQueryBuilder().from(meta.target, "e");
 		qb.select(
 			props.map((prop) => `${this.column("e", columns.get(prop))} AS ${this.escape(prop)}`),
@@ -221,6 +224,7 @@ export class TypeOrmRowStore implements RowStore {
 			column.relationMetadata?.propertyName ??
 			references.find((r) => columns.get(r.prop)?.databaseName === column.databaseName)?.prop;
 		const fields: string[] = [];
+		const lazy: string[] = [];
 		for (const column of meta.columns) {
 			if (column.embeddedMetadata) {
 				throw new DataConfigurationError(
@@ -229,6 +233,8 @@ export class TypeOrmRowStore implements RowStore {
 			}
 			if (referenceFor(column) || column.isVirtual) continue;
 			fields.push(column.propertyName);
+			// `select: false`: loaded only when a query asks for it.
+			if (!column.isSelect) lazy.push(column.propertyName);
 			columns.set(column.propertyName, column);
 		}
 		const model: EntityModel = {
@@ -250,6 +256,7 @@ export class TypeOrmRowStore implements RowStore {
 				};
 			}),
 			version: meta.versionColumn?.propertyName,
+			lazy,
 		};
 		const mapped = { model, meta, columns, targetKeys };
 		this.mapped.set(type, mapped);

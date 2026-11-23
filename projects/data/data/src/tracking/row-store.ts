@@ -31,6 +31,8 @@ export type EntityModel = {
 	children: ChildrenModel[];
 	/** The field checked and incremented on every update. */
 	version?: string;
+	/** Fields, among {@link fields}, a select leaves out unless its query names them in `load`. */
+	lazy?: string[];
 };
 
 /** A query on rows: fields and references compared with key values. */
@@ -39,6 +41,8 @@ export type RowQuery = {
 	orderBy?: Record<string, "asc" | "desc">;
 	limit?: number;
 	lock?: "update";
+	/** Fields loaded only on request to select too. A row leaves out the others. */
+	load?: readonly string[];
 };
 
 /**

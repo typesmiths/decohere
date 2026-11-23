@@ -1,4 +1,4 @@
-import type { EntityClass, EntityKey, Include, Query } from "./query.types.js";
+import type { EntityClass, EntityKey, FindByIdArgument, Query } from "./query.types.js";
 
 /**
  * One request's view of the database. What every provider promises:
@@ -13,10 +13,15 @@ import type { EntityClass, EntityKey, Include, Query } from "./query.types.js";
  * further use: start a new one.
  */
 export interface IUnitOfWork extends AsyncDisposable {
+	/**
+	 * The entity with this key: from the identity map when it holds it with everything asked for,
+	 * else from the database. `options` names child collections to `include` and fields loaded only on
+	 * request to `load`; an array is the collections alone.
+	 */
 	findById<T extends object>(
 		type: EntityClass<T>,
 		key: EntityKey<T>,
-		include?: readonly Include<T>[],
+		options?: FindByIdArgument<T>,
 	): Promise<T | null>;
 	find<T extends object>(type: EntityClass<T>, query?: Query<T>): Promise<T[]>;
 	findOne<T extends object>(type: EntityClass<T>, query?: Query<T>): Promise<T | null>;

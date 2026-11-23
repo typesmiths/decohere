@@ -1,4 +1,4 @@
-import type { EntityClass, EntityKey, Include, Query } from "./query.types.js";
+import type { EntityClass, EntityKey, FindByIdArgument, Query } from "./query.types.js";
 import type { IUnitOfWork } from "./unit-of-work.js";
 
 /** A repository for one aggregate, over the request's unit of work. Subclasses add the queries the domain needs. */
@@ -8,8 +8,8 @@ export abstract class Repository<T extends object> {
 		protected readonly type: EntityClass<T>,
 	) {}
 
-	public findById(key: EntityKey<T>, include?: readonly Include<T>[]): Promise<T | null> {
-		return this.unitOfWork.findById(this.type, key, include);
+	public findById(key: EntityKey<T>, options?: FindByIdArgument<T>): Promise<T | null> {
+		return this.unitOfWork.findById(this.type, key, options);
 	}
 
 	public find(query?: Query<T>): Promise<T[]> {

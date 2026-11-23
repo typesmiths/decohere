@@ -39,6 +39,7 @@ Mapping rules for the tracker:
 - **References** are many-to-one (or owning one-to-one) with a single join column.
 - **Embedded columns** aren't supported.
 - A **version column** (`version: true`) is checked and incremented on every update.
+- A column with **`select: false`** is loaded only when a query asks for it with `load` ([data](../data/README.md#fields-loaded-only-on-request)).
 
 `addIfAbsent(entity)` ([data](../data/README.md#add-unless-its-already-kept)) is the row store's `insertIfAbsent`: TypeORM's insert builder with `orIgnore()`, returning the key and generated columns, in the unit of work's transaction. No row back means the key was kept.
 

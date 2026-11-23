@@ -51,11 +51,27 @@ await uow.find(Order, {
 	orderBy: { placedAt: "desc" },
 	limit: 50,
 	include: ["lines", "lines.parts"], // child collections, nested up to three deep
+	load: ["terms"], // fields loaded only on request
 	lock: "update", // SELECT … FOR UPDATE, in a transaction it opens
 });
 ```
 
 Operators: a bare value or `null` (equal), `in`, `ne`, `gt`, `gte`, `lt`, `lte`. A reference compares with an entity or its key. For what a query can't express (joins across aggregates, aggregates in SQL), a repository runs its own SQL in the unit of work's transaction.
+
+`findById` takes the same `include` and `load` as options, `findById(Order, id, { include: ["lines"], load: ["terms"] })`, or the child collections alone as an array, `findById(Order, id, ["lines"])`.
+
+### Fields loaded only on request
+
+A large field, such as a JSON document, can be mapped as loaded only on request: TypeORM's `select: false`, MikroORM's `.lazy()`, or `lazy` in a memory mapping. A query leaves its column out unless it names the field in `load`, and the entities it returns have the field `undefined`:
+
+```ts
+const all = await algos.find(); // SELECT without "document"; each algo.document is undefined
+const one = await algos.findById(id, { load: ["document"] });
+```
+
+- **Saving leaves an unloaded field alone.** An aggregate loaded without it can change, and the commit writes only what changed: the column keeps its value. Load the field before changing it.
+- **Asking for it later loads it into the same instance.** A `findById` whose instance is in the identity map without the field reads it from the database, and so does a `find` that names it in `load`. Once loaded, `findById` answers from the identity map again.
+- `load` takes the entity's fields, checked by the compiler. Naming one the mapping always loads does nothing more.
 
 ## A repository's own SQL
 
@@ -163,7 +179,7 @@ The canonical suite is the unit-of-work contract, the cases in `tests/contract/c
 
 ### Writing a provider
 
-A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and five row operations (`select`, `insert`, `insertIfAbsent`, `update`, `delete`) on plain rows.
+A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and five row operations (`select`, `insert`, `insertIfAbsent`, `update`, `delete`) on plain rows. A field in the model's `lazy` is selected only when the row query names it in `load`; a row leaves out the ones it didn't select.
 
 MikroORM's unit of work is the reference. The cases are in `tests/contract/cases.ts`. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both SQL providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome. `tests/unit-of-work.contract.spec.ts` runs the same cases on the memory provider, in `pnpm test`, checking outcomes only, since it sends no SQL. The cases in `sqlCases` run SQL of their own, through the provider's `transaction()`, so it runs on the SQL providers only.
 

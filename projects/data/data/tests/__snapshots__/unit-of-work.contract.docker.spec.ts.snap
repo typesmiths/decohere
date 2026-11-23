@@ -36,6 +36,19 @@ exports[`unit of work contract > a commit failing part-way rolls everything back
 ]
 `;
 
+exports[`unit of work contract > a field loaded on request is kept when an aggregate loaded with it, or without it, changes 1`] = `
+[
+  "begin",
+  "update algo (name, version) ×1",
+  "commit",
+  "begin",
+  "update algo (name, version) ×1",
+  "commit",
+]
+`;
+
+exports[`unit of work contract > a field loaded on request is left out of a listing 1`] = `[]`;
+
 exports[`unit of work contract > a key the database generates is set on the entity after commit 1`] = `
 [
   "begin",
@@ -106,6 +119,8 @@ exports[`unit of work contract > an entity added and not yet committed is found 
   "commit",
 ]
 `;
+
+exports[`unit of work contract > asking for a field the loaded instance lacks loads it into that instance, by findById or find 1`] = `[]`;
 
 exports[`unit of work contract > children two deep load, change and insert 1`] = `
 [

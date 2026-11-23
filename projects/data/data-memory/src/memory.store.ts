@@ -111,6 +111,7 @@ export class MemoryStore {
 			const model = this.model(type);
 			for (const prop of Object.keys(query.where ?? {})) this.assertProp(model, prop);
 			for (const prop of Object.keys(query.orderBy ?? {})) this.assertProp(model, prop);
+			for (const prop of query.load ?? []) this.assertProp(model, prop);
 			let found = this.query(tx, type, query);
 			if (query.lock === "update") {
 				// Lock what matched, then read again: a row another transaction changed while this one
@@ -122,7 +123,10 @@ export class MemoryStore {
 					found = this.query(tx, type, query);
 				}
 			}
-			const props = [...model.fields, ...model.references.map((r) => r.prop)];
+			const fields = model.fields.filter(
+				(field) => !model.lazy?.includes(field) || query.load?.includes(field),
+			);
+			const props = [...fields, ...model.references.map((r) => r.prop)];
 			return found.map(([, row]) =>
 				Object.fromEntries(props.map((prop) => [prop, copy(row[prop] ?? null)])),
 			);

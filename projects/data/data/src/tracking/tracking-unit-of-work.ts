@@ -5,11 +5,22 @@ import { ChildList } from "../children.js";
 import { comparison } from "../comparison.js";
 import { domainEvents, type OutboxMapper } from "../domain-event.js";
 import { DataError, OptimisticLockError } from "../error.js";
-import type { Comparison, EntityClass, EntityKey, Include, Query } from "../query.types.js";
+import {
+	type Comparison,
+	type EntityClass,
+	type EntityKey,
+	type FindByIdArgument,
+	isIncludeList,
+	type Query,
+} from "../query.types.js";
 import type { IUnitOfWork } from "../unit-of-work.js";
 import type { ChildrenModel, EntityModel, Row, RowQuery, RowStore } from "./row-store.js";
 
-type Snapshot = { values: Row; children: Map<string, object[]> };
+/**
+ * What a loaded entity held when loaded or last committed. `unloaded` names its fields loaded only on
+ * request that weren't: they're left out of `values` and never written unless assigned.
+ */
+type Snapshot = { values: Row; children: Map<string, object[]>; unloaded: Set<string> };
 
 type Plan = {
 	inserts: object[];
@@ -67,9 +78,12 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 	public async findById<T extends object>(
 		type: EntityClass<T>,
 		key: EntityKey<T>,
-		include: readonly Include<T>[] = [],
+		options: FindByIdArgument<T> = {},
 	): Promise<T | null> {
 		this.assertUsable();
+		const { include = [], load = [] } = isIncludeList(options)
+			? { include: options }
+			: options;
 		const model = this.store.model(type);
 		const where = this.keyWhere(model, key);
 		const wanted = this.keyOf(model, where);
@@ -79,8 +93,12 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		if (added) return added as T;
 		const hit = this.identity.get(type)?.get(wanted);
 		const snapshot = hit && this.snapshots.get(hit);
-		if (snapshot && include.every((path) => this.isLoaded(type, [hit], path))) return hit as T;
-		return this.findOne(type, { where, include } as Query<T>);
+		const loaded =
+			snapshot &&
+			load.every((field) => !snapshot.unloaded.has(field)) &&
+			include.every((path) => this.isLoaded(type, [hit], path));
+		if (loaded) return hit as T;
+		return this.findOne(type, { where, include, load } as Query<T>);
 	}
 
 	public async findOne<T extends object>(type: EntityClass<T>, query: Query<T> = {}) {
@@ -100,6 +118,7 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 			orderBy: query.orderBy,
 			limit: query.limit,
 			lock: query.lock,
+			load: query.load,
 		});
 		const roots = rows.map((row) => this.hydrate(model, row)) as T[];
 		for (const path of query.include ?? []) await this.loadPath(type, roots, path);
@@ -136,7 +155,11 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		this.instances(type).set(this.keyOf(model, entity), entity);
 		const children = new Map<string, object[]>();
 		for (const spec of model.children) if (entity[spec.prop]) children.set(spec.prop, []);
-		this.snapshots.set(entity, { values: this.values(model, entity), children });
+		this.snapshots.set(entity, {
+			values: this.values(model, entity),
+			children,
+			unloaded: new Set(),
+		});
 		return true;
 	}
 
@@ -201,13 +224,27 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 
 	// ── Loading ────────────────────────────────────────────────────────────
 
-	/** The instance for a row: the one already known for its key, or a new one. Known instances keep their changes. */
+	/**
+	 * The instance for a row: the one already known for its key, or a new one. Known instances keep
+	 * their changes, and take the fields loaded only on request they lacked, when the row has them.
+	 */
 	private hydrate(model: EntityModel, row: Row): object {
 		const key = this.keyOf(model, row);
 		const known = this.instances(model.type).get(key);
-		if (known && this.snapshots.has(known)) return known;
+		const snapshot = known && this.snapshots.get(known);
+		if (snapshot) {
+			for (const field of snapshot.unloaded) {
+				if (!(field in row)) continue;
+				// A value assigned while it was unloaded is an unsaved change, and stays.
+				if (known[field] === undefined) known[field] = row[field];
+				snapshot.values[field] = clone(row[field]);
+				snapshot.unloaded.delete(field);
+			}
+			return known;
+		}
 		const entity = known ?? Object.create(model.type.prototype);
 		for (const field of model.fields) entity[field] = row[field];
+		const unloaded = new Set((model.lazy ?? []).filter((field) => !(field in row)));
 		for (const ref of model.references) {
 			const value = row[ref.prop];
 			entity[ref.prop] = value == null ? null : this.reference(ref.target, value);
@@ -216,7 +253,11 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 			entity[spec.prop] = new UnloadedChildren(`${model.name}.${spec.prop}`);
 		}
 		this.instances(model.type).set(key, entity);
-		this.snapshots.set(entity, { values: this.values(model, entity), children: new Map() });
+		this.snapshots.set(entity, {
+			values: this.values(model, entity, unloaded),
+			children: new Map(),
+			unloaded,
+		});
 		return entity;
 	}
 
@@ -354,6 +395,7 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		for (const entity of this.managed()) {
 			if (deletes.has(entity)) continue;
 			const model = this.store.model(entity.constructor as EntityClass);
+			// A field never loaded is in neither: it is written only once something assigns it.
 			const before = this.snapshots.get(entity)?.values ?? {};
 			const now = this.values(model, entity);
 			const changes: Row = {};
@@ -507,7 +549,12 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 				if (list && !(list instanceof UnloadedChildren))
 					children.set(spec.prop, [...(list as Iterable<object>)]);
 			}
-			this.snapshots.set(entity, { values: this.values(model, entity), children });
+			const unloaded = this.stillUnloaded(entity, this.snapshots.get(entity));
+			this.snapshots.set(entity, {
+				values: this.values(model, entity, unloaded),
+				children,
+				unloaded,
+			});
 		}
 		this.added.clear();
 		this.removed.clear();
@@ -565,10 +612,19 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		return byKey;
 	}
 
-	/** Fields as stored, references as the referenced key. */
-	private values(model: EntityModel, entity: object): Row {
+	/** The fields a snapshot left unloaded that nothing has assigned since. */
+	private stillUnloaded(entity: object, snapshot: Snapshot | undefined): Set<string> {
+		return new Set(
+			[...(snapshot?.unloaded ?? [])].filter((field) => entity[field] === undefined),
+		);
+	}
+
+	/** Fields as stored, references as the referenced key. Fields in `unloaded` are left out. */
+	private values(model: EntityModel, entity: object, unloaded?: ReadonlySet<string>): Row {
 		const values: Row = {};
-		for (const field of model.fields) values[field] = clone(entity[field]);
+		for (const field of model.fields) {
+			if (!unloaded?.has(field)) values[field] = clone(entity[field]);
+		}
 		for (const ref of model.references) {
 			const target = entity[ref.prop];
 			values[ref.prop] =

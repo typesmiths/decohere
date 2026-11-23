@@ -36,7 +36,7 @@ If the database is down, that step is retried until it isn't, holding back the h
 
 The container closes the instance when the app stops, after hosted services. Postgres only. Outside a plugin, `new MikroOrmUnitOfWork(orm.em, { outbox })` gives the same unit of work.
 
-Map domain classes with `defineEntity({ class, … })` in infrastructure files, so the domain imports nothing from MikroORM. Map each child collection as a one-to-many with `orphanRemoval()`, so a child dropped from its aggregate is deleted.
+Map domain classes with `defineEntity({ class, … })` in infrastructure files, so the domain imports nothing from MikroORM. Map each child collection as a one-to-many with `orphanRemoval()`, so a child dropped from its aggregate is deleted. Map a field loaded only when asked for with `.lazy()`: `load` populates it, as `include` does a collection ([data](../data/README.md#fields-loaded-only-on-request)).
 
 Things to know:
 

@@ -99,6 +99,16 @@ export function defineModel() {
 		) {}
 	}
 
+	/** A large field, loaded only when asked for. */
+	class Algo {
+		public id = id();
+		public version!: number;
+		public constructor(
+			public name: string,
+			public document: Record<string, unknown>,
+		) {}
+	}
+
 	class OutboxMessage {
 		public id = randomUUID();
 		public constructor(
@@ -109,7 +119,19 @@ export function defineModel() {
 
 	const toOutbox = (event: DomainEvent) => new OutboxMessage(event.type, event.payload);
 
-	return { Order, Line, Part, Approval, Team, Member, Tag, Receipt, OutboxMessage, toOutbox };
+	return {
+		Order,
+		Line,
+		Part,
+		Approval,
+		Team,
+		Member,
+		Tag,
+		Receipt,
+		Algo,
+		OutboxMessage,
+		toOutbox,
+	};
 }
 
 export type Model = ReturnType<typeof defineModel>;
@@ -131,12 +153,14 @@ create table member (id uuid primary key, name text not null, team_id uuid not n
 alter table team add foreign key (lead_id) references member (id);
 create table tag (id serial primary key, label text not null);
 create table receipt (id uuid primary key, amount int not null, memo text);
+create table algo (id uuid primary key, name text not null, document jsonb not null, version int not null default 1);
 create table outbox (id uuid primary key, type text not null, payload jsonb not null);
 `;
 
 export const TABLES = [
 	"outbox",
 	"receipt",
+	"algo",
 	"tag",
 	"part",
 	"line",

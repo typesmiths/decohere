@@ -13,6 +13,7 @@ export function typeOrmEntities({
 	Member,
 	Tag,
 	Receipt,
+	Algo,
 	OutboxMessage,
 }: Model) {
 	return [
@@ -149,6 +150,18 @@ export function typeOrmEntities({
 				id: { type: "uuid", primary: true },
 				amount: { type: "int" },
 				memo: { type: "text", nullable: true },
+			},
+		}),
+		new EntitySchema<InstanceType<Model["Algo"]>>({
+			name: "Algo",
+			target: Algo,
+			tableName: "algo",
+			schema,
+			columns: {
+				id: { type: "uuid", primary: true },
+				name: { type: "text" },
+				document: { type: "jsonb", select: false },
+				version: { type: "int", version: true },
 			},
 		}),
 		new EntitySchema<InstanceType<Model["OutboxMessage"]>>({
