@@ -6,7 +6,7 @@ The data contracts a Decohere app's repositories are written against, with no OR
 
 Each request gets one `IUnitOfWork`, injected with `@injectUnitOfWork()`. It promises the same on every provider:
 
-- **An identity map.** A row loaded twice in one unit of work is the same object. `findById` answers from it without asking the database.
+- **An identity map.** A row loaded twice in one unit of work is the same object. `findById` answers from it without asking the database, and finds an entity given to `add` and not yet committed, with its children as they are, so "find it, or add it" works within one unit of work. Queries (`find`, `findOne`) see only the database: an added entity is in their answers once committed. MikroORM behaves the same.
 - **Change tracking.** Change anything it loaded, then `commit()`: it writes only the fields that changed, with no save call. `add(entity)` inserts a new one and its children; `remove(entity)` deletes one and the children it loaded. It never loads more rows to delete them: declare `ON DELETE CASCADE` on a child's foreign key when its parent may be removed without loading it.
 - **One transaction.** A commit writes every change in one transaction, parents before children, children deleted before their parents. Rows that reference each other are inserted with the nullable reference empty, then updated.
 - **Version checks.** When the mapping has a version field, an update matches only the version it loaded, and a lost race throws `OptimisticLockError`.
