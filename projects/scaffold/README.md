@@ -1,6 +1,10 @@
 # @decohere/scaffold
 
-The `decohere create` and `decohere add` commands. Users run it through [`@decohere/create`](../create/README.md), whose README says what a new project gets; this page is how the scaffolder makes it.
+**For contributors.** Apps never import the scaffolder; they run it through [`@decohere/create`](../create/README.md).
+
+The scaffolder: it writes a new Decohere workspace from a recipe, and adds steps to an existing one. The commands as a user runs them (`create webapi`, `add api|postgres|auth0|users`, `auth0 login|configure|token`) and what a new project gets are in [create's README](../create/README.md). This README is for working on the scaffolder itself: how it makes that output.
+
+It runs two ways. The `decohere` product CLI in [`@decohere/cli`](../cli/README.md) loads its modules. Its own `decohere` bin (`src/cli.ts`, built on `src/program.ts`) is what the scaffolder image that `@decohere/create` starts runs.
 
 ## Output is checked-in files
 

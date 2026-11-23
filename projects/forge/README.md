@@ -4,7 +4,7 @@ Build system (SWC). `forge build --configuration debug` rewrites workspace impor
 
 [Flux](../flux/) (`flux run` / `flux serve`) uses this same compiler in-process — it does not have a second TypeScript pipeline.
 
-`forge build` transpiles without waiting for a whole-workspace typecheck. Run `forge typecheck` independently (including in the background) and require it before shipping. Why executable tests come before static contracts: [testing principles](../../docs/testing/#executable-behavior-before-type-contracts).
+`forge build` transpiles without waiting for a whole-workspace typecheck. Run `forge typecheck` independently (including in the background) and require it before shipping. Why executable tests come before static contracts: [testing principles](../../docs/contributing/testing/#executable-behavior-before-type-contracts).
 
 With no `tsconfig.json`, `forge typecheck` reads a project as plain `tsc` would, with decorators on because forge and flux compile them by default. A `tsconfig.json` at the workspace root chooses the options for every project without one of its own; forge then limits `lib` to ES2022 and turns off `@types` discovery unless it sets them (`types: ["node"]`), which keeps a backend workspace's check fast. A project with a `tsconfig.json` in its own folder (a site, a browser library) has made its own choices, so `forge typecheck` reads it as `tsc -p` would: what it leaves out means what it means to `tsc` (`lib` follows its `target`, DOM included), and the files its `include` and `files` list are checked beside the project's sources, such as a generated `types.d.ts` that declares the modules its code imports. A project on the workspace's tsconfig is checked on its own sources only, since that tsconfig's `include` was written for the whole repo. `forge build` compiles the project's sources either way.
 
@@ -156,7 +156,7 @@ projects/shop.api/.package/
 ```
 
 - **Which libraries.** Forge walks the compiled import graph from the deployable's `main`, following relative imports and bare imports that the workspace package resolves to a workspace project (including subpath `exports` such as `@app/kernel/testing`, and transitively through copied libraries). Only those libraries are copied. A library nothing reaches, and its dependencies, stay out.
-- **Which third-party packages.** What is **declared** ships: the union of `dependencies` (never `devDependencies`) of the deployable, every copied library and the workspace root `package.json`. They do not have to be imported, so a module loaded by name at run time (a pino transport `target: "pino-roll"`) ships as long as it is declared. Removing dependencies nothing uses is the author's job; a warning-only unused-dependency analysis is planned.
+- **Which third-party packages.** What is **declared** ships: the union of `dependencies` (never `devDependencies`) of the deployable, every copied library and the workspace root `package.json`. They do not have to be imported, so a module loaded by name at run time (a pino transport `target: "pino-roll"`) ships as long as it is declared. Removing dependencies nothing uses is the author's job.
 - **Versions.** Each shipped package is pinned to the exact version installed in the workspace (so the image runs what the tests ran). A declared package that is not installed fails the command.
 - **Patches.** The patches you made with `pnpm patch` ship too. npm doesn't know about them, so after the install forge applies each `patchedDependencies` entry, from the root `package.json` (`pnpm.patchedDependencies` or top-level) or `pnpm-workspace.yaml`, to every installed copy of its package, and logs `Patched @decohere/http@0.0.1-dev.123 (patches/@decohere__http@0.0.1-dev.123.patch)`. A key may be `name@1.2.3`, a range (`name@^1.2.0`) or the bare `name`; the most specific match wins, as in pnpm. The command fails, naming the patch, when a hunk doesn't apply, or when the key's version or range isn't what the deployable ships (it names both). It then removes `.package/`, so nothing half patched is left to ship. A patch for a package the deployable doesn't ship is skipped, with a log line.
 - **Imports that would crash.** If packaged code imports a third-party package that is only a `devDependency`, or declared nowhere, the command fails and names the package and who imports it.
@@ -191,9 +191,9 @@ export default {
 };
 ```
 
-`forge package @app/shop.api` then copies `projects/shop.web/dist/` to `projects/shop.api/.package/ui/` (real files, never links). The API calls `.statics("/ui/", "ui")` and the Dockerfile stays `COPY .package/ ./`. `forge package` doesn't build the UI itself: `forge build` does, [with the UI's own build script](#projects-with-a-builder-of-their-own), so `forge build && forge package @app/shop.api` is the whole release. If the folder is missing, packaging fails and tells you to build the UI first. `to` must be a new folder inside `.package/` (not `es6`, `node_modules` or `config`). See [ADR 0007](../../docs/adr/0007-serving-a-built-ui-from-http.md).
+`forge package @app/shop.api` then copies `projects/shop.web/dist/` to `projects/shop.api/.package/ui/` (real files, never links). The API sets `statics: [{ prefix: "/ui/", directory: "ui" }]` and the Dockerfile stays `COPY .package/ ./`. `forge package` doesn't build the UI itself: `forge build` does, [with the UI's own build script](#projects-with-a-builder-of-their-own), so `forge build && forge package @app/shop.api` is the whole release. If the folder is missing, packaging fails and tells you to build the UI first. `to` must be a new folder inside `.package/` (not `es6`, `node_modules` or `config`). See [ADR 0007](../../docs/contributing/adr/0007-serving-a-built-ui-from-http.md).
 
-Design record: [ADR 0006](../../docs/adr/0006-forge-package-deployables.md).
+Design record: [ADR 0006](../../docs/contributing/adr/0006-forge-package-deployables.md).
 
 ## `forge dependencies`: package manifests from imports
 
@@ -202,8 +202,21 @@ There is one install, from the root `package.json`, and it owns every version. `
 - **Peers** are declared by name in the package's own `peerDependencies`. Sync sets the root's range and keeps them out of the other two lists, even when no code imports them. Mark optional ones in `peerDependenciesMeta` by hand.
 - **Under the release configuration**, which scans only shipped code, importing a package the root lists only as a devDependency is an error unless the package declares it a peer.
 
-Design record: [ADR 0017](../../docs/adr/0017-dependency-manifests-from-imports.md).
+Design record: [ADR 0017](../../docs/contributing/adr/0017-dependency-manifests-from-imports.md).
 
 ## `forge link` clears `dist`
 
 `forge link` is a development tool: it symlinks build output into a consumer's `node_modules`. Like `forge build`, it cleans `dist` first. Without `--build` it then links an output folder holding only `package.json` files, so run it with `--build` (or build again afterwards). It is not a way to make a release build runnable; use `forge package` for that.
+
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
+
+Forge is a CLI module: the `decohere` and `forge` bins in [`@decohere/cli`](../cli/README.md) load `ForgeModule` (`forge.module.ts`). Folders in `src/`:
+
+- `commands/`: one command class per `forge` subcommand (build, package, docker, dependencies, link, publish, tag, version, typecheck, paths). `actions/`: the work each command does, one action per file.
+- `transpile/`, `factories/` and `services/`: SWC transpiling, the SWC config, watching and writing output.
+- `packaging/`: `forge package` (the import graph, pinned dependencies, pnpm patches, the UI copy). `semver/`: versions for `version` and `publish`.
+- `vite/` and `vitest/`: plugins that resolve workspace aliases and build before tests (`@decohere/forge/vite`, `@decohere/forge/vitest`). `types/`: config and build types.
+
+The canonical suite is the forge CLI's, `projects/cli/tests/forge.integration.spec.ts`, run in memory against memfs ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)). Specs here cover action edges the CLI can't see; they are in `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)). `e2e/package.e2e.spec.ts` runs `forge package` on the real disk.

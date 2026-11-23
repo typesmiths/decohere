@@ -39,3 +39,11 @@ Mapping rules for the tracker:
 - **References** are many-to-one (or owning one-to-one) with a single join column.
 - **Embedded columns** aren't supported.
 - A **version column** (`version: true`) is checked and incremented on every update.
+
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
+
+`data-typeorm` implements data's `RowStore` on TypeORM, under data's `TrackingUnitOfWork`. `src/` is flat: `typeorm.plugin.ts` (`typeOrm(...)`), `type-orm.module.ts` (`TypeOrmModule`, which opens the data sources), `data-source.factory.ts` and `database-options.ts`, `type-orm.row-store.ts` (`TypeOrmRowStore`), `inject-data-source.ts` (`@injectDataSource()`), and TypeORM's logging through Scribe (`typeorm-scribe.logger.ts`, `sql-pretty.transport.ts`).
+
+Its canonical suite is data's unit-of-work contract, `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, which checks it sends the same writes as MikroORM ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/type-orm.module.spec.ts` and `tests/typeorm.lifecycle.spec.ts` cover the wiring and lifecycle, and `tests/tracked-entity.docker.spec.ts` runs against Postgres. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).
