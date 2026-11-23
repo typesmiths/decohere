@@ -6,37 +6,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, join, relative } from "node:path";
 import ts from "typescript";
-
-/** The roles a file's name may end in, from ADR 0027. */
-export const ROLES = new Set([
-	"entity",
-	"value",
-	"service",
-	"strategy",
-	"factory",
-	"repository",
-	"port",
-	"adapter",
-	"provider",
-	"plugin",
-	"controller",
-	"handler",
-	"command",
-	"action",
-	"decorator",
-	"event",
-	"error",
-	"const",
-	"config",
-	"module",
-	"model",
-	"mapping",
-	"contract",
-	"registry",
-	"builder",
-	"host",
-	"cases",
-]);
+import { FileRoles } from "./file-roles.registry.mjs";
 
 /** The rules counted, and what each count means. */
 export const RULES = {
@@ -57,6 +27,8 @@ export class CodeDesign {
 	/** @param {string} root the workspace root */
 	constructor(root) {
 		this.root = root;
+		/** @private */
+		this.roles = new FileRoles(root);
 	}
 
 	/**
@@ -102,7 +74,8 @@ export class CodeDesign {
 		const base = basename(file).replace(/\.(ts|mts)$/, "");
 		if (BANNED.test(base)) add("bannedNames", rel);
 		const role = base.split(".");
-		if (base !== "index" && (role.length < 2 || !ROLES.has(role.at(-1)))) add("noRole", rel);
+		if (base !== "index" && (role.length < 2 || !this.roles.has(role.at(-1))))
+			add("noRole", rel);
 		const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
 		const isPluginFile = role.at(-1) === "plugin";
 		if (name !== "config" && !bins.has(relative(this.root, file))) {

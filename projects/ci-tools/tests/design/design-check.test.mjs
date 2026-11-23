@@ -1,8 +1,21 @@
 import { vol } from "memfs";
 import { afterEach, describe, expect, it } from "vitest";
 import { BASELINE, runDesignCheck } from "../../src/design/design-check.command.mjs";
+import { STANDARD_ROLES } from "../../src/design/file-roles.registry.mjs";
 
 const root = "/workspace";
+
+/** The file roles the installed @decohere/standards lists, in the table's own format. */
+const STANDARDS = [
+	"# Files and folders",
+	"",
+	"| Role | Holds | Example |",
+	"| --- | --- | --- |",
+	"| `.service.ts` | a class that does one job | `trading.service.ts` |",
+	"| `.value.ts` | a value with no identity | `money.value.ts` |",
+	"| `.plugin.ts`, `.state.ts` | a plugin factory; one state of a State pattern | `memory.plugin.ts` |",
+	"",
+].join("\n");
 
 /** A workspace with one package, `http`, holding these files under projects/http. */
 function seed(files, baseline) {
@@ -12,6 +25,7 @@ function seed(files, baseline) {
 			Object.entries(files).map(([path, text]) => [`${root}/projects/http/${path}`, text]),
 		),
 		...(baseline ? { [`${root}/${BASELINE}`]: JSON.stringify(baseline) } : {}),
+		[`${root}/${STANDARD_ROLES}`]: STANDARDS,
 	});
 }
 
@@ -118,5 +132,24 @@ describe("design:check", () => {
 
 		run(["--update"]);
 		expect(run().code).toBe(0);
+	});
+
+	it("takes the file roles from the installed standards, so a role they add needs no change here", () => {
+		seed({ ...CLEAN, "src/holding.state.ts": "export class HoldingState {}\n" });
+		expect(run()).toEqual({ code: 0, output: expect.stringContaining("design: 0 breaks") });
+	});
+
+	it("counts a role the installed standards don't list as a file with no role", () => {
+		seed({ ...CLEAN, "src/order.widget.ts": "export class OrderWidget {}\n" });
+		run(["--update"]);
+		expect(JSON.parse(vol.readFileSync(`${root}/${BASELINE}`, "utf8"))).toEqual({
+			http: { noRole: 1 },
+		});
+	});
+
+	it("stops when the standards aren't installed, rather than accept every name", () => {
+		seed(CLEAN);
+		vol.unlinkSync(`${root}/${STANDARD_ROLES}`);
+		expect(() => run()).toThrow("pnpm install");
 	});
 });
