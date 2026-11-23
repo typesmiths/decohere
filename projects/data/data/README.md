@@ -1,6 +1,6 @@
 # @decohere/data
 
-The data contracts a Decohere app's repositories are written against, with no ORM in them. A provider package puts an ORM under them: [`@decohere/data-mikro-orm`](../data-mikro-orm/README.md) or [`@decohere/data-typeorm`](../data-typeorm/README.md). For tests and local runs with no database, [`@decohere/data-memory`](../data-memory/README.md) holds the rows in the process. Why it's built this way: [ADR 0024](../../../docs/adr/0024-default-orm.md).
+The data contracts a Decohere app's repositories are written against, with no ORM in them. A provider package puts an ORM under them: [`@decohere/data-mikro-orm`](../data-mikro-orm/README.md) or [`@decohere/data-typeorm`](../data-typeorm/README.md). For tests and local runs with no database, [`@decohere/data-memory`](../data-memory/README.md) holds the rows in the process. Why it's built this way: [ADR 0024](../../../docs/contributing/adr/0024-default-orm.md).
 
 ## The unit of work
 
@@ -63,11 +63,11 @@ export class OrderRepository extends Repository<Order> {
 
 A provider is given the package for its database as `database`: `postgres` from [`@decohere/data-postgres`](../data-postgres/README.md), which supplies a bootstrap and a migrator.
 
-When the app is **built**, a provider runs `dataSources.check`: each data source's `auth`, `synchronize` and `migrateOnStart` for the environment ([ADR 0011](../../../docs/adr/0011-database-bootstrap.md)). A data source that asks to be set up (`bootstrap: true`, or an admin user in development) when the provider has no `database` stops the build with an error that says what to install. Building connects to nothing.
+When the app is **built**, a provider runs `dataSources.check`: each data source's `auth`, `synchronize` and `migrateOnStart` for the environment ([ADR 0011](../../../docs/contributing/adr/0011-database-bootstrap.md)). A data source that asks to be set up (`bootstrap: true`, or an admin user in development) when the provider has no `database` stops the build with an error that says what to install. Building connects to nothing.
 
 When the app **starts**, before hosted services and the server, the provider's start step runs `dataSources.open`: the bootstrap, which creates the database, roles and schema, then a connection per data source. Then each data source applies pending migrations if `migrateOnStart` is on, brings its tables to the mappings if `synchronize` is on, and then seeds if `seed` is on. An app that is only built, by a tool or a test, changes nothing in the database. `migrateOnStart` and `synchronize` are for development, and can't both be on.
 
-**A database that is down at start doesn't stop the app.** The start step is retried with backoff ([`startRetry`](../../http/README.md)), and the hosted services wait for it. Meanwhile `GET /ready` answers 503, and a request that resolves the data source's unit of work gets `DependencyUnavailableError`, a 503 problem. Once the database answers, the step bootstraps, connects and migrates, and the app serves. `startTestApp` and `startRetry: false` fail the start instead.
+**A database that is down at start doesn't stop the app.** The start step is retried with backoff ([`startRetry`](../../core/README.md#app)), and the hosted services wait for it. Meanwhile `GET /ready` answers 503, and a request that resolves the data source's unit of work gets `DependencyUnavailableError`, a 503 problem. Once the database answers, the step bootstraps, connects and migrates, and the app serves. `startTestApp` and `startRetry: false` fail the start instead.
 
 ## Migrations
 
@@ -115,9 +115,21 @@ try {
 | `new <name> [--data]` | Writes an empty migration; with `--data`, one that changes rows and fails until written |
 | `generate <name>` | Writes a schema migration from the provider's diff of the mappings against the tables |
 
-`generate` connects as the migrate role, which sees only its own schema, so the diff can't touch another app's tables. It refuses while migrations are pending, since the diff would repeat them. With several data sources, name one with `--data-source`. How to run them in development and in a deploy, and how to change a schema without downtime: [Migrations](../../../docs/recipes/migrations.md). An app on TypeORM's own migrations moves over with [Move from TypeORM's migrations](../../../docs/recipes/migrations.md#move-from-typeorms-migrations).
+`generate` connects as the migrate role, which sees only its own schema, so the diff can't touch another app's tables. It refuses while migrations are pending, since the diff would repeat them. With several data sources, name one with `--data-source`. How to run them in development and in a deploy, and how to change a schema without downtime: [Migrations](../../../docs/guide/recipes/migrations.md). An app on TypeORM's own migrations moves over with [Move from TypeORM's migrations](../../../docs/guide/recipes/migrations.md#move-from-typeorms-migrations).
 
-## For provider authors
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
+
+`data` is the base package: it holds the contracts (`IUnitOfWork`, `Repository<T>`, `RowStore`, `Migrator`, `MigrationTarget`, the `Query<T>` types) and installs no ORM. `data-mikro-orm`, `data-typeorm` and `data-memory` implement them, and `data-postgres` sets up the database. Folders in `src/`:
+
+- the top level: the unit of work contract and `@injectUnitOfWork()`, `Repository`, queries, children, domain events, the `database` config section, and `dataSources` (`check`, `open`, `resolve`, `start`, a namespace object today) with the policy each data source follows;
+- `tracking/`: `TrackingUnitOfWork` and the `RowStore` contract it writes through;
+- `migrations/`: migrations, the `Migrator` contract, migration files, `MigrationTarget`, and the db commands (`db.run`, a namespace object today, behind `DbCommandError`).
+
+The canonical suite is the unit-of-work contract, the cases in `tests/contract/cases.ts`: on the SQL providers in `tests/unit-of-work.contract.docker.spec.ts`, against Postgres, with MikroORM's writes snapshotted as the reference, and on the memory provider in `tests/unit-of-work.contract.spec.ts`. Units cover the query types (`tests/query.types.spec.ts`) and configuration checks (`tests/data-sources.spec.ts`) ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).
+
+### Writing a provider
 
 A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
 

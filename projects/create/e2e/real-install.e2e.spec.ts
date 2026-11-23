@@ -380,7 +380,7 @@ test -f projects/billing/package.json`),
 			{ skip: !containerRegistry },
 		);
 
-		// The steps in docs/getting-started.md.
+		// The steps in docs/guide/getting-started.md.
 		group("the CLI installed in an empty folder", () => {
 			it("works with npm", async () => {
 				const dir = join(root, "npm-steps");

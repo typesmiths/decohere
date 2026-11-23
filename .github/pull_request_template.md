@@ -17,6 +17,6 @@ Explain the reasoning, not just the list of edits. Plain words; explain any term
 
 ## Decisions
 
-<!-- Which ADR in docs/adr/ did this change or add? Write "none" if no decision changed. -->
+<!-- Which ADR in docs/contributing/adr/ did this change or add? Write "none" if no decision changed. -->
 
 Closes #

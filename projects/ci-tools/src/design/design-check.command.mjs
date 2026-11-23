@@ -57,7 +57,9 @@ export function runDesignCheck(options = {}) {
 		}
 	}
 
-	log(`design: ${total(counts)} breaks of ADR 0027 (docs/adr/0027-code-design.md).`);
+	log(
+		`design: ${total(counts)} breaks of ADR 0027 (docs/contributing/adr/0027-code-design.md).`,
+	);
 	if (rose.length > 0) {
 		log(rose.join("\n"));
 		log(

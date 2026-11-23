@@ -46,7 +46,7 @@ export function promoteLatest(options) {
 	}
 	log(`Promoting ${version} to latest on ${packages.length} packages`);
 
-	// Once a stable version is out, latest belongs to releases: see "Stable release" in docs/ci.
+	// Once a stable version is out, latest belongs to releases: see "Stable release" in docs/contributing/ci.
 	const current = distTag(LAUNCH_PACKAGE, "latest");
 	if (current != null && !current.includes("-") && version.includes("-")) {
 		log(`latest is the stable ${current}, and ${version} is a dev version. Nothing moved.`);
