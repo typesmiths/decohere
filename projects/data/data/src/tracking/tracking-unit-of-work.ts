@@ -68,7 +68,12 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 		this.assertUsable();
 		const model = this.store.model(type);
 		const where = this.keyWhere(model, key);
-		const hit = this.identity.get(type)?.get(this.keyOf(model, where));
+		const wanted = this.keyOf(model, where);
+		// Added and not yet committed: found by its key with no query, its children as they are, as
+		// with MikroORM. Queries still see only the database.
+		const added = this.addedWithKey(model, wanted);
+		if (added) return added as T;
+		const hit = this.identity.get(type)?.get(wanted);
 		const snapshot = hit && this.snapshots.get(hit);
 		if (snapshot && include.every((path) => this.isLoaded(type, [hit], path))) return hit as T;
 		return this.findOne(type, { where, include } as Query<T>);
@@ -481,6 +486,16 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 		return [...this.identity.values()].flatMap((byKey) =>
 			[...byKey.values()].filter((e) => this.snapshots.has(e)),
 		);
+	}
+
+	/** An entity given to {@link add}, not yet committed, of this class and with this key. */
+	private addedWithKey(model: EntityModel, key: string): object | undefined {
+		for (const entity of this.added) {
+			if (entity.constructor !== model.type) continue;
+			if (model.key.some((k) => entity[k] == null)) continue;
+			if (this.keyOf(model, entity) === key) return entity;
+		}
+		return undefined;
 	}
 
 	private isKnown(entity: object): boolean {
