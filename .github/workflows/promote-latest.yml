@@ -28,10 +28,10 @@ jobs:
       contents: read
       id-token: write
     steps:
+      # The script asks origin for the version's tag, so a shallow checkout is enough.
       - uses: actions/checkout@v4
         with:
           fetch-depth: 1
-          fetch-tags: true
 
       - uses: actions/setup-node@v4
         with:

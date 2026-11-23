@@ -7,10 +7,16 @@ const DAY_LATER = PUBLISHED + 25 * 60 * 60 * 1000;
 const PACKAGES = ["@decohere/cli", "@decohere/core"];
 
 type Registry = {
+	/** What `dev` points at now, as `npm dist-tag ls` shows it. */
 	dev?: string;
+	/** What `npm view` still serves for `dev`: it lags for a minute or more after a move. */
+	cachedDev?: string;
 	versions?: Record<string, string[]>;
 	latest?: Record<string, string>;
+	/** `v*` tags on origin. */
 	tags?: string[];
+	/** `v*` tags in the workflow's checkout, which is shallow: only the tip commit's. */
+	localTags?: string[];
 	failMoving?: string[];
 	moves?: string[];
 };
@@ -27,10 +33,21 @@ function fakeRun(registry: Registry) {
 	const moves: string[] = (registry.moves ??= []);
 	return (command: string, args: string[]) => {
 		const ok = (stdout = "") => ({ status: 0, stdout });
-		if (command === "git") return ok((registry.tags ?? [`v${VERSION}`]).join("\n"));
-		const [verb, sub, third] = args;
+		const [verb, sub, third, fourth] = args;
+		if (command === "git" && verb === "tag" && sub === "--list") {
+			return ok((registry.localTags ?? []).filter((tag) => tag === third).join("\n"));
+		}
+		if (command === "git" && verb === "ls-remote" && sub === "--tags" && third === "origin") {
+			return ok(
+				(registry.tags ?? [`v${VERSION}`])
+					.map((tag) => `refs/tags/${tag}`)
+					.filter((ref) => ref === fourth)
+					.map((ref) => `0123abcd\t${ref}\n`)
+					.join(""),
+			);
+		}
 		if (verb === "view" && sub === "@decohere/cli" && third === "dist-tags.dev") {
-			return ok(registry.dev ?? "");
+			return ok(registry.cachedDev ?? registry.dev ?? "");
 		}
 		if (verb === "view" && third === "version") {
 			const [, name, version] = /^(.+)@(.+)$/.exec(sub ?? "") ?? [];
@@ -40,7 +57,7 @@ function fakeRun(registry: Registry) {
 			return ok(JSON.stringify({ [VERSION]: new Date(PUBLISHED).toISOString() }));
 		}
 		if (verb === "dist-tag" && sub === "ls")
-			return ok(`dev: x\nlatest: ${latest[third ?? ""]}\n`);
+			return ok(`dev: ${registry.dev ?? "x"}\nlatest: ${latest[third ?? ""]}\n`);
 		if (verb === "dist-tag" && sub === "add") {
 			const [, name, version] = /^(.+)@(.+)$/.exec(third ?? "") ?? [];
 			if (registry.failMoving?.includes(name ?? "")) return { status: 1, stdout: "" };
@@ -79,6 +96,28 @@ describe("promoteLatest", () => {
 	it("uses what dev points at when no version is given", () => {
 		const { code, moves } = promote({ dev: VERSION }, {});
 
+		expect(code).toBe(0);
+		expect(moves).toEqual(PACKAGES);
+	});
+
+	it("uses what dev points at now, not npm view's lagging copy of it", () => {
+		const { code, output, moves } = promote(
+			{ dev: VERSION, cachedDev: "0.0.1-dev.20261105.60" },
+			{},
+		);
+
+		expect(output).toContain(`Promoting ${VERSION}`);
+		expect(code).toBe(0);
+		expect(moves).toEqual(PACKAGES);
+	});
+
+	it("finds the v* tag on origin when the shallow checkout lacks it", () => {
+		const { code, output, moves } = promote(
+			{ tags: [`v${VERSION}`], localTags: [] },
+			{ version: VERSION },
+		);
+
+		expect(output).not.toContain("didn't fully ship");
 		expect(code).toBe(0);
 		expect(moves).toEqual(PACKAGES);
 	});

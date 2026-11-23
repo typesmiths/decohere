@@ -207,7 +207,7 @@ gh workflow run promote-latest.yml                       # what dev points at
 gh workflow run promote-latest.yml -f version=<version>
 ```
 
-It stops with nothing moved if `latest` is already a stable version and this one is a dev version, if any package lacks the version, or the version has no `v*` tag, which means it didn't fully ship. It also stops if the version is under a day old, because current pnpm skips versions that new and would install an older one; `-f allow_young=true` overrides that. Run it again if it stops partway: packages already there are skipped.
+With no version it reads `dev` with `npm dist-tag ls`, which is current as soon as Publish moves it; `npm view` can serve the old value for a minute or more. It stops with nothing moved if `latest` is already a stable version and this one is a dev version, if any package lacks the version, or the version has no `v*` tag on GitHub, which means it didn't fully ship. It asks GitHub for the tag (`git ls-remote`) because the workflow's checkout is shallow and holds only the newest commit's tags. It also stops if the version is under a day old, because current pnpm skips versions that new and would install an older one; `-f allow_young=true` overrides that. Run it again if it stops partway: packages already there are skipped.
 
 **Setup.** Each package needs a Trusted Publisher for this workflow, separate from its `publish.yml` one: `pnpm npm:bootstrap` adds it ([Adding a new npm package](#adding-a-new-npm-package)). npm's docs say a new publisher must complete a successful publish within 2 days, so run the workflow soon after.
 

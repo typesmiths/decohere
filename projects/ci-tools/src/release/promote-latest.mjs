@@ -3,10 +3,10 @@
  * Points npm's `latest` tag at a version on every public @decohere package. Run by
  * `promote-latest.yml`, which authenticates over OIDC.
  *
- * Refuses a version that isn't on every package, has no `v*` tag (a version only gets one once it
- * passed CI and fully shipped), or is under a day old, unless `allowYoung` is set: current pnpm
- * skips versions that new and would install an older one. Safe to re-run: packages already there
- * are skipped.
+ * With no version, takes what `dev` points at. Refuses a version that isn't on every package, has
+ * no `v*` tag on origin (a version only gets one once it passed CI and fully shipped), or is under
+ * a day old, unless `allowYoung` is set: current pnpm skips versions that new and would install an
+ * older one. Safe to re-run: packages already there are skipped.
  */
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
@@ -35,8 +35,11 @@ export function promoteLatest(options) {
 	const log = options.log ?? console.log;
 	const npm = (...args) => run("npm", args);
 
-	const version =
-		options.version?.trim() || npm("view", LAUNCH_PACKAGE, "dist-tags.dev").stdout.trim();
+	/** `npm dist-tag ls` reads fresh; `npm view` can lag for a minute or more after a move. */
+	const distTag = (name, tag) =>
+		new RegExp(`^${tag}: (.+)$`, "m").exec(npm("dist-tag", "ls", name).stdout)?.[1]?.trim();
+
+	const version = options.version?.trim() || distTag(LAUNCH_PACKAGE, "dev");
 	if (!version) {
 		log(`Could not read the dev tag of ${LAUNCH_PACKAGE}. Nothing moved.`);
 		return 1;
@@ -44,14 +47,20 @@ export function promoteLatest(options) {
 	log(`Promoting ${version} to latest on ${packages.length} packages`);
 
 	// Once a stable version is out, latest belongs to releases: see "Stable release" in docs/ci.
-	const current = /^latest: (.+)$/m.exec(npm("dist-tag", "ls", LAUNCH_PACKAGE).stdout)?.[1];
+	const current = distTag(LAUNCH_PACKAGE, "latest");
 	if (current != null && !current.includes("-") && version.includes("-")) {
 		log(`latest is the stable ${current}, and ${version} is a dev version. Nothing moved.`);
 		return 1;
 	}
 
-	const tag = run("git", ["tag", "--list", `v${version}`]).stdout.trim();
-	if (tag !== `v${version}`) {
+	// Asks origin: the workflow's checkout is shallow and holds only the tip commit's tags.
+	const ref = `refs/tags/v${version}`;
+	const remote = run("git", ["ls-remote", "--tags", "origin", ref]);
+	if (remote.status !== 0) {
+		log("Could not read the tags on origin. Nothing moved.");
+		return 1;
+	}
+	if (!remote.stdout.split("\n").some((line) => line.split("\t")[1] === ref)) {
 		log(`${version} has no v${version} tag, so it didn't fully ship. Nothing moved.`);
 		return 1;
 	}
@@ -84,13 +93,7 @@ export function promoteLatest(options) {
 		}
 	}
 
-	/** `npm dist-tag ls` reads fresh; `npm view` can lag for a minute or so after a move. */
-	const onLatest = (name) => {
-		const line = npm("dist-tag", "ls", name)
-			.stdout.split("\n")
-			.find((entry) => entry.startsWith("latest:"));
-		return line?.slice("latest:".length).trim() === version;
-	};
+	const onLatest = (name) => distTag(name, "latest") === version;
 
 	const failed = [];
 	for (const name of packages) {
