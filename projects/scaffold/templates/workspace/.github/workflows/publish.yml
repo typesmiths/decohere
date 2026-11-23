@@ -1,0 +1,43 @@
+name: Publish
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+concurrency:
+  group: publish-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: false
+
+env:
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+  SCRIBE_LOG_LEVEL: info
+
+jobs:
+  publish:
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 1
+
+      - uses: ./.github/actions/setup-node-pnpm
+
+      - name: Build release
+        run: pnpm run build
+
+      - name: Publish packages
+        run: pnpm exec forge publish --configuration release
+        # Skips packages with "private": true (e.g. the webapi app).
+        # Optional registry images: replace "Build release" above with `pnpm run package`, then add
+        # `pnpm exec forge docker --configuration release --push` after configuring GHCR/OIDC.
+        # Not enabled by default. Each API's Dockerfile copies .package/, which `forge package`
+        # builds, so the image build itself needs no npm token.

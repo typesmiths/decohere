@@ -50,6 +50,8 @@ The scaffolded Dev Container asks no questions. `gh` is installed in it: run `gh
 
 Scaffolds a full web API using `@decohere/http` (HTTP), `@decohere/crucible` (DI), `@decohere/config` (configuration) and Scribe (logging), plus a Dev Container workspace.
 
+What it writes is checked-in files, not code generated on the fly: the workspace every project starts with, then the **web API recipe**, a complete app on Fastify that the Decohere repo boots and tests as it is ([scaffold](../scaffold/README.md)). Only names and ports change. `--database` and `--auth` are the same [add steps](#add-to-a-project) you can run later, applied on top of the recipe.
+
 ```bash
 npx @decohere/create webapi -d my-app
 npx @decohere/create webapi -d my-app --name billing
@@ -78,7 +80,7 @@ my-app/
   .devcontainer/
   projects/
     api/                # or projects/<name> when --name is set
-      package.json      # private: true (app, not an npm package)
+      package.json      # private: true; "decohere" records the recipe and the steps added
       Dockerfile        # copies .package/ (written by `forge package`)
       .dockerignore
       src/
@@ -127,20 +129,39 @@ export default app;
 | `package` / `package:<name>` | release build, then `forge package` (all APIs, or that one) | Before `docker build` |
 | `start` | `node dist/release/projects/<first>/es6/src/main.js` | Production default API (`pnpm start`) |
 | `start:<name>` | same path for that API | Deploy that API (`pnpm run start:billing`) |
-| `dev` | `flux serve --env-file-if-exists .env` (plus `--project @<app>/<first>` when named) | Local HMR for the first API; loads `.env` if present |
+| `dev` | `PORT=3000 flux serve --env-file-if-exists .env --project @<app>/<first>` | Local HMR for the first API; loads `.env` if present |
 | `dev:<name>` | `PORT=<3000+n> flux serve --env-file-if-exists .env --project @<app>/<name>` | Local HMR for that API |
 | `lint` | `oxlint --fix`, then `prettier --write .`, skipping `.devcontainer` | Fix and format |
 | `lint:check` / `typecheck` / `test` | oxlint and Prettier / forge typecheck / vitest | CI |
 
-#### Multiple APIs / add later
+#### Add to a project
+
+Each part a project can have is an add step. `create` runs the ones you choose on top of the recipe; in the project's Dev Container you can run any of them later:
 
 ```bash
-decohere add api billing
-# empty machine / npm create still maps `webapi add`:
-npx @decohere/create webapi add billing -d my-app
+pnpm decohere add api billing            # the web API recipe again, as projects/billing (asks for its steps)
+pnpm decohere add postgres               # Postgres in the Dev Container, a database and sample table per API
+pnpm decohere add postgres --orm typeorm # the same, mapped with TypeORM instead of MikroORM
+pnpm decohere add auth0                  # Auth0: every route needs a token (see below)
+pnpm decohere add users                  # with Postgres and Auth0: a local profile per user, admin seeded
 ```
 
-Adds `projects/billing`, `start:billing` / `package:billing` / `dev:billing`, and `projects/billing/Dockerfile`. Does not rewrite the first API or workspace files like `.prettierrc.json`.
+| `create` option | Is the recipe, plus |
+|---|---|
+| `--database postgres/mikro-orm` | `add postgres` |
+| `--database postgres/typeorm` | `add postgres --orm typeorm` |
+| `--auth auth0` | `add auth0` |
+| both | `add postgres`, `add auth0`, then `add users` |
+
+Every step:
+
+- **Adds, and never takes away.** A file the project doesn't have is copied in. One it has is merged: `package.json`, `devcontainer.json`, `docker-compose.yml` and `config/*.yaml` get only the keys and list items they lack (a data source by its `name`), `.env` only the variables it doesn't set, `.gitignore` only missing lines, `README.md` only missing `##` sections.
+- **Changes nothing when run again.** `--dry-run` lists what it would change and writes nothing (and touches no Auth0 tenant).
+- **Edits `app.ts` only in the shape it generated.** It inserts its lines (`.use(auth())` after `.use(config(…))`, the data provider before `.build()`, and so on). If one can't go in, it leaves the file as it is and prints every line to add.
+- **Replaces a sample file only if you haven't touched it.** `add auth0` and `add users` rewrite `hello.controller.ts` and its test only while they are exactly what the recipe (or `add auth0`) wrote; otherwise they print where their version is.
+- **Records itself** in the API's `package.json`, under `"decohere": { "recipe", "steps" }`.
+
+`add api billing` adds `projects/billing`, `start:billing` / `package:billing` / `dev:billing`, its port in the Dev Container, and `projects/billing/Dockerfile`. It doesn't rewrite the first API or workspace files like `.prettierrc.json`. From an empty machine, `npx @decohere/create webapi add billing -d my-app` does the same.
 
 Each API is a separate deploy: package it (`pnpm run package:billing`) and build the image from its folder (`docker build projects/billing`), or set the start command to `pnpm run start:billing`. Workspace `config/` is shared; each API still has its own named datasource and `{PREFIX}_DB_*` env (host/port default to the Compose Postgres).
 
@@ -169,7 +190,7 @@ In the project's Dev Container:
 pnpm decohere add auth0
 ```
 
-This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.use(auth())` to each API's `app.ts`. Running it again changes nothing. If an `app.ts` no longer has the generated shape, the command leaves it alone and prints the lines to add. It also creates a `<project> Token` machine app (written to `.env` as `AUTH0_TOKEN_CLIENT_ID`). It doesn't add the local user profile a new project with Postgres gets.
+This logs in if needed, creates the Auth0 API and a `<project> Dev` login app, writes `AUTH0_ISSUER_BASE_URL`, `AUTH0_AUDIENCE` and `AUTH0_CLIENT_ID` to `.env`, adds the `auth` section to `config/config.yaml`, and adds `.use(auth())` to each API's `app.ts`. It gives the Hello controller `@Authorize` permissions and its test a token check of its own. It also creates a `<project> Token` machine app (written to `.env` as `AUTH0_TOKEN_CLIENT_ID`). With Postgres too, `pnpm decohere add users` adds the local user profile a new project with both gets; with `DECOHERE_ADMIN_PASSWORD` set, it also creates the admin user on Auth0.
 
 Once Auth0 is added, **every route needs a token** unless it has `@AllowAnonymous()`, because `auth()` is secure by default. To call one, in the Dev Container:
 

@@ -110,12 +110,10 @@
     "specsAway": 2
   },
   "scaffold": {
-    "looseFunctions": 77,
-    "namespaceObjects": 4,
-    "severalClasses": 5,
-    "noRole": 23,
+    "looseFunctions": 61,
+    "noRole": 15,
     "envReads": 6,
-    "specsAway": 16
+    "specsAway": 11
   },
   "scribe": {
     "looseFunctions": 7,

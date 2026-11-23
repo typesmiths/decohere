@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@decohere/data-typeorm": "*",
+    "typeorm": "^1.1.2"
+  }
+}

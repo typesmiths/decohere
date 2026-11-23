@@ -12,6 +12,10 @@ import {
 	AddAuth0Action,
 	type AddAuth0Options,
 	AddModule,
+	AddPostgresAction,
+	type AddPostgresOptions,
+	AddUsersAction,
+	type AddUsersOptions,
 	Auth0ConfigureAction,
 	type Auth0ConfigureOptions,
 	Auth0LoginAction,
@@ -58,9 +62,30 @@ class HostAddAuth0Action extends AddAuth0Action {
 	}
 }
 
+@injectable()
+class HostAddPostgresAction extends AddPostgresAction {
+	public override async run(options: AddPostgresOptions): Promise<ActionResponse> {
+		if (!hasDecohereTools()) return needsDevContainer("postgres");
+		return super.run(options);
+	}
+}
+
+@injectable()
+class HostAddUsersAction extends AddUsersAction {
+	public override async run(options: AddUsersOptions): Promise<ActionResponse> {
+		if (!hasDecohereTools()) return needsDevContainer("users");
+		return super.run(options);
+	}
+}
+
 /** `decohere add` — runs only where the Dev Container's tools are. */
 export class HostAddModule extends AddModule {
-	public override readonly actions = { api: HostAddApiAction, auth0: HostAddAuth0Action };
+	public override readonly actions = {
+		api: HostAddApiAction,
+		auth0: HostAddAuth0Action,
+		postgres: HostAddPostgresAction,
+		users: HostAddUsersAction,
+	};
 }
 
 @injectable()

@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@decohere/data": "*",
+    "@decohere/data-postgres": "*"
+  },
+  "decohere": {
+    "steps": [
+      "postgres"
+    ]
+  }
+}

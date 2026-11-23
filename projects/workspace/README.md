@@ -47,7 +47,18 @@ export default {
 };
 ```
 
-Per-project settings go under `projects`, keyed by package name: `docker` (image, Dockerfile, tags, build args) and `ui` (the UI project a deployable ships, see [forge](../forge/README.md#shipping-the-ui-with-the-api)).
+Per-project settings go under `projects`, keyed by package name: `docker` (image, Dockerfile, tags, build args), `ui` (the UI project a deployable ships, see [forge](../forge/README.md#shipping-the-ui-with-the-api)), and `ignore` and `copyFiles`, which **add** to the workspace's lists:
+
+```js
+// Files the package copies at run time: not compiled, not scanned for dependencies, shipped as they are.
+export default {
+	projects: {
+		"@app/tool": { ignore: ["templates/**"], copyFiles: ["templates/**", "templates/**/.*", "templates/**/.*/**"] },
+	},
+};
+```
+
+Globs skip dotfiles unless a segment starts with a dot, hence the last two patterns.
 
 ### A project's own scripts
 

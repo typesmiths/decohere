@@ -1,0 +1,5 @@
+APP_NAME_DB_HOST=postgres
+APP_NAME_DB_PORT=5432
+APP_NAME_DB_NAME=workspace_name_app_name_dev
+APP_NAME_DB_USER=workspace_name_app_name_app
+APP_NAME_DB_MIGRATE_USER=workspace_name_app_name_migrate

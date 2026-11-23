@@ -1,3 +1,5 @@
+import { CreateCliError } from "./api-name.js";
+
 /** The `--database` choices. MikroORM is the default ORM for Postgres. */
 export const DATABASE_PROVIDERS = ["none", "postgres/mikro-orm", "postgres/typeorm"] as const;
 
@@ -19,5 +21,13 @@ export function parseDatabaseProvider(value: unknown): DatabaseProvider | undefi
 		return value as DatabaseProvider;
 	throw new Error(
 		`--database must be one of ${DATABASE_PROVIDERS.join(", ")} (got ${JSON.stringify(value)})`,
+	);
+}
+
+/** Check an `--orm` value. */
+export function parseOrm(value: unknown): Orm {
+	if (value === "mikro-orm" || value === "typeorm") return value;
+	throw new CreateCliError(
+		`--orm must be mikro-orm or typeorm (got ${JSON.stringify(value)})`,
 	);
 }

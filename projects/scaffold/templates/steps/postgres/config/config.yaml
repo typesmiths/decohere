@@ -1,0 +1,14 @@
+# Production: the app connects with its own role only, and changes nothing in the database on
+# its own. Migrations run as a release step (docs/database.md).
+database:
+  dataSources:
+    - name: app-name
+      provider: postgres
+      host: ${APP_NAME_DB_HOST}
+      port: ${APP_NAME_DB_PORT}
+      database: ${APP_NAME_DB_NAME}
+      username: ${APP_NAME_DB_USER}
+      password: ${APP_NAME_DB_PASSWORD}
+      synchronize: false
+      seed: false
+      bootstrap: false

@@ -1,0 +1,6 @@
+{
+  "window.title": "workspace-name${separator}${activeEditorShort}",
+  "window.titleSeparator": " | ",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true
+}

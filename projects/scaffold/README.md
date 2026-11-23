@@ -2,21 +2,60 @@
 
 **For contributors.** Apps never import the scaffolder; they run it through [`@decohere/create`](../create/README.md).
 
-The scaffolder: it writes a new Decohere workspace with one or more web APIs, and adds to an existing one. The commands as a user runs them (`create webapi`, `add api`, `add auth0`, `auth0 login|configure|token`) are in [create's README](../create/README.md). This README is for working on the scaffolder itself.
+The scaffolder: it writes a new Decohere workspace from a recipe, and adds steps to an existing one. The commands as a user runs them (`create webapi`, `add api|postgres|auth0|users`, `auth0 login|configure|token`) and what a new project gets are in [create's README](../create/README.md). This README is for working on the scaffolder itself: how it makes that output.
 
 It runs two ways. The `decohere` product CLI in [`@decohere/cli`](../cli/README.md) loads its modules. Its own `decohere` bin (`src/cli.ts`, built on `src/program.ts`) is what the scaffolder image that `@decohere/create` starts runs.
 
-## How it is built
+## Output is checked-in files
 
-- **Modules.** `CreateModule` (`create webapi`), `AddModule` (`add api`, `add auth0`) and `Auth0Module` (`auth0 login`, `configure`, `token`) are `ModuleManifest`s from [`@decohere/devkit/cli`](../devkit/README.md): a command class and an action class per subcommand, one per file (`webapi.command.ts`, `webapi.action.ts`, …).
-- **Models.** Every file the scaffolder writes is a model of that file, in `src/models/` (workspace files: `package.json`, `tsconfig`, the Dev Container, Compose, VS Code settings, Dockerfiles) and `src/webapi/models/` (an API's files: its `package.json`, `main.ts`, controller, sample spec, migrations, production Dockerfile, CI workflow). Features change the models, then the workspace writes them all at once.
-- **Features.** `src/webapi/features/` holds the optional parts of an API: `database.feature.ts` (the data provider and its config), `auth.feature.ts` (Auth0), and `finalize.feature.ts` (installing and formatting after the files are written). Each implements `Feature` from `src/services/scaffold.service.ts`: `getOptions`, then `scaffold`, then an optional `finalize`.
-- **The Dev Container base image** is `AppDevContainerBaseImage` in `src/models/docker-image.model.ts`; [`projects/devcontainer/Dockerfile`](../devcontainer/README.md) is generated from it.
+Everything the scaffolder writes is a real file under `templates/`, laid out as it lands in a workspace. Nothing is built from strings at run time.
 
-## Working on this package
+```
+templates/
+  workspace/            what every new workspace starts with: Dev Container, CI, lint, tsconfig, README
+  recipes/
+    webapi/             a complete app: a web API on Fastify
+      config/config.app-name.yaml
+      package.json      what the app adds to the workspace's package.json (its scripts and dependencies)
+      projects/app-name/
+        src/app.ts      createApp(): the composition, every part written out
+        src/main.ts     starts it
+        tests/hello.controller.spec.ts
+  steps/
+    postgres/           what `decohere add postgres` adds, whatever the ORM
+    mikro-orm/          … with MikroORM (the default)
+    typeorm/            … with TypeORM
+    auth0/              what `decohere add auth0` adds
+    users/              what `decohere add users` adds, whatever the ORM
+    users-mikro-orm/
+    users-typeorm/
+```
 
-For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
+- **A recipe is a working app.** `src/templates/recipes.spec.ts` imports each recipe's `createApp()` from where it sits, starts it and calls `GET /hello`; its own `tests/` run in `pnpm test`; the repo type-checks and lints it like any other code. A second recipe (another HTTP provider, or a worker with no HTTP) is another folder under `recipes/`.
+- **A step is the files it adds**, plus its edits to `app.ts` in `src/steps/<name>-step.service.ts`. Its files are parts of an app, not whole ones, so the repo's `tsc` and `pnpm test` leave `templates/steps/` out. `e2e/generated-app-types.e2e.spec.ts` generates an app with every step on top of the recipe, once per ORM, and type-checks it against the release build.
+- **Placeholders are names that still compile.** In paths and text, `workspace-name`, `app-name` and `app-port` become the project's name, the app's folder and its port; `workspace_name` and `app_name` the same as Postgres identifiers; `APP_NAME` the app's environment prefix; `decohere-devcontainer-image` the Dev Container image at this version. Every `@decohere/*` dependency in a template `package.json` gets this package's version, so `"*"` is fine there. `_gitignore` and `_env` land as `.gitignore` and `.env`, which npm and git would drop from the package.
+- **A step's migration** is named `00000000-000000-<name>.ts`. It is written once per app, stamped with the time, and the app's `src/migrations/index.ts` is rewritten to list every migration in the folder, as the db commands do.
 
-`src/` holds the modules, commands and actions at the top, with `models/`, `services/`, `domain/` (prompts) and `webapi/` (the web API template: options, features, models, Dev Container scripts).
+## Applying a template
 
-The canonical suite for the tree it writes is `tests/cli.integration.spec.ts`. A generated app's types are checked by `e2e/generated-app-types.e2e.spec.ts`, against the release build, in CI's `package` job ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)). Units cover model and contract edges, and `tests/first-migrations.docker.spec.ts` needs Docker. Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).
+`Templates.apply` (`src/templates/templates.service.ts`) copies one folder for one app into a `WorkspaceChanges`, which holds every write in memory until `commit()`, so `--dry-run` can list them. For each file:
+
+| The workspace | What happens |
+|---|---|
+| doesn't have it | written |
+| has it, and it's JSON, YAML, `.env`, an ignore list, Markdown, or `.devcontainer/Dockerfile` | merged by `FileMerge` (`src/templates/file-merge.service.ts`), which only adds: keys and list items it lacks (YAML list items with a `name` match by it), variables, lines, `##` sections, Docker steps before the last `USER` |
+| has it, it's source, and it's exactly what a folder in the step's `replaces` writes | replaced |
+| has it otherwise | left alone; the user is told where the step's version is |
+
+Edits to `app.ts` (`AppSource`, `src/steps/app-source.model.ts`) each say whether they are done, how to make them in the shape the recipe generates, and what to add by hand. A file gets all of a step's edits or none, and the user gets every missing line.
+
+## Adding a step
+
+1. Put its files under `templates/steps/<name>/`, laid out as in a workspace, with a `projects/app-name/package.json` that records `"decohere": { "steps": ["<name>"] }`.
+2. Write `src/steps/<name>-step.service.ts`: a class that applies its folders for each app, then its `app.ts` edits.
+3. Add the command in `src/program.ts` and the `add` module, and a `create` option if new projects should be able to start with it.
+4. Test it once on top of the recipe in `src/steps/add-steps.integration.spec.ts` (what it adds, that a second run changes nothing, `--dry-run`, a hand-edited `app.ts`), and add it to the apps `generated-app-types.e2e` type-checks.
+
+## Shipping the templates
+
+`.decohere.js` at the repo root leaves `templates/` out of the package's build and of `forge dependencies sync` (`ignore`), so the recipes' imports aren't the scaffolder's dependencies, and copies it into the package as files (`copyFiles`). The code finds it beside its own `package.json`.

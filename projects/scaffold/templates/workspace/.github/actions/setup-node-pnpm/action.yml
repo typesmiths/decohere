@@ -1,0 +1,45 @@
+name: Setup Node + pnpm
+description: Install pnpm and Node, configure npm registry auth, install deps
+inputs:
+  node-version:
+    description: Node.js version
+    required: false
+    default: "24"
+  pnpm-version:
+    description: pnpm version
+    required: false
+    default: "10"
+  install:
+    description: Run pnpm install --frozen-lockfile
+    required: false
+    default: "true"
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v4
+      with:
+        version: ${{ inputs.pnpm-version }}
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: pnpm
+        cache-dependency-path: pnpm-lock.yaml
+
+    - name: Configure npm auth
+      shell: bash
+      run: |
+        if [[ -n "${NODE_AUTH_TOKEN:-}" ]]; then
+          echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" >> .npmrc
+        fi
+
+    - name: Install dependencies
+      if: inputs.install == 'true'
+      shell: bash
+      run: |
+        if [[ -f pnpm-lock.yaml ]]; then
+          pnpm install --frozen-lockfile
+        else
+          pnpm install
+        fi

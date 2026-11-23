@@ -1,56 +1,32 @@
-import { createRequire } from "node:module";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { createRequire, findPackageJSON } from "node:module";
+import { dirname } from "node:path";
 
-const _require = createRequire(import.meta.url);
-
-type CreatePackageMetadata = {
-	name?: string;
-	version?: string;
+type ScaffoldPackageMetadata = {
+	version: string;
 	decohere?: {
 		dockerImageRepository?: string;
 		devcontainerImageRepository?: string;
 	};
 };
 
-const DEFAULT_CREATE_VERSION = "0.0.1-dev";
-const DEFAULT_CREATE_IMAGE_REPOSITORY = "ghcr.io/typesmiths/decohere/create";
-const DEFAULT_DEVCONTAINER_IMAGE_REPOSITORY = "ghcr.io/typesmiths/decohere/devcontainer";
-
-function resolveCreateMetadata() {
-	let dir = dirname(fileURLToPath(import.meta.url));
-	for (let i = 0; i < 5; i++) {
-		try {
-			const pkg = _require(join(dir, "package.json")) as CreatePackageMetadata;
-			if (pkg.name === "@decohere/scaffold") {
-				return {
-					version: pkg.version ?? DEFAULT_CREATE_VERSION,
-					imageRepository:
-						pkg.decohere?.dockerImageRepository ?? DEFAULT_CREATE_IMAGE_REPOSITORY,
-					devcontainerImageRepository:
-						pkg.decohere?.devcontainerImageRepository ?? DEFAULT_DEVCONTAINER_IMAGE_REPOSITORY,
-				};
-			}
-		} catch {}
-		const parent = dirname(dir);
-		if (parent === dir) break;
-		dir = parent;
-	}
-
-	return {
-		version: DEFAULT_CREATE_VERSION,
-		imageRepository: DEFAULT_CREATE_IMAGE_REPOSITORY,
-		devcontainerImageRepository: DEFAULT_DEVCONTAINER_IMAGE_REPOSITORY,
-	};
+// The package's own manifest: beside src/ in the repo, and at the package root once published.
+// Found and read from the real disk, even in a test that keeps files in memory.
+const manifestPath = findPackageJSON(import.meta.url);
+if (manifestPath == null) {
+	throw new Error(`@decohere/scaffold has no package.json above ${import.meta.url}`);
 }
+const manifest = createRequire(import.meta.url)(manifestPath) as ScaffoldPackageMetadata;
 
-const createMetadata = resolveCreateMetadata();
+/** The folder of @decohere/scaffold's package.json, which holds templates/. */
+export const PACKAGE_DIR = dirname(manifestPath);
 
-/** Version of @decohere/create, used to pin scaffolded @decohere/* dependencies. */
-export const CREATE_VERSION = createMetadata.version;
+/** Version of @decohere/scaffold (and @decohere/create), used to pin scaffolded @decohere/* dependencies. */
+export const CREATE_VERSION = manifest.version;
 
 /** Canonical published Docker repository for the @decohere/create builder image. */
-export const CREATE_IMAGE_REPOSITORY = createMetadata.imageRepository;
+export const CREATE_IMAGE_REPOSITORY =
+	manifest.decohere?.dockerImageRepository ?? "ghcr.io/typesmiths/decohere/create";
 
 /** Published app Dev Container base (`docker pull` updates shared layers). */
-export const DEVCONTAINER_IMAGE_REPOSITORY = createMetadata.devcontainerImageRepository;
+export const DEVCONTAINER_IMAGE_REPOSITORY =
+	manifest.decohere?.devcontainerImageRepository ?? "ghcr.io/typesmiths/decohere/devcontainer";

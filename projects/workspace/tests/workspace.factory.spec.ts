@@ -165,3 +165,34 @@ it("adds a user's ignoreProjects to the defaults instead of replacing them", asy
 
 	expect(workspace.getProjects("debug").map((p) => p.name)).toEqual([MOCK_PROJ1, MOCK_PROJ2]);
 });
+
+it("adds a project's own ignore to the workspace's, so its sources leave out a folder and still no .d.ts", async () => {
+	vol.fromJSON({
+		...mockFiles,
+		[`${root}/${projPath}/src/types.d.ts`]: "export type T = 1;",
+		[`${root}/${projPath}/templates/app/src/app.ts`]: 'import "@other/package";',
+	});
+	vi.spyOn(UserConfigFactory, "getUserConfig").mockResolvedValue({
+		projects: { [MOCK_PROJ1]: { ignore: ["templates/**"] } },
+	});
+
+	const workspace = await WorkspaceFactory.create({ rootDir: root });
+	const project = workspace.getProjects("debug").find((p) => p.name === MOCK_PROJ1);
+	const files = await project?.getAllFiles();
+
+	expect(files?.map((file) => file.relativePath)).toEqual(["src/index.ts"]);
+});
+
+it("adds a project's own copyFiles to the workspace's, so it still ships its package.json", async () => {
+	vol.fromJSON(mockFiles);
+	vi.spyOn(UserConfigFactory, "getUserConfig").mockResolvedValue({
+		copyFiles: ["package.json", "README.md"],
+		projects: { [MOCK_PROJ1]: { copyFiles: ["templates/**"] } },
+	});
+
+	const workspace = await WorkspaceFactory.create({ rootDir: root });
+	const [one, two] = workspace.getProjects("debug");
+
+	expect(one?.copyFiles).toEqual(["package.json", "README.md", "templates/**"]);
+	expect(two?.copyFiles).toEqual(["package.json", "README.md"]);
+});

@@ -8,14 +8,16 @@ vi.mock("node:child_process", () => ({
 	spawnSync: mockSpawnSync,
 }));
 
-const { PRETTIER_VERSION } = await import("../src/models/package-json.model.js");
-const { formatScaffoldedFiles } = await import("../src/webapi/features/format-files.js");
+import { resetMemfs } from "@decohere/testing";
+import { vol } from "memfs";
+const { formatScaffoldedFiles } = await import("../src/webapi/format-files.js");
 
 beforeEach(() => {
 	mockSpawnSync.mockReset();
 });
 
 afterEach(() => {
+	resetMemfs();
 	vi.clearAllMocks();
 });
 
@@ -27,12 +29,17 @@ describe("formatScaffoldedFiles", () => {
 
 		expect(mockSpawnSync).toHaveBeenCalledWith(
 			"prettier",
-			["--write", "."],
+			["--write", "--ignore-unknown", "."],
 			expect.objectContaining({ cwd: "/tmp/scaffold" }),
 		);
 	});
 
-	it("falls back to npx, at the version projects get, when prettier is not on PATH", () => {
+	it("falls back to npx, at the version the workspace pins, when prettier is not on PATH", () => {
+		vol.fromJSON({
+			"/tmp/scaffold/package.json": JSON.stringify({
+				devDependencies: { prettier: "3.9.10" },
+			}),
+		});
 		const enoent = Object.assign(new Error("not found"), { code: "ENOENT" });
 		mockSpawnSync
 			.mockReturnValueOnce({ status: 1, stdout: "", stderr: "", error: enoent })
@@ -43,7 +50,7 @@ describe("formatScaffoldedFiles", () => {
 		expect(mockSpawnSync).toHaveBeenNthCalledWith(
 			2,
 			"npx",
-			["--yes", `prettier@${PRETTIER_VERSION}`, "--write", "."],
+			["--yes", "prettier@3.9.10", "--write", "--ignore-unknown", "."],
 			expect.objectContaining({ cwd: "/tmp/scaffold" }),
 		);
 	});

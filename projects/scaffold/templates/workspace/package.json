@@ -1,0 +1,24 @@
+{
+  "name": "workspace-name",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "forge build --configuration release",
+    "build:watch": "forge build --watch",
+    "package": "pnpm run build && forge package",
+    "lint": "oxlint --fix && prettier --write . \"!.devcontainer/**\"",
+    "lint:check": "oxlint --deny-warnings && prettier --check . \"!.devcontainer/**\"",
+    "typecheck": "forge typecheck",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@decohere/cli": "*",
+    "@decohere/forge": "*",
+    "@types/node": "^24.0.0",
+    "oxlint": "1.87.0",
+    "prettier": "3.9.10",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.12"
+  }
+}

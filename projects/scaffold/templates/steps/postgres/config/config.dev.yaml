@@ -1,0 +1,13 @@
+# Development, merged into config.yaml by data source name. The local server trusts every
+# connection, so there are no passwords: `password: null` replaces the production one. The app
+# creates its database and roles, and applies migrations when it starts.
+database:
+  dataSources:
+    - name: app-name
+      auth: trust
+      password: null
+      migrateOnStart: true
+      seed: true
+      bootstrap: true
+      adminUser: postgres
+      migrateUsername: ${APP_NAME_DB_MIGRATE_USER}

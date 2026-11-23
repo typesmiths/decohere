@@ -1,0 +1,4 @@
+# Auth0 checks each request's token. The values come from .env.
+auth:
+  discoveryUrl: ${AUTH0_ISSUER_BASE_URL}
+  audience: ${AUTH0_AUDIENCE}
