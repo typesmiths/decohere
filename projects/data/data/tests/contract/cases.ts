@@ -453,6 +453,37 @@ export const cases: Case[] = [
 		},
 	},
 	{
+		name: "addIfAbsent takes a whole aggregate: its children are written on commit when it is new, and none when it is kept",
+		async run(p) {
+			const order = new p.model.Order("ann");
+			{
+				await using first = p.begin();
+				order.addLine("apple", 1, ["stalk"]);
+				order.addLine("pear", 2);
+				expect(await first.addIfAbsent(order)).toBe(true);
+				await first.commit();
+			}
+			await using second = p.begin();
+			const again = new p.model.Order("bob");
+			again.id = order.id;
+			again.addLine("plum", 3, ["stone"]);
+			expect(await second.addIfAbsent(again)).toBe(false);
+			await second.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			const [order] = await uow.find(p.model.Order, { include: ["lines.parts"] });
+			expect(order.customer).toBe("ann");
+			expect(skus(order)).toEqual(["apple", "pear"]);
+			expect([...order.lines].map((l) => [...l.parts].map((x) => x.name))).toEqual([
+				["stalk"],
+				[],
+			]);
+			expect(await uow.find(p.model.Line)).toHaveLength(2);
+			expect(await uow.find(p.model.Part)).toHaveLength(1);
+		},
+	},
+	{
 		name: "addIfAbsent sets what the database generates, and an aggregate it added takes children and changes on commit",
 		async run(p) {
 			await using uow = p.begin();
@@ -467,9 +498,6 @@ export const cases: Case[] = [
 			await uow.commit();
 			expect(order.version).toBe(2);
 			await expect(uow.addIfAbsent(order)).rejects.toThrow(DataError);
-			const withLines = new p.model.Order("bob");
-			withLines.addLine("pear", 2);
-			await expect(uow.addIfAbsent(withLines)).rejects.toThrow(DataError);
 		},
 		async check(p) {
 			await using uow = p.begin();

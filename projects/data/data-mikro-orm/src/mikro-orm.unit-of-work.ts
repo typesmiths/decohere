@@ -20,7 +20,6 @@ import {
 	type FindOptions,
 	FlushMode,
 	LockMode,
-	helper,
 	OptimisticLockError as MikroOptimisticLockError,
 	ReferenceKind,
 } from "@mikro-orm/core";
@@ -120,18 +119,13 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 		this.assertUsable();
 		const type = entityName(entity.constructor as EntityClass);
 		const meta = this.em.getMetadata().get(type);
-		if (this.em.getUnitOfWork().getPersistStack().has(entity) || helper(entity).__managed) {
+		const uow = this.em.getUnitOfWork();
+		const held =
+			uow.getPersistStack().has(entity) || [...uow.getIdentityMap().values()].includes(entity);
+		if (held) {
 			throw new DataError(
 				`${meta.className}: addIfAbsent takes a new entity, not one this unit of work holds`,
 			);
-		}
-		for (const prop of meta.relations) {
-			const children = entity[prop.name] as { length: number } | undefined;
-			if (prop.kind === ReferenceKind.ONE_TO_MANY && children && children.length > 0) {
-				throw new DataError(
-					`${meta.className}.${prop.name}: addIfAbsent writes the entity's own row; add its children once it is added`,
-				);
-			}
 		}
 		const em = await this.transaction();
 		// What the database fills in (a generated key, the version's default) comes back to the entity.
@@ -146,7 +140,13 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 		const [inserted] = result.rows ?? [];
 		if (inserted === undefined) return false;
 		for (const prop of generated) entity[String(prop.name)] = inserted[prop.fieldNames[0]];
+		// Its children are new: written on commit, with the rest of the unit of work. Taken before the
+		// merge, which attaches the entity as it is in the database: with no children.
+		const children = meta.relations
+			.filter((prop) => prop.kind === ReferenceKind.ONE_TO_MANY)
+			.flatMap((prop) => [...((entity[prop.name] as Iterable<object> | undefined) ?? [])]);
 		em.merge(entity);
+		for (const child of children) em.persist(child);
 		return true;
 	}
 

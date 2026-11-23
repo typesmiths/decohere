@@ -31,12 +31,11 @@ if (await uow.addIfAbsent(new Receipt(paymentId, amount))) {
 await uow.commit();
 ```
 
-It answers now, so it writes now: `INSERT … ON CONFLICT DO NOTHING RETURNING …` on MikroORM and TypeORM, a key check on memory. The insert runs in the unit of work's transaction, which it begins if none is open, so it commits with the rest of the unit of work, or rolls back with it. After `true` the entity is managed, as if loaded: its generated key and version are set, and later changes to it, children added to it included, are saved on commit. After `false` the entity isn't attached: nothing about it is written, and the rest of the unit of work commits as usual. Load the kept row with `findById` to see it.
+It answers now, so it writes now: `INSERT … ON CONFLICT DO NOTHING RETURNING …` on MikroORM and TypeORM, a key check on memory. The insert runs in the unit of work's transaction, which it begins if none is open, so it commits with the rest of the unit of work, or rolls back with it. It takes a whole aggregate: the root's row is written at once, and its children, nested ones included, on commit with the rest of the unit of work. After `true` the entity is managed, as if loaded: its generated key and version are set, and its children and later changes to it are saved on commit. After `false` the entity isn't attached: nothing of it is written, children included, and the rest of the unit of work commits as usual. Load the kept row with `findById` to see it.
 
 What it can't do, since it writes before the rest of the commit:
 
 - **An entity it references must already be in the database**, not just given to `add` in the same unit of work: the foreign key is checked when it writes, and fails the statement (and so the transaction).
-- **It writes one row.** An entity whose child collections hold anything is refused (`DataError`): add it, then add its children.
 - **It takes a new entity.** One the unit of work already loaded or was given to `add` is refused.
 - **"Already kept" means any unique key**, on the SQL providers: `ON CONFLICT DO NOTHING` skips a row that clashes with any unique constraint, not only the primary key. Memory knows only the key.
 - **It waits for a row another transaction is inserting under the same key**, as Postgres does, and answers once that transaction ends.

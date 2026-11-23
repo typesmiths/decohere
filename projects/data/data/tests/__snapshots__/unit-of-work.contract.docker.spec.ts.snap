@@ -118,6 +118,19 @@ exports[`unit of work contract > addIfAbsent sets what the database generates, a
 ]
 `;
 
+exports[`unit of work contract > addIfAbsent takes a whole aggregate: its children are written on commit when it is new, and none when it is kept 1`] = `
+[
+  "begin",
+  "insert orders ×1 on conflict do nothing",
+  "insert line ×2",
+  "insert part ×1",
+  "commit",
+  "begin",
+  "insert orders ×1 on conflict do nothing",
+  "commit",
+]
+`;
+
 exports[`unit of work contract > an added entity is found by its key with its children as added, and not after it is removed 1`] = `[]`;
 
 exports[`unit of work contract > an entity added and not yet committed is found by its key, and committed once 1`] = `

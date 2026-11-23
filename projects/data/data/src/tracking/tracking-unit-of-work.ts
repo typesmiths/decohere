@@ -140,19 +140,12 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 				`${model.name}: addIfAbsent takes a new entity, not one this unit of work holds`,
 			);
 		}
-		for (const spec of model.children) {
-			const children = entity[spec.prop];
-			if (children && !(children instanceof UnloadedChildren) && children.length > 0) {
-				throw new DataError(
-					`${model.name}.${spec.prop}: addIfAbsent writes the entity's own row; add its children once it is added`,
-				);
-			}
-		}
 		await this.beginTransaction();
 		const generated = await this.store.insertIfAbsent(type, this.insertRow(model, entity, []));
 		if (generated === null) return false;
 		Object.assign(entity, generated);
 		this.instances(type).set(this.keyOf(model, entity), entity);
+		// Its children are new too: recorded as loaded and empty, the commit inserts what it holds.
 		const children = new Map<string, object[]>();
 		for (const spec of model.children) if (entity[spec.prop]) children.set(spec.prop, []);
 		this.snapshots.set(entity, {
