@@ -136,14 +136,23 @@ function databaseConfig(c: Connection): IConfigurationService {
 	};
 }
 
+/** An app on one data source, built as an app builds it: `configure` adds its plugin and services. */
+export async function startApp(c: Connection, configure: (builder: Builder) => Builder) {
+	const app = await configure(
+		Builder.create(new ServiceContainerBuilder()).withServices((s) =>
+			s.registerSingleton(ConfigurationServiceToken, databaseConfig(c)),
+		),
+	).build();
+	await app.start({ port: 0, shutdownSignals: false, startRetry: false });
+	return app;
+}
+
 /** TypeORM as an app uses it: `typeOrm()` given the model's `EntitySchema` mapping. */
 export async function openTypeOrm(c: Connection): Promise<SqlProvider> {
 	const model = defineModel();
-	const app = await Builder.create(new ServiceContainerBuilder())
-		.withServices((s) => s.registerSingleton(ConfigurationServiceToken, databaseConfig(c)))
-		.use(typeOrm({ entities: typeOrmEntities(model), outbox: model.toOutbox }))
-		.build();
-	await app.start({ port: 0, shutdownSignals: false, startRetry: false });
+	const app = await startApp(c, (builder) =>
+		builder.use(typeOrm({ entities: typeOrmEntities(model), outbox: model.toOutbox })),
+	);
 	return {
 		name: "TypeORM",
 		model,

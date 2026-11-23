@@ -12,6 +12,8 @@ import {
 	OptimisticLockError,
 	type OutboxMapper,
 	type Query,
+	TransactionSettings,
+	type TransactionSettingsSource,
 	type Where,
 } from "@decohere/data";
 import {
@@ -31,6 +33,11 @@ type Path<T> = Include<T> | FieldKeys<T>;
 export type MikroOrmUnitOfWorkOptions = {
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
 	outbox?: OutboxMapper;
+	/**
+	 * Settings made at the start of each transaction, as MikroORM's session context: while they
+	 * name any, MikroORM runs a read outside a transaction in one of its own.
+	 */
+	settings?: TransactionSettingsSource;
 };
 
 /**
@@ -74,6 +81,7 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 		options: FindByIdArgument<T> = {},
 	): Promise<T | null> {
 		this.assertUsable();
+		this.useSettings();
 		const { include = [], load = [] } = isIncludeList(options)
 			? { include: options }
 			: options;
@@ -90,6 +98,7 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 		query: Query<T> = {},
 	): Promise<T[]> {
 		this.assertUsable();
+		this.useSettings();
 		if (query.lock && !this.em.isInTransaction()) {
 			await this.em.begin();
 		}
@@ -165,6 +174,7 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 
 	public async beginTransaction() {
 		this.assertUsable();
+		this.useSettings();
 		if (!this.em.isInTransaction()) {
 			await this.em.begin();
 		}
@@ -172,6 +182,7 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 
 	public async commit() {
 		this.assertUsable();
+		this.useSettings();
 		try {
 			if (this.options.outbox) {
 				const uow = this.em.getUnitOfWork();
@@ -209,6 +220,23 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 			}
 		} finally {
 			this.em.clear();
+		}
+	}
+
+	/**
+	 * Give MikroORM the source's settings as they are now, for the next transaction it begins. It
+	 * refuses a change inside a transaction, which began with the settings it has.
+	 */
+	private useSettings() {
+		const source = this.options.settings;
+		if (source == null || this.em.isInTransaction()) {
+			return;
+		}
+		const settings = TransactionSettings.of(source.transactionSettings());
+		// setSessionContext merges, so a setting the source no longer names would stay.
+		this.em.clearSessionContext();
+		if (!settings.isEmpty) {
+			this.em.setSessionContext({ variables: Object.fromEntries(settings.entries()) });
 		}
 	}
 

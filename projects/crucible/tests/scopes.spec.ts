@@ -75,6 +75,21 @@ describe("beginScope", () => {
 		expect(probe.scope).toBe(child);
 	});
 
+	it("gives a request-scoped factory the scope resolving it, so it can use that scope's services", () => {
+		const builder = new ServiceContainerBuilder();
+		builder.registerRequestScoped(RequestWork);
+		builder.registerRequestScoped("work-holder", (scope: LifetimeScope) => ({
+			scope,
+			work: scope.resolve(RequestWork),
+		}));
+		const container = builder.build();
+		using child = container.beginScope();
+
+		const holder = child.resolve<{ scope: LifetimeScope; work: RequestWork }>("work-holder");
+		expect(holder.scope).toBe(child);
+		expect(holder.work).toBe(child.resolve(RequestWork));
+	});
+
 	it("throws when beginning a scope on a disposed container", () => {
 		const container = new ServiceContainerBuilder().build();
 		container[Symbol.dispose]();

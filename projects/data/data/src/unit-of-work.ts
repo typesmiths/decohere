@@ -7,8 +7,13 @@ import type { EntityClass, EntityKey, FindByIdArgument, Query } from "./query.ty
  *   with no save call, and only the fields that changed;
  * - one commit writes every change, and the outbox, in one transaction;
  * - a version field, when the mapping has one, is checked on update ({@link OptimisticLockError});
- * - disposing it without a commit rolls back.
+ * - disposing it without a commit rolls back;
+ * - when its data source has a settings source (a `TransactionSettingsSource`) and it names any
+ *   settings, every read and write runs in a transaction that begins with them, so a row-level
+ *   security policy sees them: a read outside an open transaction runs in one of its own. The source
+ *   is asked each time a transaction begins.
  *
+
  * After a commit it can be used again. After a commit fails it is rolled back and refuses
  * further use: start a new one.
  */

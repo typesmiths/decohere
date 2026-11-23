@@ -1,4 +1,5 @@
 import type { Comparison, EntityClass } from "../query.types.js";
+import type { TransactionSettings } from "../transaction-settings.value.js";
 
 /** One row, keyed by property name. A reference holds the referenced row's key value. */
 export type Row = Record<string, unknown>;
@@ -51,7 +52,11 @@ export type RowQuery = {
  */
 export interface RowStore {
 	model(type: EntityClass): EntityModel;
-	begin(): Promise<void>;
+	/**
+	 * Begin a transaction, and make `settings` for as long as it lasts (Postgres:
+	 * `set_config(name, value, true)`). A store with no such settings, such as memory, ignores them.
+	 */
+	begin(settings?: TransactionSettings): Promise<void>;
 	commit(): Promise<void>;
 	rollback(): Promise<void>;
 	/** Hand the connection back. Called once, when the unit of work is disposed. */

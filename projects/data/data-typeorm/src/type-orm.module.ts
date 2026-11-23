@@ -16,7 +16,7 @@ import {
 	type IReadinessCheck,
 	ReadinessCheckToken,
 } from "@decohere/core/hosting";
-import type { ContainerBuilder } from "@decohere/crucible";
+import type { ContainerBuilder, LifetimeScope } from "@decohere/crucible";
 import { memoize } from "@decohere/core/caching";
 import type { DataSource, Logger } from "typeorm";
 import { DataSourceFactory } from "./data-source.factory.js";
@@ -110,7 +110,7 @@ export class TypeOrmModule {
 		builder: ContainerBuilder,
 		logger: Logger,
 	) {
-		const { entities, repositories, outbox, dataSourceOptions } = moduleConfig;
+		const { entities, repositories, outbox, settings, dataSourceOptions } = moduleConfig;
 		const dataSource = DataSourceFactory.create(
 			{
 				entities,
@@ -121,14 +121,17 @@ export class TypeOrmModule {
 			dataSourceOptions,
 		);
 
-		const unitOfWork = () => {
+		const unitOfWork = (scope: LifetimeScope) => {
 			if (!dataSource.isInitialized) {
 				throw new DependencyUnavailableError(
 					`data source "${String(name)}"`,
 					"not connected yet",
 				);
 			}
-			return new TrackingUnitOfWork(new TypeOrmRowStore(dataSource), { outbox });
+			return new TrackingUnitOfWork(new TypeOrmRowStore(dataSource), {
+				outbox,
+				settings: settings == null ? undefined : scope.resolve(settings),
+			});
 		};
 		builder.registerRequestScoped(name, unitOfWork);
 		builder.registerSingleton(typeOrmDataSourceToken(name), dataSource);

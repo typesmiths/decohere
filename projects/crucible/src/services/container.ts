@@ -246,7 +246,8 @@ export class Container implements IContainer {
 		const type = registration.type as Constructable | FunctionType;
 		const canConstruct = isConstructable(type);
 		const deps = this.resolveDependencies(type, [...path, registration]);
-		const inst = (canConstruct ? new type(...deps) : type()) as T;
+		// A factory gets the scope resolving it, as a class asking for LifetimeScopeToken does.
+		const inst = (canConstruct ? new type(...deps) : type(this)) as T;
 		return inst;
 	}
 

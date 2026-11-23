@@ -245,7 +245,11 @@ using scope = container.beginScope();
 const connection = scope.resolve("connection");
 ```
 
-Arrow factories are called as functions (not `new`). Use them when construction needs arguments the container should not know about.
+Arrow factories are called as functions (not `new`). Use them when construction needs arguments the container should not know about. A factory is given the scope resolving it, to use that scope's services, as a class does by injecting `LifetimeScopeToken`:
+
+```ts
+builder.registerRequestScoped("unit-of-work", (scope) => new UnitOfWork(pool, scope.resolve(TenantSettings)));
+```
 
 ### Optional / missing dependencies
 

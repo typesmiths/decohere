@@ -13,6 +13,8 @@ import {
 	isIncludeList,
 	type Query,
 } from "../query.types.js";
+import type { TransactionSettingsSource } from "../transaction-settings-source.contract.js";
+import { TransactionSettings } from "../transaction-settings.value.js";
 import type { IUnitOfWork } from "../unit-of-work.js";
 import type { ChildrenModel, EntityModel, Row, RowQuery, RowStore } from "./row-store.js";
 
@@ -31,6 +33,11 @@ type Plan = {
 export type TrackingUnitOfWorkOptions = {
 	/** Writes the events aggregates raise to an outbox table in the same commit. */
 	outbox?: OutboxMapper;
+	/**
+	 * Settings made at the start of each transaction. While they name any, a read outside a
+	 * transaction runs in one of its own.
+	 */
+	settings?: TransactionSettingsSource;
 };
 
 /** Stands in for a child collection that wasn't loaded, so using it fails loudly instead of looking empty. */
@@ -115,22 +122,28 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 		query: Query<T> = {},
 	): Promise<T[]> {
 		this.assertUsable();
-		if (query.lock && !this.store.inTransaction()) {
-			await this.store.begin();
+		if (query.lock) {
+			await this.beginTransaction();
 		}
-		const model = this.store.model(type);
-		const rows = await this.store.select(type, {
-			where: this.rowWhere(model, query.where ?? {}),
-			orderBy: query.orderBy,
-			limit: query.limit,
-			lock: query.lock,
-			load: query.load,
-		});
-		const roots = rows.map((row) => this.hydrate(model, row)) as T[];
-		for (const path of query.include ?? []) {
-			await this.loadPath(type, roots, path);
+		if (this.store.inTransaction()) {
+			return this.read(type, query);
 		}
-		return roots;
+		const settings = this.settings();
+		if (settings.isEmpty) {
+			return this.read(type, query);
+		}
+		// A policy reads the settings, which last only as long as a transaction: outside one, the read
+		// gets its own, as MikroORM runs a read when a session context is set.
+		await this.store.begin(settings);
+		let found: T[];
+		try {
+			found = await this.read(type, query);
+		} catch (err) {
+			await this.store.rollback();
+			throw err;
+		}
+		await this.store.commit();
+		return found;
 	}
 
 	public add(entity: object) {
@@ -185,7 +198,7 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 	public async beginTransaction() {
 		this.assertUsable();
 		if (!this.store.inTransaction()) {
-			await this.store.begin();
+			await this.store.begin(this.settings());
 		}
 	}
 
@@ -210,7 +223,7 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 				return;
 			}
 			if (!this.store.inTransaction()) {
-				await this.store.begin();
+				await this.store.begin(this.settings());
 			}
 			await this.write(plan);
 			await this.store.commit();
@@ -246,6 +259,23 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 	}
 
 	// ── Loading ────────────────────────────────────────────────────────────
+
+	/** The query's rows as instances, with the children it includes. */
+	private async read<T extends object>(type: EntityClass<T>, query: Query<T>): Promise<T[]> {
+		const model = this.store.model(type);
+		const rows = await this.store.select(type, {
+			where: this.rowWhere(model, query.where ?? {}),
+			orderBy: query.orderBy,
+			limit: query.limit,
+			lock: query.lock,
+			load: query.load,
+		});
+		const roots = rows.map((row) => this.hydrate(model, row)) as T[];
+		for (const path of query.include ?? []) {
+			await this.loadPath(type, roots, path);
+		}
+		return roots;
+	}
 
 	/**
 	 * The instance for a row: the one already known for its key, or a new one. Known instances keep
@@ -812,6 +842,15 @@ export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitO
 			throw new DataError(`${model.name} has no child collection "${prop}"`);
 		}
 		return spec;
+	}
+
+	/** What the source says now: asked as each transaction begins. */
+	private settings(): TransactionSettings {
+		const source = this.options.settings;
+		if (source == null) {
+			return TransactionSettings.none;
+		}
+		return TransactionSettings.of(source.transactionSettings());
 	}
 
 	private assertUsable() {
