@@ -37,8 +37,8 @@ describe("ServiceContainerBuilder", () => {
 			const expected: FactoryResponse = { field: "fieldValue" };
 			const factory = () => expected;
 			builder.registerRequestScoped<FactoryResponse>(FACTORY_KEY, factory);
-			const container = builder.build();
-			const actual = container.resolve(FACTORY_KEY);
+			using scope = builder.build().beginScope();
+			const actual = scope.resolve(FACTORY_KEY);
 			expect(actual).toEqual(expected);
 		});
 	});
@@ -171,7 +171,7 @@ describe("ServiceContainerBuilder", () => {
 				throw "ERROR";
 			} catch {}
 
-			expect(() => containerRef.resolve(Disposable)).toThrow();
+			expect(() => containerRef.beginScope()).toThrow("This container has been disposed");
 		});
 	});
 });
