@@ -18,9 +18,9 @@ Test what the program does for its users (files written, HTTP responses, exit co
 2. Prove it with the smallest executable test: a behavior suite for user-visible results, a unit for an isolated edge.
 3. Fix types and run `pnpm run typecheck` before review. Type errors are deferred from the inner loop, never accepted.
 
-## When `main` catches what a PR didn't
+## When the merge queue catches what a PR didn't
 
-`verify-release` on `main` is the slowest check, and a failure there has already merged. When it catches a bug, fix it, then add a test at the cheapest level that could have caught it. If no cheaper test can, say why in the PR.
+`verify-release` in the merge queue is the slowest check, and a failure there drops the PR from the queue after its review. When it catches a bug, fix it, then add a test at the cheapest level that could have caught it. If no cheaper test can, say why in the PR.
 
 ## Canonical suite ownership
 
@@ -30,7 +30,7 @@ Test what the program does for its users (files written, HTTP responses, exit co
 | a recipe runs as it is | `projects/scaffold/src/templates/recipes.spec.ts`, plus each recipe's own `tests/` | none |
 | each `decohere add` step, once on a recipe | `projects/scaffold/src/steps/add-steps.integration.spec.ts` | Auth0 setup in `auth.wiring.spec.ts` |
 | a generated app's types | `projects/scaffold/e2e/generated-app-types.e2e.spec.ts`, against the release build, in CI's `package` job on PRs | none |
-| what a user installs | `projects/create/e2e/real-install.e2e.spec.ts`, against a temporary registry, in CI's `verify-release` job on `main` | `runInBuilder` and argv in `projects/create/tests/runner.spec.ts` |
+| what a user installs | `projects/create/e2e/real-install.e2e.spec.ts`, against a temporary registry, in CI's `verify-release` job in the merge queue | `runInBuilder` and argv in `projects/create/tests/runner.spec.ts` |
 | product CLI shape | `projects/cli/tests/product.integration.spec.ts` | per-module forge, flux and create suites |
 | forge CLI | `projects/cli/tests/forge.integration.spec.ts` | action edges the CLI cannot see |
 | flux CLI | `projects/cli/tests/flux.integration.spec.ts` | HotReloadServer edges in `projects/flux/tests/hmr.server.spec.ts` |

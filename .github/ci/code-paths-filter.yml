@@ -15,7 +15,7 @@ code:
   - ".github/actions/**"
   - ".github/ci/**"
 
-# A PR builds the images only when these change. main always builds them, in verify-release.
+# A PR builds the images only when these change. The merge queue always builds them, in verify-release.
 images:
   - "projects/create/**"
   - "projects/devcontainer/**"

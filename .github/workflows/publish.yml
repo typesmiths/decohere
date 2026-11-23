@@ -1,10 +1,10 @@
 name: Publish
 
 on:
-  workflow_run:
-    workflows: ["CI"]
+  # The merge queue tested this exact commit and built it; Publish ships that build. CI doesn't run
+  # on main.
+  push:
     branches: [main]
-    types: [completed]
   # A stable release, started by hand. It lives in this file because npm's trusted publishing is
   # tied to it. See "Stable release" in docs/contributing/ci/README.md.
   workflow_dispatch:
@@ -28,7 +28,7 @@ on:
         default: true
 
 concurrency:
-  group: publish-${{ github.event.workflow_run.head_branch || 'release' }}
+  group: publish-${{ github.event_name == 'push' && 'main' || 'release' }}
   cancel-in-progress: false
 
 env:
@@ -36,16 +36,11 @@ env:
 
 jobs:
   guard:
-    # Only a push to this repo's main: a pull request's CI run also triggers workflow_run, and a
-    # fork's branch can be called main too.
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_repository.full_name == github.repository &&
-       github.event.workflow_run.head_branch == 'main')
+    # A push to main, or a stable release started by hand.
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # Finding the tested build waits up to 10 minutes for a CI run still finishing.
+    timeout-minutes: 15
     permissions:
       actions: read
       contents: read
@@ -54,9 +49,10 @@ jobs:
       should_publish: ${{ steps.release.outputs.should_publish || steps.check.outputs.should_publish }}
       channel: ${{ steps.release.outputs.channel || 'dev' }}
       release_channel: ${{ steps.release.outputs.release_channel || 'beta' }}
-      sha: ${{ steps.release.outputs.sha || github.event.workflow_run.head_sha }}
-      # The run holding the build to publish. A release makes its own, from the tested one.
-      build_run_id: ${{ steps.release.outputs.build_run_id || github.event.workflow_run.id }}
+      sha: ${{ steps.release.outputs.sha || github.sha }}
+      # The run holding the build to publish: the merge queue's for this commit. A release makes its
+      # own, from the tested one.
+      build_run_id: ${{ steps.release.outputs.build_run_id || steps.queue.outputs.run_id }}
       tested_run_id: ${{ steps.release.outputs.tested_run_id }}
     steps:
       # For the patch check: it uses nothing but Node.
@@ -99,11 +95,14 @@ jobs:
             echo "::error::$VERSION is already on npm."
             exit 1
           fi
-          tested_run_id="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?head_sha=$sha&event=push&status=success&per_page=1" --jq '.workflow_runs[0].id // empty')"
-          if [[ -z "$tested_run_id" ]]; then
-            echo "::error::No successful CI run for $sha."
-            exit 1
+          # A patch branch runs full CI on push. main's commits were tested in the merge queue, or
+          # on main itself for versions that shipped before the queue ran the full suite.
+          if [[ -n "$PATCH_BRANCH" ]]; then
+            events=push
+          else
+            events=merge_group,push
           fi
+          tested_run_id="$(node projects/ci-tools/src/release/tested-build.command.mjs "$sha" "$events")"
           {
             echo "sha=$sha"
             echo "tested_run_id=$tested_run_id"
@@ -114,19 +113,19 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       # Code changes are counted since the last commit that shipped, not since the parent: the
-      # merge queue can land a code PR and a docs PR in one push, and CI runs on the tip only.
+      # merge queue can land a code PR and a docs PR in one push, and Publish runs on the tip only.
       # Full history and tags, so the last v* tag behind the tip can be found.
       - uses: actions/checkout@v4
         if: github.event_name != 'workflow_dispatch'
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
 
       - name: Find the last shipped commit
         id: parent
         if: github.event_name != 'workflow_dispatch'
         env:
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          SHA: ${{ github.sha }}
         run: |
           base="$(node projects/ci-tools/src/release/find-publish-base.mjs "$SHA")"
           echo "Comparing $SHA with ${base:-nothing (first commit)}"
@@ -138,15 +137,15 @@ jobs:
         with:
           token: ${{ github.token }}
           base: ${{ steps.parent.outputs.sha }}
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.sha }}
           filters: .github/ci/code-paths-filter.yml
 
       - name: Skip duplicate, stale, or docs-only publishes
         id: check
         if: github.event_name != 'workflow_dispatch'
         run: |
-          BRANCH="${{ github.event.workflow_run.head_branch }}"
-          SHA="${{ github.event.workflow_run.head_sha }}"
+          BRANCH="${{ github.ref_name }}"
+          SHA="${{ github.sha }}"
 
           if [[ -z "${{ steps.parent.outputs.sha }}" ]]; then
             echo "Skipping: no parent commit for path comparison"
@@ -164,7 +163,7 @@ jobs:
           tip="$(git rev-parse "origin/$BRANCH")"
 
           if [[ "$tip" != "$SHA" ]]; then
-            echo "Skipping: CI SHA ${SHA} is not current tip of ${BRANCH} (${tip})"
+            echo "Skipping: ${SHA} is not current tip of ${BRANCH} (${tip})"
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -180,6 +179,19 @@ jobs:
           fi
 
           echo "should_publish=true" >> "$GITHUB_OUTPUT"
+
+      # The queue tested the exact commit that lands, so its run holds this commit's build. None
+      # means the commit skipped the queue: stop, rather than ship something nothing tested.
+      - name: Find the merge queue's build of this commit
+        id: queue
+        if: steps.check.outputs.should_publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          run_id="$(node projects/ci-tools/src/release/tested-build.command.mjs "$SHA" merge_group)"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "Shipping the build of $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$run_id" >> "$GITHUB_STEP_SUMMARY"
 
   # Gives the tested build its stable version, changing only package.json files, then uses it the
   # way a user does. The images are rebuilt around it, because the scaffolder pins versions.

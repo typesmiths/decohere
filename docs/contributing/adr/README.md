@@ -50,7 +50,7 @@ Update the topic's record **in the same PR as the code**: rewrite what no longer
 | [0009](0009-agent-instructions-in-agents-md.md) | Agent instructions live in `AGENTS.md`; `.claude/CLAUDE.md` imports it | Accepted |
 | [0014](0014-package-names.md) | Products keep their names (forge, flux, crucible, scribe); support libraries are named for what they do; a base package holds the contracts and a `<library>-<vendor>` provider package implements them; hosting is in `core` | Accepted |
 | [0019](0019-dev-versions-from-the-ci-run.md) | Dev versions come from the CI run, chosen once in CI; Publish reads them from the build; tags only record what shipped | Accepted |
-| [0020](0020-test-the-real-install-before-publishing.md) | `main` tests the real install from a temporary registry before publishing; PRs run the quicker checks | Accepted |
+| [0020](0020-test-the-real-install-before-publishing.md) | The merge queue tests the real install from a temporary registry, and Publish ships the build it tested; PRs run the quicker checks | Accepted |
 | [0021](0021-esm-only-packages.md) | Published packages are ESM only; forge's default release build makes ESM and types | Accepted |
 | [0022](0022-where-scaffolding-runs.md) | Scaffolding runs where its tools are: directly in a Decohere Dev Container, otherwise in the scaffolder image with nothing shared and the project copied out | Accepted |
 | [0023](0023-config-layers.md) | Config is layered: class defaults, then sources in order. `EnvDataSource` maps `SECTION__KEY`, and a class's `static schema` is checked with errors that never show a value | Accepted |

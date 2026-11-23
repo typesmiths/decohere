@@ -7,14 +7,16 @@ CI stores no secrets or variables. npm publishing uses Trusted Publishing (OIDC)
 | Event | What runs |
 |---|---|
 | Pull request (this repo or a fork) | CI: lint, typecheck, unit tests, release build and publish dry run. Images are built only when their files change, and Docker-backed tests run only when data code changes. Read-only token, no secrets. |
-| Merge queue (`merge_group`) | The same checks on the PR combined with `main` and the PRs ahead of it, docs-only or not. No images or Docker-backed tests: `main` covers those. |
-| Push to `release/<major>.<minor>` | A patch to a release: the full run, as on `main`. Nothing publishes until you start a release. See [Patching a release](#patching-a-release). |
-| Push to `main` | The integration run. A beta release build, then **verify-release** uses it from a temporary registry, alongside the coverage gate and Docker-backed tests. Lint, typecheck and the package check don't repeat, because the queue tested this same commit. If it all passes, Publish uploads that build to the npm `dev` dist-tag. |
+| Merge queue (`merge_group`) | The full run, on the PR combined with `main` and the PRs ahead of it, docs-only or not: lint, typecheck, the package check, the coverage gate, Docker-backed tests, one release build stamped with its dev version, and **verify-release**, which uses that build from a temporary registry. If any of it fails, the PR leaves the queue and `main` never sees it. |
+| Push to `main` | No CI: the queue tested this exact commit. **Publish** finds the queue's CI run for the commit and uploads its build to the npm `dev` dist-tag, and **Pages** deploys with that run's coverage. |
+| Push to `release/<major>.<minor>` | A patch to a release: the full run, as in the queue, since these commits don't go through it. Nothing publishes until you start a release. See [Patching a release](#patching-a-release). |
 | Started by hand | **Stable release**: gives a tested build its stable version, checks it, and publishes it to npm `latest`. See [Stable release](#stable-release). |
 | Nightly 03:17 UTC | Bench on `main`, then Pages (benchmark charts). |
 | Nightly 06:00 UTC | npm audit. |
 
-`main` accepts changes only through the merge queue, with squash merges, and requires the `ci` check. A branch without a pull request gets no CI; open a draft PR. Docs-only changes (nothing matching [`code-paths-filter.yml`](../../../.github/ci/code-paths-filter.yml)) skip the suite on pull requests and `main` pushes, and the `ci` check still passes. `workflow_dispatch` and the merge queue never skip for docs. An image break can land on `main` when a PR didn't touch the image files: `main` turns red and nothing publishes until it's fixed.
+`main` accepts changes only through the merge queue, with squash merges, and requires the `ci` check. Branch protection asks for that check on the pull request and on the queue's commit, never on a commit already on `main`, so `main` needs no CI run of its own. The queue fast-forwards `main` to the commit it tested, so that commit's SHA finds its run. A branch without a pull request gets no CI; open a draft PR. Docs-only changes (nothing matching [`code-paths-filter.yml`](../../../.github/ci/code-paths-filter.yml)) skip the suite on pull requests and `release/**` pushes, and the `ci` check still passes. `workflow_dispatch` and the merge queue never skip for docs. Nothing in the normal flow needs a run started by hand: the queue's run is the one that counts.
+
+An admin can merge past the queue. That commit has no queue run, so Publish stops with an error saying so and nothing ships; the next change through the queue publishes both.
 
 ## The flows
 
@@ -24,20 +26,19 @@ A pull request:
 flowchart LR
   pr["PR"] --> checks["Quick checks<br/>lint, types, tests, build"]
   checks --> queue["Merge queue"]
-  queue --> main["main"]
   checks -- fails --> stop["Can't merge"]
-  queue -- fails --> stop
 ```
 
-A push to `main`:
+The merge queue, and the push to `main` it makes:
 
 ```mermaid
 flowchart LR
-  push["Push to main"] --> build["One build"]
+  queue["Merge queue"] --> build["Full checks<br/>and one build"]
   build --> verify["Verify<br/>use it as a user would"]
-  verify --> publish["Publish that build<br/>to npm dev"]
+  verify --> main["main"]
+  main --> publish["Publish that build<br/>to npm dev"]
   publish --> latest["Promote to latest<br/>you start it"]
-  verify -- fails --> red["main is red<br/>nothing published"]
+  verify -- fails --> out["PR leaves the queue<br/>main unchanged"]
 ```
 
 A stable release:
@@ -58,13 +59,14 @@ flowchart LR
 |---|---|
 | [`ci.yml`](../../../.github/workflows/ci.yml) | The suite; required check `ci`. |
 | [`promote-latest.yml`](../../../.github/workflows/promote-latest.yml) | Started by hand: moves npm `latest` to a version that fully shipped. |
-| [`publish.yml`](../../../.github/workflows/publish.yml) | After CI succeeds on `main`: npm, Docker images, `v*` tag. Started by hand: a stable release. |
-| [`pages.yml`](../../../.github/workflows/pages.yml) | After CI succeeds on `main`: coverage and CI badges to GitHub Pages. |
+| [`publish.yml`](../../../.github/workflows/publish.yml) | On a push to `main`: the merge queue's build of that commit to npm, Docker images, `v*` tag. Started by hand: a stable release. |
+| [`pages.yml`](../../../.github/workflows/pages.yml) | On a push to `main`: coverage (from the queue's run) and status badges to GitHub Pages. |
 | [`bench.yml`](../../../.github/workflows/bench.yml) | Nightly benchmarks on `main`, deployed to Pages. |
 | [`clear-benchmark-history.yml`](../../../.github/workflows/clear-benchmark-history.yml) | Manual: redeploys Pages with an empty benchmark history. |
 | [`npm-audit.yml`](../../../.github/workflows/npm-audit.yml) | Nightly `pnpm audit` report. |
 | [`setup-node-pnpm`](../../../.github/actions/setup-node-pnpm/action.yml) | Composite action: pnpm, Node, install, optional git identity. |
-| [`publish-prepare`](../../../.github/actions/publish-prepare/action.yml) | Composite action: applies the build's version and downloads CI's release build for Publish. |
+| [`publish-prepare`](../../../.github/actions/publish-prepare/action.yml) | Composite action: downloads CI's release build for Publish and applies its version. |
+| [`tested-build`](../../../projects/ci-tools/src/release/tested-build.command.mjs) | Script: the CI run whose build ships a commit (the queue's, on `main`), or an error saying there's none. |
 | [`verify-release`](../../../.github/actions/verify-release/action.yml) | Composite action: uses a build from a temporary registry, the way a user does. |
 | [`failure-report`](../../../.github/actions/failure-report/action.yml) | Composite action: puts why a failed job failed on the run's summary page. |
 | [`code-paths-filter.yml`](../../../.github/ci/code-paths-filter.yml) | Which paths count as code for CI and Publish. |
@@ -77,23 +79,25 @@ The run's summary page says which step failed and why, with the step's last line
 
 `changes` decides whether to run the suite; these jobs run and `ci` fails if any that ran didn't pass:
 
-- **lint/typecheck**: `lint:check` (oxlint, Prettier, `forge paths --check` and `design:check`), `typecheck`, actionlint, a check for packages not on npm yet, and `pnpm audit`, which fails on high or critical advisories. On `main` pushes it also updates the `security(ci): npm audit vulnerabilities detected` issue.
-- **test (1/3, 2/3, 3/3)**: unit tests split across three jobs, on everything except `main`.
-- **coverage** (`main`): the unit tests with coverage thresholds. It uploads coverage for Pages.
-- **test-docker**: Docker-backed tests. On `main` and manual runs, and on a PR that changes data code.
-- **build** (`main` and manual runs): stamps the dev version, syncs dependency versions and uploads the release build as `forge-release-beta-<run>`.
-- **package** (everything except `main`): one release build, dependency drift report, a generated app typechecked against that build ([`generated-app-types.e2e.spec.ts`](../../../projects/scaffold/e2e/generated-app-types.e2e.spec.ts)) and `forge publish --dry-run`. When the image files changed, it also packs `create.tgz`, runs `forge docker --dry-run` (images built, not pushed), and builds a generated app's Dev Container on that base image.
-- **verify-release** (`main` and manual runs only): takes `build`'s build, runs the quick e2e specs for the build and the forge CLI, publishes it to a temporary registry ([Verdaccio](../../../.github/ci/verdaccio.yaml)) inside the job, builds the images, checks the scaffolder in the `create` image matches its tag, then runs [`real-install.e2e.spec.ts`](../../../projects/create/e2e/real-install.e2e.spec.ts): the real launcher, the generated app's install, typecheck, build, test, lint and `/health` on exact pnpm versions, the generated Dev Container, with and without Postgres, and the install steps in the docs. If it fails, nothing reaches npm. A broken merge turns `main` red, and publishing stops until a fix or revert lands ([ADR 0020](../adr/0020-test-the-real-install-before-publishing.md)).
+The **full run** is the merge queue, a push to `release/**` and a run started by hand; a pull request runs the rest.
 
-To run it on a branch without publishing: `gh workflow run ci.yml --ref <branch>`. Publish only follows pushes.
+- **lint/typecheck**: `lint:check` (oxlint, Prettier, `forge paths --check` and `design:check`), `typecheck`, actionlint, a check for packages not on npm yet, and `pnpm audit`, which fails on high or critical advisories. The nightly `npm-audit.yml` keeps the audit issue.
+- **test (1/3, 2/3, 3/3)**: unit tests split across three jobs, on pull requests. The full run has **coverage** instead.
+- **coverage** (full run): the unit tests with coverage thresholds. It uploads coverage for Pages.
+- **test-docker**: Docker-backed tests. In the full run, and on a PR that changes data code.
+- **build** (full run): stamps the dev version, syncs dependency versions and uploads the release build as `forge-release-beta-<run>`. In the queue, that's the build Publish ships.
+- **package** (everywhere): one release build, dependency drift report, a generated app typechecked against that build ([`generated-app-types.e2e.spec.ts`](../../../projects/scaffold/e2e/generated-app-types.e2e.spec.ts)) and `forge publish --dry-run`. When the image files changed, it also packs `create.tgz`, runs `forge docker --dry-run` (images built, not pushed), and builds a generated app's Dev Container on that base image.
+- **verify-release** (full run): takes `build`'s build, runs the quick e2e specs for the build and the forge CLI, publishes it to a temporary registry ([Verdaccio](../../../.github/ci/verdaccio.yaml)) inside the job, builds the images, checks the scaffolder in the `create` image matches its tag, then runs [`real-install.e2e.spec.ts`](../../../projects/create/e2e/real-install.e2e.spec.ts): the real launcher, the generated app's install, typecheck, build, test, lint and `/health` on exact pnpm versions, the generated Dev Container, with and without Postgres, and the install steps in the docs. If it fails in the queue, the PR leaves the queue, so the break never reaches `main` or npm ([ADR 0020](../adr/0020-test-the-real-install-before-publishing.md)).
+
+`gh workflow run ci.yml --ref <branch>` runs the full run on a branch without publishing. The normal flow never needs it: the queue runs the same jobs on the commit that lands.
 
 ## Publish (`publish.yml`)
 
-Runs when CI succeeds on a **push** to this repository's `main`; pull request runs and forks are excluded. It also runs a [stable release](#stable-release), started by hand.
+Runs on a **push** to this repository's `main`, which only the merge queue makes. It also runs a [stable release](#stable-release), started by hand.
 
-CI chooses a dev version once, before its release build: `0.0.1-dev.20261104.512` is the commit's UTC date and CI's run number. Publish reads that version from the build and never works it out again ([ADR 0019](../adr/0019-dev-versions-from-the-ci-run.md)).
+The queue's CI run chooses a dev version once, before its release build: `0.0.1-dev.20261104.512` is the commit's UTC date and CI's run number. Publish reads that version from the build and never works it out again ([ADR 0019](../adr/0019-dev-versions-from-the-ci-run.md)).
 
-1. **guard**: skips when nothing but docs changed since the last commit that shipped (the newest `v*` tag behind it, not just the parent: the merge queue can land a code PR and a docs PR in one push), when the commit is no longer the branch tip, or when it already has a `v*` tag.
+1. **guard**: skips when nothing but docs changed since the last commit that shipped (the newest `v*` tag behind it, not just the parent: the merge queue can land a code PR and a docs PR in one push), when the commit is no longer the branch tip, or when it already has a `v*` tag. Otherwise it finds the queue's successful CI run for this commit by its SHA, waiting a few minutes if that run is still finishing, and checks its `forge-release-beta-<run>` build is still there. The run is linked on the summary page. With no such run (the commit skipped the queue) or no build, it fails with a message and nothing publishes; Publish never builds one itself.
 2. **verify**: probes npm and GHCR for this version and outputs which steps to skip. It fails if a package name isn't on npm yet, which the merge queue should already have stopped.
 3. **npm**: `forge publish --channel dev` from `main`, `--channel latest` for a stable release, over OIDC. Skipped if the version is already on npm. Runs alongside **docker**.
 4. **docker**: the only job with `packages: write`. Builds and pushes the `create` and `devcontainer` images (plus `:latest` for a stable release).
@@ -106,7 +110,7 @@ GHCR accepts the `GITHUB_TOKEN` only for images whose **Manage Actions access** 
 
 ## Stable release
 
-A stable release ships a version `main` already tested, without running those tests again. It lives in `publish.yml` because npm's trusted publishing is tied to that file.
+A stable release ships a version the merge queue already tested, without running those tests again. It lives in `publish.yml` because npm's trusted publishing is tied to that file.
 
 1. Pick a version that has a `v*` tag and is under 14 days old, since that's how long its build is kept.
 2. Try it first. A dry run does everything up to publishing, and it's the default:
@@ -120,7 +124,7 @@ A stable release ships a version `main` already tested, without running those te
 
 What it does:
 
-- **release-build** downloads the build CI tested, and changes only the version and `@decohere/*` pins in its `package.json` files. It fails if the old version appears anywhere else. It then rebuilds the images, because the scaffolder pins versions, and runs the same **verify-release** checks as `main`.
+- **release-build** downloads the build CI tested (the queue's run of that commit, or for a version from before 2026-11-23, its run on `main`), and changes only the version and `@decohere/*` pins in its `package.json` files. It fails if the old version appears anywhere else. It then rebuilds the images, because the scaffolder pins versions, and runs the same **verify-release** checks as the merge queue.
 - **npm**, **docker**, **check-images** and **tag** run as for any publish, with `latest` as the npm tag and `v0.1.0` on the tested commit.
 - **release-finish** creates the GitHub Release, and pushes the branch for the PR in step 4. It can't open the PR itself, because this repo doesn't let Actions create PRs.
 
@@ -131,7 +135,7 @@ Changesets are off ([ADR 0003](../adr/0003-no-changesets-until-public-release.md
 Use this when `main` has moved on and you need to fix a release without shipping what came after it.
 
 1. Land the fix on `main` first.
-2. Cut the branch from the release's tag, and cherry-pick the fix. Pushing the branch runs full CI, because its commits weren't tested on `main`:
+2. Cut the branch from the release's tag, and cherry-pick the fix. Pushing the branch runs full CI, because its commits don't go through the merge queue:
 
    ```bash
    git switch -c release/0.1 v0.1.0
@@ -145,11 +149,11 @@ Use this when `main` has moved on and you need to fix a release without shipping
    gh workflow run publish.yml -f patch_branch=release/0.1 -f version=0.1.1
    ```
 
-It takes the build CI made of that branch's latest commit, and carries on as above. It refuses a commit with no passing CI run, a version that doesn't belong on the branch, or one that isn't newer than npm `latest`: a patch to an older line would take `latest` backwards, and there's no separate tag for those yet. The base version PR is only offered if `main` isn't already further on.
+It takes the build CI made of that branch's latest commit on push, and carries on as above. It refuses a commit with no passing CI run, a version that doesn't belong on the branch, or one that isn't newer than npm `latest`: a patch to an older line would take `latest` backwards, and there's no separate tag for those yet. The base version PR is only offered if `main` isn't already further on.
 
 ## Pages
 
-GitHub Pages (<https://typesmiths.github.io/decohere/>) holds the badges and benchmark charts. `pages.yml` (after CI on `main`), `bench.yml` and `clear-benchmark-history.yml` each deploy the whole site and share one concurrency group. Each carries over what it does not regenerate.
+GitHub Pages (<https://typesmiths.github.io/decohere/>) holds the badges and benchmark charts. `main`'s status badge shows Publish's last run on `main`, since CI doesn't run there. `pages.yml` (on a push to `main`, with the coverage from the queue's run of that commit), `bench.yml` and `clear-benchmark-history.yml` each deploy the whole site and share one concurrency group. Each carries over what it does not regenerate.
 
 ## Benchmarks
 

@@ -47,13 +47,59 @@ describe("publish.yml", () => {
 		expect(guard).not.toContain("HEAD^1");
 	});
 
-	it("only releases a patch whose commit passed full CI", () => {
+	it("only releases a patch whose commit passed full CI on its branch", () => {
+		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
+		const find = guard.indexOf('tested-build.command.mjs "$sha" "$events"');
+
+		expect(find).toBeGreaterThan(-1);
+		expect(guard).toMatch(/if \[\[ -n "\$PATCH_BRANCH" \]\]; then\n\s+events=push\n/);
+		expect(guard.indexOf("git/ref/heads/")).toBeLessThan(find);
+	});
+
+	it("releases a tested version from the queue's build, or main's for a version from before", () => {
 		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
 
-		expect(guard).toContain("event=push&status=success");
-		expect(guard.indexOf("git/ref/heads/")).toBeLessThan(
-			guard.indexOf("event=push&status=success"),
+		expect(guard).toMatch(/else\n\s+events=merge_group,push\n/);
+	});
+
+	it("starts on a push to main, not when a CI run finishes", () => {
+		const on = yml.slice(0, yml.indexOf("workflow_dispatch:"));
+
+		expect(on).toMatch(/push:\n\s+branches: \[main\]/);
+		expect(yml).not.toContain("workflow_run");
+	});
+
+	it("ships the build the merge queue tested for this same commit", () => {
+		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
+		const queue = guard.slice(guard.indexOf("- name: Find the merge queue's build"));
+
+		expect(queue).toContain("if: steps.check.outputs.should_publish == 'true'");
+		expect(queue).toContain('tested-build.command.mjs "$SHA" merge_group');
+		expect(guard).toContain(
+			"build_run_id: ${{ steps.release.outputs.build_run_id || steps.queue.outputs.run_id }}",
 		);
+	});
+
+	it("gives the guard longer than the wait for a queue run that's still finishing", () => {
+		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
+		const minutes = Number(/timeout-minutes: (\d+)/.exec(guard)?.[1]);
+		const service = fs.readFileSync(
+			fileURLToPath(new URL("../../src/release/tested-build.service.mjs", import.meta.url)),
+			"utf8",
+		);
+		const patience = Number(/patienceMs \?\? (\d+) \* 60_000/.exec(service)?.[1]);
+
+		expect(patience).toBeGreaterThan(0);
+		expect(minutes).toBeGreaterThan(patience);
+	});
+
+	it("refuses a commit with no tested build rather than building one", () => {
+		const queue = yml.slice(yml.indexOf("- name: Find the merge queue's build"));
+
+		expect(queue.slice(0, queue.indexOf("\n      - "))).not.toContain("continue-on-error");
+		// Only CI stamps and builds. A stable release only changes the version of a tested build.
+		expect(yml).not.toMatch(/forge [^\n]*\bbuild --configuration/);
+		expect(yml).not.toMatch(/forge [^\n]*\bversion --channel/);
 	});
 
 	it("reads a patch's tested version from its build", () => {
@@ -76,7 +122,7 @@ describe("publish.yml", () => {
 		const guard = yml.slice(yml.indexOf("\n  guard:"), yml.indexOf("\n  release-build:"));
 
 		expect(on).toContain("branches: [main]");
-		expect(guard).toContain("head_branch == 'main'");
+		expect(guard).toContain("github.ref == 'refs/heads/main'");
 	});
 
 	it("only tags a version once npm and the images have shipped", () => {

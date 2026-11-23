@@ -11,9 +11,11 @@ if (repo == null || token == null) {
 	throw new Error("GITHUB_REPOSITORY and GITHUB_TOKEN are required");
 }
 
-const workflowFileName = "ci.yml";
+// CI doesn't run on main: the merge queue tests each commit before it lands, and Publish ships it.
+// So main's state is whether Publish's last run passed.
+const workflowFileName = "publish.yml";
 
-const branches = [{ branch: "main", label: "CI Main", file: "ci-main.svg" }];
+const branches = [{ branch: "main", label: "Main", file: "ci-main.svg" }];
 
 async function getLatestWorkflowRun(branch) {
 	const url =
