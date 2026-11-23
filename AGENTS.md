@@ -6,7 +6,7 @@ These are the instructions for every coding agent on this repo ([ADR 0009](docs/
 
 Before changing code, run `pnpm install` and read in this order:
 
-1. The shared rules every Typesmiths project follows, from the installed `@decohere/standards`: `node_modules/@decohere/standards/rules/README.md` lists them, in the order to read them. What follows is particular to Decohere, and where it is silent the shared rules apply.
+1. The shared rules every Typesmiths project follows, from the installed `@decohere/standards`: [docs/contributing/standards/](docs/contributing/standards/README.md) lists them, in the order to read them. That folder links to the package in `node_modules`, so it is empty until `pnpm install`. What follows is particular to Decohere, and where it is silent the shared rules apply.
 2. [Style](docs/contributing/style/): how code is written, its do's and don'ts, and samples to copy. New code follows [ADR 0027](docs/contributing/adr/0027-code-design.md): one class per job, files named `<thing>.<role>.ts`, specs beside the code.
 3. [Architecture](docs/contributing/architecture/): the packages, what may import what, and §5 on how a package is shaped.
 4. [Testing](docs/contributing/testing/): which suite owns a behaviour, and where a spec goes.

@@ -48,7 +48,7 @@ The picture: [code design](../architecture/code-design.svg).
 
 ### Names
 
-- **A file is named for the thing it holds and its role, one thing per file:** `route-path.value.ts`, `memory.plugin.ts`, `optimistic-lock.error.ts`. The roles, and what each one means, are the shared standards' table (`node_modules/@decohere/standards/rules/files-and-folders.md`, after `pnpm install`), and `pnpm design:check` reads the same table. A role the table lacks is added to the standards before it is used.
+- **A file is named for the thing it holds and its role, one thing per file:** `route-path.value.ts`, `memory.plugin.ts`, `optimistic-lock.error.ts`. The roles, and what each one means, are the shared standards' table ([file names](../standards/files-and-folders.md#file-names), after `pnpm install`), and `pnpm design:check` reads the same table. A role the table lacks is added to the standards before it is used.
 - **No `utils`, `helpers`, `common`, `shared`, `misc`, `.types.ts`, `.store.ts` or verb-named files.** A type lives beside the thing it describes: in its file, or a `.contract.ts` when it is the contract a provider implements.
 - **Interfaces have no `I` prefix**, as in TypeScript's own libraries: `Clock`, not `IClock`. An implementation is named for how it differs (`SystemClock`, `FixedClock`), and the token is `ClockToken`. Eleven interfaces still have the prefix (`IUnitOfWork`, `IContainer`, `ICache`, …); they lose it when their package moves.
 - **Errors are named classes ending in `Error`**, one per file (`optimistic-lock.error.ts`), thrown and never swallowed. Decohere's errors already end in `Error`.
@@ -69,7 +69,7 @@ The scaffolder generates apps that follow the same rules, and Crucible's decorat
 
 ### Where the rules live
 
-The rules that aren't Decohere's own move to a shared standards repository, `typesmiths/standards`, published as a package each project installs. A project picks up a new version as a dependency update, through its usual pull request and CI. It points its agent instructions at the copy in its `node_modules`. Rules a tool can check, such as the counts above, ship with the package as checks, so a project that takes the update and breaks a rule fails CI on that pull request. Decohere installs it as an exact dev dependency that Dependabot proposes updates to; `AGENTS.md` sends agents to it, and the design check takes its file roles from it.
+The rules that aren't Decohere's own move to a shared standards repository, `typesmiths/standards`, published as a package each project installs. A project picks up a new version as a dependency update, through its usual pull request and CI. It points its agent instructions at the copy in its `node_modules`. Rules a tool can check, such as the counts above, ship with the package as checks, so a project that takes the update and breaks a rule fails CI on that pull request. Decohere installs it as an exact dev dependency that Dependabot proposes updates to, linked at `docs/contributing/standards/` so it shows in the file tree and search; `AGENTS.md` sends agents to it, and the design check takes its file roles from it.
 
 ## Consequences
 
@@ -83,3 +83,4 @@ The rules that aren't Decohere's own move to a shared standards repository, `typ
 
 - 2026-11-22: Adopted ledger's rules from its funding module for Decohere's own code. Errors end in `Error`, specs sit beside the code, and Crucible's decorators are allowed in an app's domain. Packages stay as they are. The counts are measured in CI and may only fall.
 - 2026-11-23: Decohere installs `@decohere/standards` and takes the file roles and their meanings from it, instead of listing them here.
+- 2026-11-23: The rules are linked at `docs/contributing/standards/`, with standards 0.3.0's `standards link`.
