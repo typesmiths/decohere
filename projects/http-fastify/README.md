@@ -1,6 +1,6 @@
 # @decohere/http-fastify
 
-The [Fastify](https://fastify.dev) provider for [`@decohere/http`](../http/README.md): `FastifyProvider`, the web server that serves an app's controllers. `@decohere/http` holds the controllers, routing, auth, OpenAPI, health and problem details; this package is where Fastify and its plugins are. Why the split: [architecture §2](../../docs/architecture/README.md#2-vendors-stay-at-the-composition-edge).
+The [Fastify](https://fastify.dev) provider for [`@decohere/http`](../http/README.md): `FastifyProvider`, the web server that serves an app's controllers. `@decohere/http` holds the controllers, routing, auth, OpenAPI, health and problem details; this package is where Fastify and its plugins are. Why the split: [architecture §2](../../docs/contributing/architecture/README.md#2-vendors-stay-at-the-composition-edge).
 
 ```bash
 npm install @decohere/http @decohere/http-fastify
@@ -62,7 +62,7 @@ What to know about the plugin's behaviour:
 - **Helmet, CORS and the rate limit** are unaffected, and an error reply (a `401`, a `400` with a large body) is compressed like any other.
 - **Pre-compressed files.** Serving `.br`/`.gz` files built ahead of time is a possible later step; today static files are compressed on the fly.
 
-Why this shape: [ADR 0008](../../docs/adr/0008-response-compression-in-http.md).
+Why this shape: [ADR 0008](../../docs/contributing/adr/0008-response-compression-in-http.md).
 
 ## Streams and stopping
 
@@ -72,4 +72,12 @@ Why this shape: [ADR 0008](../../docs/adr/0008-response-compression-in-http.md).
 
 ## Testing
 
-`bootModule({ controllers, provider: FastifyProvider })`, from `@decohere/http/testing`, runs controllers as a real app on this provider, on a free loopback port. This package's own suites, `tests/*.integration.spec.ts`, cover what only the wire shows: compression and static files.
+`bootModule({ controllers, provider: FastifyProvider })`, from `@decohere/http/testing`, runs controllers as a real app on this provider, on a free loopback port.
+
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
+
+`http-fastify` implements `HttpProvider` from [`@decohere/http`](../http/README.md) (which extends core's `AppServer`) on Fastify. `src/` holds one file, `fastify.provider.ts` (`FastifyProvider`): routing, compression, static files, server-sent events and stopping.
+
+Its canonical suites are `tests/*.integration.spec.ts` (`compression.integration.spec.ts`, `static.integration.spec.ts`), for what only the wire shows ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)). Everything else about HTTP is tested in `projects/http/tests/`, on this provider. Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).

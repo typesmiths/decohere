@@ -1,0 +1,291 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1960" viewBox="0 0 1600 1960" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="15" fill="#1f2328">
+  <title>Decohere code design (ADR 0027)</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
+    </marker>
+    <marker id="ok" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2e7d32"/>
+    </marker>
+    <marker id="no" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c0392b"/>
+    </marker>
+    <style>
+      .panel { fill: #ffffff; stroke: #d0d7de; stroke-width: 1.5; }
+      .h1 { font-size: 30px; font-weight: 700; }
+      .h2 { font-size: 21px; font-weight: 700; }
+      .sub { font-size: 14px; fill: #57606a; }
+      .small { font-size: 13px; fill: #57606a; }
+      .b { font-weight: 700; }
+      .contracts { fill: #e8f1fb; stroke: #3b6ea8; stroke-width: 2; }
+      .impl { fill: #fdf1e3; stroke: #b9772e; stroke-width: 2; }
+      .base { fill: #f1edf7; stroke: #6b5b95; stroke-width: 2; }
+      .app { fill: #eaf6ec; stroke: #3f8a4f; stroke-width: 2; }
+      .host { fill: #f6f8fa; stroke: #57606a; stroke-width: 2; }
+      .group { fill: none; stroke: #8c959f; stroke-width: 1.5; stroke-dasharray: 6 4; }
+      .line { stroke: #57606a; stroke-width: 2; fill: none; }
+      .good { stroke: #2e7d32; stroke-width: 2.5; fill: none; }
+      .bad { stroke: #c0392b; stroke-width: 2.5; fill: none; stroke-dasharray: 7 5; }
+      .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 14px; }
+      .note { fill: #57606a; font-style: italic; }
+      .was { fill: #fbeaea; stroke: #c0392b; stroke-width: 1.5; }
+      .now { fill: #eaf6ec; stroke: #3f8a4f; stroke-width: 1.5; }
+      .bar { fill: #c0392b; opacity: 0.75; }
+      .track { fill: #f0f2f4; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1960" fill="#ffffff"/>
+  <text x="40" y="52" class="h1">How Decohere's code is laid out</text>
+  <text x="40" y="78" class="sub">ADR 0027 · packages as modules, folders by subdomain, one class per job, specs beside the code</text>
+
+  <!-- ───────────── 1. Packages ───────────── -->
+  <rect x="30" y="100" width="1540" height="560" rx="10" class="panel"/>
+  <text x="54" y="134" class="h2">1. Packages are modules: contracts in the base package, implementations in providers</text>
+
+  <rect x="470" y="156" width="660" height="62" rx="8" class="app"/>
+  <text x="800" y="182" text-anchor="middle" class="b">an app on Decohere</text>
+  <text x="800" y="204" text-anchor="middle" class="small">its code imports base packages; only app.ts names a provider</text>
+
+  <!-- data -->
+  <rect x="60" y="250" width="560" height="300" rx="12" class="group"/>
+  <text x="80" y="276" class="b">data</text>
+  <rect x="200" y="296" width="280" height="80" rx="8" class="contracts"/>
+  <text x="340" y="322" text-anchor="middle" class="b">@decohere/data</text>
+  <text x="340" y="344" text-anchor="middle" class="small">IUnitOfWork · Repository&lt;T&gt; · Query&lt;T&gt;</text>
+  <text x="340" y="362" text-anchor="middle" class="small">RowStore · TrackingUnitOfWork</text>
+  <rect x="80" y="450" width="160" height="70" rx="8" class="impl"/>
+  <text x="160" y="480" text-anchor="middle" class="b">data-mikro-orm</text>
+  <text x="160" y="500" text-anchor="middle" class="small">MikroORM's own UoW</text>
+  <rect x="260" y="450" width="160" height="70" rx="8" class="impl"/>
+  <text x="340" y="480" text-anchor="middle" class="b">data-typeorm</text>
+  <text x="340" y="500" text-anchor="middle" class="small">a RowStore</text>
+  <rect x="440" y="450" width="160" height="70" rx="8" class="impl"/>
+  <text x="520" y="480" text-anchor="middle" class="b">data-memory</text>
+  <text x="520" y="500" text-anchor="middle" class="small">rows in the process</text>
+  <path d="M160,448 L270,380" class="line" marker-end="url(#arrow)"/>
+  <path d="M340,448 L340,380" class="line" marker-end="url(#arrow)"/>
+  <path d="M520,448 L410,380" class="line" marker-end="url(#arrow)"/>
+
+  <!-- http -->
+  <rect x="660" y="250" width="380" height="300" rx="12" class="group"/>
+  <text x="680" y="276" class="b">http</text>
+  <rect x="710" y="296" width="280" height="80" rx="8" class="contracts"/>
+  <text x="850" y="322" text-anchor="middle" class="b">@decohere/http</text>
+  <text x="850" y="344" text-anchor="middle" class="small">controllers · routing · auth · OpenAPI</text>
+  <text x="850" y="362" text-anchor="middle" class="small">the HttpProvider contract</text>
+  <rect x="770" y="450" width="160" height="70" rx="8" class="impl"/>
+  <text x="850" y="480" text-anchor="middle" class="b">http-fastify</text>
+  <text x="850" y="500" text-anchor="middle" class="small">FastifyProvider</text>
+  <path d="M850,448 L850,380" class="line" marker-end="url(#arrow)"/>
+
+  <!-- scribe -->
+  <rect x="1080" y="250" width="460" height="300" rx="12" class="group"/>
+  <text x="1100" y="276" class="b">scribe</text>
+  <rect x="1170" y="296" width="280" height="80" rx="8" class="contracts"/>
+  <text x="1310" y="322" text-anchor="middle" class="b">@decohere/scribe</text>
+  <text x="1310" y="344" text-anchor="middle" class="small">the logging facade</text>
+  <text x="1310" y="362" text-anchor="middle" class="small">no dependencies</text>
+  <rect x="1110" y="450" width="190" height="70" rx="8" class="impl"/>
+  <text x="1205" y="480" text-anchor="middle" class="b">scribe-pino</text>
+  <rect x="1320" y="450" width="190" height="70" rx="8" class="impl"/>
+  <text x="1415" y="480" text-anchor="middle" class="b">scribe-console</text>
+  <path d="M1205,448 L1270,380" class="line" marker-end="url(#arrow)"/>
+  <path d="M1415,448 L1350,380" class="line" marker-end="url(#arrow)"/>
+
+  <!-- app imports -->
+  <path d="M600,220 C560,250 420,260 360,294" class="good" marker-end="url(#ok)"/>
+  <path d="M800,220 L830,294" class="good" marker-end="url(#ok)"/>
+  <path d="M1000,220 C1100,250 1220,260 1280,294" class="good" marker-end="url(#ok)"/>
+
+  <!-- forbidden -->
+  <path d="M990,330 C1060,380 1060,430 1000,470 C980,480 960,485 934,485" class="bad" marker-end="url(#no)"/>
+
+  <rect x="60" y="566" width="1480" height="34" rx="6" class="base"/>
+  <text x="800" y="588" text-anchor="middle" class="small">beneath them all: core (hosting, reflection, caching) · crucible (DI) · config</text>
+  <text x="60" y="634" class="b" fill="#2e7d32">✓ arrows: “imports”; an app's code imports the base package</text>
+  <text x="700" y="634" class="b" fill="#c0392b">✕ a base package never imports its provider</text>
+  <text x="1200" y="634" class="small">no package is split or added</text>
+
+  <!-- ───────────── 2. Inside a package ───────────── -->
+  <rect x="30" y="680" width="760" height="740" rx="10" class="panel"/>
+  <text x="54" y="714" class="h2">2. Inside a package: subdomain, then kind</text>
+  <text x="54" y="738" class="sub">one thing per file, &lt;thing&gt;.&lt;role&gt;.ts · the spec beside it · the shape, names illustrative</text>
+
+  <g class="mono" xml:space="preserve">
+    <text x="60" y="778">projects/http/src/</text>
+    <text x="60" y="800">├─ index.ts</text>
+    <text x="60" y="822">├─ http.plugin.ts</text>
+    <text x="60" y="844">├─ <tspan font-weight="700">routing/</tspan>                    <tspan class="note">← a subdomain</tspan></text>
+    <text x="60" y="866">│  ├─ index.ts                 <tspan class="note">← what it exports</tspan></text>
+    <text x="60" y="888">│  ├─ router.service.ts</text>
+    <text x="60" y="910">│  ├─ router.service.spec.ts   <tspan class="note">← spec beside</tspan></text>
+    <text x="60" y="932">│  ├─ route-path.value.ts</text>
+    <text x="60" y="954">│  ├─ route-path.value.spec.ts</text>
+    <text x="60" y="976">│  ├─ decorators/              <tspan class="note">← a kind, once</tspan></text>
+    <text x="60" y="998">│  │  ├─ controller.decorator.ts   <tspan class="note">there are several</tspan></text>
+    <text x="60" y="1020">│  │  └─ route.decorator.ts</text>
+    <text x="60" y="1042">│  └─ filters/exception-filter.host.ts</text>
+    <text x="60" y="1064">├─ <tspan font-weight="700">auth/</tspan></text>
+    <text x="60" y="1086">│  ├─ token.service.ts</text>
+    <text x="60" y="1108">│  ├─ casl-authorization.service.ts</text>
+    <text x="60" y="1130">│  ├─ safe-outbound-url.value.ts</text>
+    <text x="60" y="1152">│  └─ errors/unauthorized.error.ts</text>
+    <text x="60" y="1174">├─ <tspan font-weight="700">openapi/</tspan></text>
+    <text x="60" y="1196">│  ├─ openapi-document.builder.ts</text>
+    <text x="60" y="1218">│  └─ request-schema.builder.ts</text>
+    <text x="60" y="1240">├─ <tspan font-weight="700">health/</tspan></text>
+    <text x="60" y="1262">│  ├─ health.controller.ts</text>
+    <text x="60" y="1284">│  └─ readiness.service.ts</text>
+    <text x="60" y="1306">└─ http.integration.spec.ts    <tspan class="note">← a suite for the package</tspan></text>
+  </g>
+  <text x="60" y="1346" class="b">Never:</text>
+  <text x="60" y="1370" class="small">utils · helpers · common · shared · misc · .types.ts · .store.ts · verb-named files</text>
+  <text x="60" y="1394" class="small">A type lives beside the thing it describes; a provider's contract in a .contract.ts.</text>
+
+  <!-- ───────────── 3. One class per job ───────────── -->
+  <rect x="810" y="680" width="760" height="740" rx="10" class="panel"/>
+  <text x="834" y="714" class="h2">3. One class per job: today → target</text>
+  <text x="834" y="738" class="sub">examples from the code on 2026-11-23</text>
+
+  <g>
+    <rect x="840" y="760" width="330" height="80" rx="6" class="was"/>
+    <text x="852" y="784" class="b">16 loose SQL builders</text>
+    <text x="852" y="806" class="small">createUserQuery(), grantConnectQuery()…</text>
+    <text x="852" y="824" class="small">data-postgres</text>
+    <path d="M1172,800 L1206,800" class="line" marker-end="url(#arrow)"/>
+    <rect x="1210" y="760" width="330" height="80" rx="6" class="now"/>
+    <text x="1222" y="784" class="b">PostgresRoles</text>
+    <text x="1222" y="806" class="small">one class whose job is the roles' SQL,</text>
+    <text x="1222" y="824" class="small">behind an interface</text>
+
+    <rect x="840" y="860" width="330" height="80" rx="6" class="was"/>
+    <text x="852" y="884" class="b">a namespace object</text>
+    <text x="852" y="906" class="small">export const dataSources =</text>
+    <text x="852" y="924" class="small">  { check, open, resolve, start }</text>
+    <path d="M1172,900 L1206,900" class="line" marker-end="url(#arrow)"/>
+    <rect x="1210" y="860" width="330" height="80" rx="6" class="now"/>
+    <text x="1222" y="884" class="b">DataSources</text>
+    <text x="1222" y="906" class="small">an injected class; providers depend on</text>
+    <text x="1222" y="924" class="small">its interface</text>
+
+    <rect x="840" y="960" width="330" height="80" rx="6" class="was"/>
+    <text x="852" y="984" class="b">helpers anyone imports</text>
+    <text x="852" y="1006" class="small">sumBy, mergeBy, findDuplicatesBy</text>
+    <text x="852" y="1024" class="small">core/collections</text>
+    <path d="M1172,1000 L1206,1000" class="line" marker-end="url(#arrow)"/>
+    <rect x="1210" y="960" width="330" height="80" rx="6" class="now"/>
+    <text x="1222" y="984" class="b">a method on the owner</text>
+    <text x="1222" y="1006" class="small">or a base class kinds extend;</text>
+    <text x="1222" y="1024" class="small">what nobody owns goes</text>
+
+    <rect x="840" y="1060" width="330" height="80" rx="6" class="was"/>
+    <text x="852" y="1084" class="b">types in their own file</text>
+    <text x="852" y="1106" class="small">query.types.ts, readiness.types.ts</text>
+    <text x="852" y="1124" class="small">16 files</text>
+    <path d="M1172,1100 L1206,1100" class="line" marker-end="url(#arrow)"/>
+    <rect x="1210" y="1060" width="330" height="80" rx="6" class="now"/>
+    <text x="1222" y="1084" class="b">beside their thing</text>
+    <text x="1222" y="1106" class="small">in its file, or query.contract.ts</text>
+    <text x="1222" y="1124" class="small">when providers implement it</text>
+
+    <rect x="840" y="1160" width="330" height="80" rx="6" class="was"/>
+    <text x="852" y="1184" class="b">process.env in a library</text>
+    <text x="852" y="1206" class="small">37 reads, e.g. core/system/</text>
+    <text x="852" y="1224" class="small">environment.ts</text>
+    <path d="M1172,1200 L1206,1200" class="line" marker-end="url(#arrow)"/>
+    <rect x="1210" y="1160" width="330" height="80" rx="6" class="now"/>
+    <text x="1222" y="1184" class="b">read once, at the edge</text>
+    <text x="1222" y="1206" class="small">config sources and bins read it</text>
+    <text x="1222" y="1224" class="small">and pass values in</text>
+
+    <rect x="840" y="1260" width="700" height="60" rx="6" class="now"/>
+    <text x="852" y="1286" class="b">Already true: every error class ends in Error</text>
+    <text x="852" y="1306" class="small">OptimisticLockError, DependencyUnavailableError, DataConfigurationError…</text>
+  </g>
+  <text x="840" y="1356" class="small">Kept as loose functions: plugin factories (typeOrm(), memory()), decorators,</text>
+  <text x="840" y="1376" class="small">define… helpers whose result is data (defineMigration, mapEntity), and mechanics (sleep).</text>
+
+  <!-- ───────────── 4. How far ───────────── -->
+  <rect x="30" y="1440" width="760" height="500" rx="10" class="panel"/>
+  <text x="54" y="1474" class="h2">4. How far we are, 2026-11-23</text>
+  <text x="54" y="1498" class="sub">827 breaks · pnpm design:check fails if a count rises; it may only fall</text>
+
+  <g>
+    <text x="60" y="1544" class="b">specs not beside their code</text>
+    <rect x="320" y="1530" width="420" height="20" rx="3" class="track"/>
+    <rect x="320" y="1530" width="390" height="20" rx="3" class="bar"/>
+    <text x="702" y="1546" text-anchor="end" class="b" fill="#ffffff">232</text>
+
+    <text x="60" y="1590" class="b">exported loose functions</text>
+    <rect x="320" y="1576" width="420" height="20" rx="3" class="track"/>
+    <rect x="320" y="1576" width="409" height="20" rx="3" class="bar"/>
+    <text x="721" y="1592" text-anchor="end" class="b" fill="#ffffff">243</text>
+
+    <text x="60" y="1636" class="b">files with no role suffix</text>
+    <rect x="320" y="1622" width="420" height="20" rx="3" class="track"/>
+    <rect x="320" y="1622" width="407" height="20" rx="3" class="bar"/>
+    <text x="719" y="1638" text-anchor="end" class="b" fill="#ffffff">242</text>
+
+    <text x="60" y="1682" class="b">process.env reads in libraries</text>
+    <rect x="320" y="1668" width="420" height="20" rx="3" class="track"/>
+    <rect x="320" y="1668" width="62" height="20" rx="3" class="bar"/>
+    <text x="391" y="1684" class="b">37</text>
+
+    <text x="60" y="1728" class="b">namespace objects</text>
+    <rect x="320" y="1714" width="420" height="20" rx="3" class="track"/>
+    <rect x="320" y="1714" width="54" height="20" rx="3" class="bar"/>
+    <text x="383" y="1730" class="b">32</text>
+
+    <text x="60" y="1774" class="b">files with several classes</text>
+    <rect x="320" y="1760" width="420" height="20" rx="3" class="track"/>
+    <rect x="320" y="1760" width="35" height="20" rx="3" class="bar"/>
+    <text x="364" y="1776" class="b">21</text>
+
+    <text x="60" y="1820" class="b">.types, .store, utils files</text>
+    <rect x="320" y="1806" width="420" height="20" rx="3" class="track"/>
+    <rect x="320" y="1806" width="34" height="20" rx="3" class="bar"/>
+    <text x="363" y="1822" class="b">20</text>
+
+    <text x="60" y="1866" class="b">error classes without Error</text>
+    <rect x="320" y="1852" width="420" height="20" rx="3" class="track"/>
+    <text x="330" y="1868" class="b" fill="#2e7d32">0 ✓</text>
+  </g>
+  <text x="60" y="1912" class="small">Worst first: scaffold, core and http hold 155 of the 243 loose functions. Moves go package by package.</text>
+
+  <!-- ───────────── 5. Standards ───────────── -->
+  <rect x="810" y="1440" width="760" height="500" rx="10" class="panel"/>
+  <text x="834" y="1474" class="h2">5. Shared rules: how a change reaches each repo</text>
+
+  <rect x="840" y="1500" width="300" height="80" rx="8" class="base"/>
+  <text x="990" y="1528" text-anchor="middle" class="b">typesmiths/standards</text>
+  <text x="990" y="1550" text-anchor="middle" class="small">the rules (design, names, tests)</text>
+  <text x="990" y="1568" text-anchor="middle" class="small">+ the checks, such as these counts</text>
+
+  <rect x="1240" y="1500" width="300" height="80" rx="8" class="base"/>
+  <text x="1390" y="1528" text-anchor="middle" class="b">@typesmiths/standards</text>
+  <text x="1390" y="1550" text-anchor="middle" class="small">a versioned package on npm</text>
+  <text x="1390" y="1568" text-anchor="middle" class="small">published by its CI</text>
+  <path d="M1142,1540 L1236,1540" class="line" marker-end="url(#arrow)"/>
+  <text x="1160" y="1530" class="small">release</text>
+
+  <rect x="1060" y="1620" width="300" height="80" rx="8" class="host"/>
+  <text x="1210" y="1648" text-anchor="middle" class="b">update PR in each project</text>
+  <text x="1210" y="1670" text-anchor="middle" class="small">opened by the dependency bot,</text>
+  <text x="1210" y="1688" text-anchor="middle" class="small">like any other dependency</text>
+  <path d="M1390,1582 C1390,1606 1300,1606 1290,1616" class="line" marker-end="url(#arrow)"/>
+
+  <rect x="860" y="1740" width="300" height="80" rx="8" class="impl"/>
+  <text x="1010" y="1768" text-anchor="middle" class="b">decohere</text>
+  <text x="1010" y="1790" text-anchor="middle" class="small">CI runs the new checks;</text>
+  <text x="1010" y="1808" text-anchor="middle" class="small">fails if a rule is broken</text>
+  <rect x="1240" y="1740" width="300" height="80" rx="8" class="impl"/>
+  <text x="1390" y="1768" text-anchor="middle" class="b">ledger</text>
+  <text x="1390" y="1790" text-anchor="middle" class="small">same PR, same checks</text>
+  <text x="1390" y="1808" text-anchor="middle" class="small">on its own schedule</text>
+  <path d="M1150,1702 L1060,1736" class="line" marker-end="url(#arrow)"/>
+  <path d="M1270,1702 L1350,1736" class="line" marker-end="url(#arrow)"/>
+
+  <text x="840" y="1868" class="small">AGENTS.md points at node_modules/@typesmiths/standards/, the version that project runs,</text>
+  <text x="840" y="1888" class="small">so agents read the rules CI checks. Nothing to pull by hand; no copy to drift.</text>
+</svg>

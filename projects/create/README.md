@@ -107,7 +107,7 @@ USER node
 
 #### The app and its test
 
-`src/app.ts` is the app's composition, written out so you can see and change every part: Pino logging, `http(FastifyProvider, …)` with an OpenAPI document, `config(…)` from `config/` and the environment, and `health()`. To use another HTTP provider or logger, edit that line; nothing is hidden behind a preset ([architecture: progressive](../../docs/architecture/README.md#4-progressive-new-apps-start-from-a-recipe-the-app-owns)). `src/main.ts` only starts it:
+`src/app.ts` is the app's composition, written out so you can see and change every part: Pino logging, `http(FastifyProvider, …)` with an OpenAPI document, `config(…)` from `config/` and the environment, and `health()`. To use another HTTP provider or logger, edit that line; nothing is hidden behind a preset ([architecture: progressive](../../docs/contributing/architecture/README.md#4-progressive-new-apps-start-from-a-recipe-the-app-owns)). `src/main.ts` only starts it:
 
 ```ts
 import { createApp } from "./app.js";
@@ -218,7 +218,7 @@ npx @decohere/create webapi -d my-app --name api --name billing --database postg
 
 `config.yaml` lists one datasource per API (`name: billing` → `mikroOrm({ name: "billing" })`). Locally they share host `postgres` port `5432`. Point `BILLING_DB_HOST` / `BILLING_DB_PORT` at another server to split later. `webapi add billing --database postgres/mikro-orm` appends a datasource; the bootstrap `CREATE DATABASE`s it on first run.
 
-Each API builds in `src/app.ts` (`createApp()`) and starts in `src/main.ts`. Its migrations are in `src/migrations/`, starting with one per table the scaffold maps, and development applies them on start. `pnpm decohere db <command>` runs `src/db.ts` (add `--api billing` when there are several APIs): `generate <name>` writes a migration from your mapping changes, and `migrate`, `status`, `revert` and `new` do what they say. See [Migrations](../../docs/recipes/migrations.md).
+Each API builds in `src/app.ts` (`createApp()`) and starts in `src/main.ts`. Its migrations are in `src/migrations/`, starting with one per table the scaffold maps, and development applies them on start. `pnpm decohere db <command>` runs `src/db.ts` (add `--api billing` when there are several APIs): `generate <name>` writes a migration from your mapping changes, and `migrate`, `status`, `revert` and `new` do what they say. See [Migrations](../../docs/guide/recipes/migrations.md).
 
 #### Health probes
 
@@ -259,7 +259,7 @@ While the API is running, `http://localhost:3000/openapi.json` describes every r
 | `--name <slug>` | `webapi` | API directory under `projects/` (repeatable; default `api`) |
 | `add api <name>` | `decohere add api` | Add an API to an existing Decohere workspace |
 | `add auth0` | `decohere add auth0` | Add Auth0 to an existing workspace |
-| `auth0 login` | `decohere auth0` | Device/URL login; keeps tokens in `~/.config/auth0` |
+| `auth0 login` | `decohere auth0` | Device/URL login; keeps the login in the project's own folder on your machine (see [`auth0`](#auth0)) |
 | `auth0 configure` | `decohere auth0` | Update the Auth0 API, login app and token app for an existing workspace |
 | `auth0 token` | `decohere auth0` | Print an access token for calling the API in development |
 | `--database <provider>` | `webapi` / `add` | `none` \| `postgres/mikro-orm` \| `postgres/typeorm` |
@@ -308,3 +308,15 @@ gh auth status -t
 ```
 
 If you still get `403` after adding `read:packages`, ask an org admin to grant your user/team access to the `typesmiths/decohere/create` package.
+
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
+
+`@decohere/create` is the launcher: its `create-decohere` bin (`npm create @decohere`) works out where a command runs and starts it there. The scaffolder itself is [`@decohere/scaffold`](../scaffold/README.md). `src/` is flat:
+
+- `resolve-launch.ts`: maps what the user typed onto the product CLI's command line (`create webapi`, `add api`).
+- `runner.ts`: `launch` runs the command here when this container has Decohere's tools (`tools.ts`, `DECOHERE_TOOLS`), otherwise `runInBuilder` runs it in the scaffolder image, `ghcr.io/typesmiths/decohere/create:<version>`, and copies the project out.
+- `cli.ts` is the bin, and `version.ts` the version the image and scaffold package are pinned to. The image is built from `Dockerfile`, with `pack-builder-tgz.mjs` packing the scaffolder into it.
+
+The canonical suite for what a user installs is `e2e/real-install.e2e.spec.ts`, against a temporary registry, in CI's `verify-release` job on `main`; `runInBuilder` and its argv are covered in `tests/runner.spec.ts` ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)). Specs are in `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).

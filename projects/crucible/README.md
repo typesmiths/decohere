@@ -34,7 +34,7 @@ Decorator metadata is required. Enable it in `tsconfig.json` (the Decohere scaff
 }
 ```
 
-`@decohere/core/reflection` loads `reflect-metadata`. Import `@decohere/crucible` (or `@decohere/core`) before constructing decorated classes.
+`@decohere/core/reflection` loads `reflect-metadata`, and `@decohere/crucible` imports it. Import `@decohere/crucible` (or `@decohere/core/reflection`) before constructing decorated classes.
 
 ---
 
@@ -80,14 +80,7 @@ import { SampleService } from "./sample.service.js";
 
 `import type` is correct for **interfaces** and type-only helpers. Those have no runtime constructor; pair them with `@inject(token)` (see below).
 
-Linters that prefer type-only imports (`import type` / `import { type X }`) will flag a class that appears unused except as a constructor type. Keep the value import and suppress that rule locally — for example with oxlint (or ESLint):
-
-```ts
-// oxlint-disable-next-line typescript/consistent-type-imports -- constructor injection needs the class at runtime
-import { Workspace } from "@decohere/workspace";
-```
-
-That pattern is used throughout Forge (`Build`, `Clean`, …). Same idea applies to ESLint `consistent-type-imports` or equivalent.
+Linters that prefer type-only imports (`import type` / `import { type X }`) may flag a class that appears only as a constructor type. Keep the value import, and turn the lint rule off for that line if it flags it.
 
 ---
 
@@ -119,7 +112,7 @@ export class SampleService {
 }
 ```
 
-Keep tokens in a `const.ts` (or next to the interface). Register against the same token:
+A token sits beside its interface: in the interface's file, or in its `.contract.ts`. Register against the same token:
 
 ```ts
 builder.registerSingleton(SampleStoreToken, PostgresSampleStore);
@@ -133,7 +126,7 @@ builder.registerSingleton(SampleStoreToken, store);
 
 ## Registration and lifetimes
 
-Keys match by **identity** ([ADR 0013](../../docs/adr/0013-container-keys-and-lifetimes.md)): a class matches only itself, a symbol only itself, a string only an equal string. So `resolve("SampleService")` does not find `registerSingleton(SampleService)`, `Symbol("TokenService")` does not collide with a class `TokenService`, two classes with the same name in different modules stay apart, and minified class names still work.
+Keys match by **identity** ([ADR 0013](../../docs/contributing/adr/0013-container-keys-and-lifetimes.md)): a class matches only itself, a symbol only itself, a string only an equal string. So `resolve("SampleService")` does not find `registerSingleton(SampleService)`, `Symbol("TokenService")` does not collide with a class `TokenService`, two classes with the same name in different modules stay apart, and minified class names still work.
 
 Registering the same class (or the same type on a token) twice **throws** `RegistrationError` — silent last-wins hides accidental double-registers. Replace it explicitly:
 
@@ -228,7 +221,7 @@ await using scope = container.beginScope("req-2");
 - Disposing a parent does **not** dispose child scopes. Dispose the scope you created.
 - Singletons are cached on the root container and shared with nested scopes. Resolving a singleton after the root is disposed throws.
 
-`App.dispose` (`@decohere/http`) (Flux HMR / SIGINT) disposes the **root** container, then Scribe. Implement `Symbol.asyncDispose` (or `Symbol.dispose`) on long-lived services — sockets, pools, timers. Only **constructed** instances are disposed (resolve them at boot; transients are not cached). `export default app` is the composition-root contract; do not wrap it for extra teardown.
+`App.dispose` (`@decohere/core/hosting`) (Flux HMR / SIGINT) disposes the **root** container, then Scribe. Implement `Symbol.asyncDispose` (or `Symbol.dispose`) on long-lived services — sockets, pools, timers. Only **constructed** instances are disposed (resolve them at boot; transients are not cached). `export default app` is the composition-root contract; do not wrap it for extra teardown.
 
 The current scope is always registered as `LifetimeScopeToken`:
 
@@ -302,7 +295,7 @@ using scope = container.beginScope("test");
 const hello = scope.resolve(HelloController);
 ```
 
-To assert constructor arguments under DI, use `spyOnConstructor` from `@decohere/testing` — a bare `vi.spyOn` / `vi.fn` constructor drops `design:paramtypes`. See [Asserting DI constructor arguments](../../docs/testing/how-tos/vitest-constructor-spy-with-di.md).
+To assert constructor arguments under DI, use `spyOnConstructor` from `@decohere/testing` — a bare `vi.spyOn` / `vi.fn` constructor drops `design:paramtypes`. See [Asserting DI constructor arguments](../../docs/contributing/testing/how-tos/vitest-constructor-spy-with-di.md).
 
 ---
 
@@ -349,10 +342,22 @@ To assert constructor arguments under DI, use `spyOnConstructor` from `@decohere
 - Property or setter injection (constructors only)
 - Compile-time graph checking
 
-## Dependencies
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
+
+Crucible implements the container contract in [`@decohere/core/composition`](../core/README.md) (`ContainerBuilder`, `IContainer`, `LifetimeScope`, `inject`, `optional`). Folders in `src/`:
+
+- `services/`: `ServiceContainerBuilder`, `Container` and the registry they share.
+- `decorators/`: `@injectable()`, and `@inject`/`@optional` re-exported from core (`@decohere/crucible/decorators`).
+- `models/`: what a registration and a key are. `types/`: the errors (`ResolveError`, `RegistrationError`, …) and types.
+
+There is no canonical suite for crucible in the [testing table](../../docs/contributing/testing/README.md#canonical-suite-ownership). Its specs are in `tests/` (registration, resolution, scopes, multiple package copies), with `tests/hosting/` exercising core's `Builder` on this container (start steps, a worker with hosted services). They move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).
+
+### Dependencies
 
 | Package | Role |
 |---|---|
 | [`@decohere/core`](../core) | Reflection helpers for `design:paramtypes` (`getMeta`, `isConstructable`, …) |
 
-Layering: [architecture](../../docs/architecture/).
+Layering: [architecture](../../docs/contributing/architecture/).

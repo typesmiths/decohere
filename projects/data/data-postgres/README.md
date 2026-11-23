@@ -19,7 +19,7 @@ Before the provider connects, `postgres.bootstrap` does what each data source's 
 - creates the schema;
 - grants each role only what it needs.
 
-Data sources on one server and database are set up once, in order, and running it again changes nothing. The rules (`bootstrap`, `auth: trust`, the admin and migrate roles) are in [ADR 0011](../../../docs/adr/0011-database-bootstrap.md).
+Data sources on one server and database are set up once, in order, and running it again changes nothing. The rules (`bootstrap`, `auth: trust`, the admin and migrate roles) are in [ADR 0011](../../../docs/contributing/adr/0011-database-bootstrap.md).
 
 A runner or script that opens its own connection can call `bootstrapDataSources(dataSources, { applicationName })` directly.
 
@@ -39,3 +39,11 @@ A runner or script that opens its own connection can call `bootstrapDataSources(
 ## What else goes here
 
 Other Postgres-only code, as it's built, such as starting a development Postgres on demand. Another database would get a package of its own with the same shape.
+
+## Working on this package
+
+For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
+
+`data-postgres` implements `DatabaseSupport` from [`@decohere/data`](../data/README.md) (the `Migrator` contract and a bootstrap) for Postgres. `src/` is flat: `index.ts` (`postgres`), `bootstrap.ts` and `server-manager.ts` (`PostgresServerManager`: the database, roles, schema and grants), `user-scripts.ts` (the SQL it runs, with identifiers checked and quoted) and `migrator.ts` (`postgresMigrator`).
+
+The unit-of-work contract is data's canonical suite ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)); database setup and roles are tested here. `tests/*.docker.spec.ts` run against a real Postgres (`pnpm test:docker`), `*.pentest.spec.ts` check least privilege and unsafe names, and the rest run in `pnpm test`. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).

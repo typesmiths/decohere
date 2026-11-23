@@ -17,7 +17,7 @@ import { vi } from "vitest";
 // - Forge config loading tests (projects/forge/tests/integration/commands/build.integration.spec.ts)
 //   Tests dynamic import of .decohere.js configuration files from memfs
 //
-// For details and patterns, see: docs/testing/how-tos/module-load-hooks-with-memfs.md
+// For details and patterns, see: docs/contributing/testing/how-tos/module-load-hooks-with-memfs.md
 registerHooks({
 	load: (url, context, next) => {
 		try {
