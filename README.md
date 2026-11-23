@@ -6,7 +6,7 @@
 
 <p>
   <a href="https://www.npmjs.com/package/@decohere/cli"><img src="https://img.shields.io/npm/v/@decohere/cli.svg?style=for-the-badge&label=npm" alt="npm version"></a>
-  <a href="https://github.com/typesmiths/decohere/actions/workflows/ci.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/typesmiths/decohere/ci.yml?branch=main&style=for-the-badge&label=CI" alt="CI"></a>
+  <a href="https://github.com/typesmiths/decohere/actions/workflows/publish.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/typesmiths/decohere/publish.yml?branch=main&style=for-the-badge&label=Publish" alt="Publish"></a>
   <a href="LICENSE"><img src="https://img.shields.io/npm/l/@decohere/cli.svg?style=for-the-badge" alt="License"></a>
   <a href="https://github.com/typesmiths/decohere"><img src="https://img.shields.io/github/stars/typesmiths/decohere?style=for-the-badge&logo=github" alt="GitHub stars"></a>
 </p>

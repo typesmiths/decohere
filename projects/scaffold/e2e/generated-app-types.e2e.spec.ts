@@ -1,11 +1,11 @@
 /**
  * Typechecks a generated app against the release build, seeing only what the app declares. This
- * catches on a PR, in seconds, what otherwise only shows up in `verify-release` on main. Locally,
+ * catches on a PR, in seconds, what otherwise only shows up in `verify-release` in the merge queue. Locally,
  * run `pnpm forge build --configuration release` first.
  *
  * The packages are copied out of the repo. Mapping them to source would load the repo's own
  * `@types/node`, and a missing one would go unnoticed. Third-party packages an app only gets
- * indirectly aren't there, so their types are `any`: the real install on main covers those.
+ * indirectly aren't there, so their types are `any`: the real install in the merge queue covers those.
  */
 import { spawnSync } from "node:child_process";
 import {

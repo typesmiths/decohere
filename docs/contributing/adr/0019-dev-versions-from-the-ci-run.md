@@ -14,7 +14,7 @@ A failed publish had a related hazard: it leaves no tag, so the next commit coul
 ## Decision
 
 - A dev version is `<base>-dev.<YYYYMMDD>.<run number>`, such as `0.0.1-dev.20261104.512`. The base is the major.minor.patch of the root `package.json`, the date is the HEAD commit's date in UTC, and the number is CI's `github.run_number`.
-- It is chosen once, in CI, before the release build: `forge version --channel dev --build-number <n>`. Forge takes the number as a flag and reads no CI variable ([architecture §1](../architecture/README.md#1-keep-the-product-pure-of-its-host)).
+- It is chosen once, in CI, before the release build: `forge version --channel dev --build-number <n>`. For `main` that's the merge queue's run, which tests the exact commit that lands; for a patch branch, its push run ([ADR 0020](0020-test-the-real-install-before-publishing.md)). Forge takes the number as a flag and reads no CI variable ([architecture §1](../architecture/README.md#1-keep-the-product-pure-of-its-host)).
 - Publish never works out a version. It reads it from the build with `forge version --from-build`, which fails if the built packages disagree.
 - A `v*` tag only records that a commit fully shipped. Nothing reads tags to pick a dev version.
 - A stable release takes the build of a tested dev version and changes only the version in its `package.json` files ([ADR 0020](0020-test-the-real-install-before-publishing.md)).
@@ -37,3 +37,4 @@ Not chosen:
 
 - 2026-11-04: Decided, after a publish reported success on `main` while publishing nothing.
 - 2026-11-05: Stable releases no longer use changesets or `release-prep.yml`.
+- 2026-11-23: The run that chooses `main`'s version is the merge queue's, not the push to `main`'s, since CI no longer runs on `main` and Publish ships the queue's build.

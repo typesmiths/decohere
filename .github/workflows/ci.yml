@@ -1,14 +1,15 @@
 name: CI
-# Pull requests (from this repo and from forks) and the merge queue run the quick checks. A PR also
-# builds images or runs Docker-backed tests when their files change. main doesn't repeat the checks,
-# because the queue tested that same commit: it makes one build and uses it the way a user does. A
+# Pull requests (from this repo and from forks) run the quick checks, and build images or run
+# Docker-backed tests when their files change. The merge queue runs everything, including the one
+# release build and verify-release, which uses it the way a user does: the queue tests the exact
+# commit that lands, so a push to main runs nothing here, and Publish ships the queue's build. A
 # fork's run gets no secrets and a read-only token: nothing here needs either.
 on:
   pull_request:
   merge_group:
   push:
-    # release/<major>.<minor>: a patch to a release. Its commits weren't tested on main, so they get the full run.
-    branches: [main, "release/**"]
+    # release/<major>.<minor>: a patch to a release. Its commits don't go through the queue, so they get the full run.
+    branches: ["release/**"]
   workflow_dispatch:
 concurrency:
   group: ci-${{ github.ref }}
@@ -26,6 +27,8 @@ jobs:
       pull-requests: read
     outputs:
       run: ${{ steps.gate.outputs.run }}
+      # The queue, a patch branch, or a run started by hand: everything, with the release build.
+      full: ${{ steps.gate.outputs.full }}
       images: ${{ steps.filter.outputs.images }}
       data: ${{ steps.filter.outputs.data }}
     steps:
@@ -43,6 +46,13 @@ jobs:
 
       - id: gate
         run: |
+          if [[ "${{ github.event_name }}" == "merge_group" ||
+                "${{ github.event_name }}" == "workflow_dispatch" ||
+                "${{ github.ref }}" == refs/heads/release/* ]]; then
+            echo "full=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "full=false" >> "$GITHUB_OUTPUT"
+          fi
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ||
                 "${{ github.event_name }}" == "merge_group" ||
                 "${{ steps.filter.outputs.code }}" == "true" ]]; then
@@ -56,7 +66,7 @@ jobs:
   lint:
     name: lint/typecheck
     needs: [changes]
-    if: needs.changes.outputs.run == 'true' && github.ref != 'refs/heads/main'
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -132,11 +142,12 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-  # Three groups side by side, because the unit tests are what a PR waits for longest.
+  # Three groups side by side, because the unit tests are what a PR waits for longest. The full
+  # run has coverage instead, which runs the same tests.
   test:
     name: test (${{ matrix.shard }}/3)
     needs: [changes]
-    if: needs.changes.outputs.run == 'true' && github.ref != 'refs/heads/main'
+    if: needs.changes.outputs.run == 'true' && needs.changes.outputs.full != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -155,10 +166,10 @@ jobs:
       - name: Run unit tests
         run: pnpm test --shard=${{ matrix.shard }}/3
 
-  # Enforces the thresholds on main, and feeds the Pages badges.
+  # Enforces the thresholds before a merge, and feeds the Pages badges.
   coverage:
     needs: [changes]
-    if: needs.changes.outputs.run == 'true' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/'))
+    if: needs.changes.outputs.run == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -182,16 +193,13 @@ jobs:
             dist/coverage/lcov.info
           retention-days: 1
 
-  # Real Postgres. On a PR only when data code changes; never in the queue.
+  # Real Postgres. On a PR only when data code changes; always in the full run.
   test-docker:
     name: test-docker
     needs: [changes]
     if: >
       needs.changes.outputs.run == 'true' &&
-      (needs.changes.outputs.data == 'true' ||
-       github.ref == 'refs/heads/main' ||
-       startsWith(github.ref, 'refs/heads/release/') ||
-       github.event_name == 'workflow_dispatch')
+      (needs.changes.outputs.data == 'true' || needs.changes.outputs.full == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -206,12 +214,11 @@ jobs:
       - name: Run Docker-backed tests
         run: pnpm run test:docker
 
-  # The one build Publish ships: verify-release uses it, then Publish uploads it.
+  # The one build Publish ships: verify-release uses it, then Publish uploads it. In the queue, the
+  # commit built is the one that lands on main.
   build:
     needs: [changes]
-    if: >
-      needs.changes.outputs.run == 'true' &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') || github.event_name == 'workflow_dispatch')
+    if: needs.changes.outputs.run == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -244,12 +251,12 @@ jobs:
           retention-days: 14
 
   # One release tree: npm dry-run (before pack mutates dist/release), then, when the image files
-  # changed, pack once and forge docker (create + devcontainer, extra :local tag). main needs none of
-  # this: verify-release builds the images and really publishes, to a temporary registry.
+  # changed, pack once and forge docker (create + devcontainer, extra :local tag). In the full run,
+  # verify-release also builds the images and really publishes, to a temporary registry.
   package:
     name: package
     needs: [changes]
-    if: needs.changes.outputs.run == 'true' && github.ref != 'refs/heads/main'
+    if: needs.changes.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
@@ -340,14 +347,13 @@ jobs:
             exit 1
           fi
 
-  # Uses the build `build` stamped, from a temporary registry, the way a user would. Publish only
-  # runs if this passes, and uploads this same build. Only on main: too slow for every PR.
+  # Uses the build `build` stamped, from a temporary registry, the way a user would. If it fails in
+  # the queue, the PR leaves the queue and main never sees it; Publish uploads this same build. Too
+  # slow for every PR.
   verify-release:
     name: verify-release
     needs: [changes, build]
-    if: >
-      needs.changes.outputs.run == 'true' &&
-      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/') || github.event_name == 'workflow_dispatch')
+    if: needs.changes.outputs.run == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
