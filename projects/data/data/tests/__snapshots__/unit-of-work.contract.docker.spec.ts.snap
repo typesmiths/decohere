@@ -54,6 +54,23 @@ exports[`unit of work contract > a query sees the database: an entity added and 
 
 exports[`unit of work contract > a re-query returns the instance already loaded, with its unsaved changes 1`] = `[]`;
 
+exports[`unit of work contract > a repository's own statement runs in the unit of work's transaction, and rolls back with a failed commit 1`] = `
+[
+  "begin",
+  "insert receipt ×1",
+  "insert orders ×2",
+  "rollback",
+]
+`;
+
+exports[`unit of work contract > a repository's own statement sees what the unit of work wrote before commit, and others don't 1`] = `
+[
+  "begin",
+  "insert receipt ×1",
+  "commit",
+]
+`;
+
 exports[`unit of work contract > a row loaded twice is one instance, read once 1`] = `[]`;
 
 exports[`unit of work contract > an added entity is found by its key with its children as added, and not after it is removed 1`] = `[]`;

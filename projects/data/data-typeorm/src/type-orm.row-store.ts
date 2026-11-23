@@ -3,6 +3,7 @@ import {
 	type Comparison,
 	DataConfigurationError,
 	type EntityClass,
+	type TrackingUnitOfWork,
 	type EntityModel,
 	type ReferenceModel,
 	type Row,
@@ -31,6 +32,12 @@ const SQL_OPERATORS: Record<string, string> = {
 };
 
 /**
+ * The unit of work `typeOrm()` registers. A provider-side repository injects it as this type to run
+ * its own SQL in the unit of work's transaction: `(await unitOfWork.transaction()).queryRunner`.
+ */
+export type TypeOrmUnitOfWork = TrackingUnitOfWork<TypeOrmRowStore>;
+
+/**
  * The TypeORM provider's share of the unit of work: the mapping, read from TypeORM's metadata,
  * and row operations on one connection. TypeORM builds and sends the SQL; it neither loads
  * relations nor tracks changes here, so child collections are mapped with `persistence: false`.
@@ -41,6 +48,14 @@ export class TypeOrmRowStore implements RowStore {
 
 	public constructor(private readonly dataSource: DataSource) {
 		this.runner = dataSource.createQueryRunner();
+	}
+
+	/**
+	 * The unit of work's own connection. A statement run on it is in the unit of work's transaction
+	 * when one is open: get it through {@link TypeOrmUnitOfWork}'s `transaction()`, which opens one.
+	 */
+	public get queryRunner(): QueryRunner {
+		return this.runner;
 	}
 
 	public model(type: EntityClass): EntityModel {

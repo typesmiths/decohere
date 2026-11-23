@@ -42,7 +42,28 @@ Things to know:
 
 - **MikroORM changes the classes it maps** at run time: field accessors, `toJSON` and a `__helper`. A loaded child also carries its parent. Map HTTP responses to DTOs rather than serialising entities. Don't map one class with two providers in one process.
 - **Version fields** need a database default (`version int not null default 1`). MikroORM leaves the column to it on insert.
-- **SQL a query can't express:** `uow.entityManager.getKysely()`, inside a repository.
+- **SQL a query can't express** goes through `transaction()`, below.
+
+## A repository's own SQL
+
+`MikroOrmUnitOfWork.transaction()` opens the unit of work's transaction if none is open, and returns its forked entity manager. `em.execute()`, `em.getKysely()` and `em.createQueryBuilder()` then run on the transaction's connection: what they write commits or rolls back with the unit of work, and they see what it has written in that transaction ([data](../data/README.md#a-repositorys-own-sql)). A repository that needs it injects the unit of work as `MikroOrmUnitOfWork`:
+
+```ts
+@injectable()
+export class ReceiptRepository extends Repository<Receipt> {
+	public constructor(@injectUnitOfWork() private readonly mikroOrm: MikroOrmUnitOfWork) {
+		super(mikroOrm, Receipt);
+	}
+
+	public async totalFor(account: string): Promise<number> {
+		const em = await this.mikroOrm.transaction();
+		const [row] = await em.execute("select coalesce(sum(amount), 0) as total from receipt where account = ?", [account]);
+		return Number(row.total);
+	}
+}
+```
+
+The entity manager runs with `flushMode: "commit"`, so a statement doesn't flush pending changes first: it sees the database as this transaction has written it. `entityManager` gives the same entity manager without opening a transaction; a statement run through it outside one commits on its own.
 
 ## Working on this package
 

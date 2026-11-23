@@ -6,7 +6,7 @@ import { ServiceContainerBuilder } from "@decohere/crucible";
 import { DataError, type IUnitOfWork, OptimisticLockError } from "@decohere/data";
 import { expect } from "vitest";
 import type { Order } from "./model.js";
-import type { OpenProvider } from "./providers.js";
+import type { OpenProvider, SqlProvider } from "./providers.js";
 
 const A = "00000000-0000-4000-a000-00000000000a";
 const B = "00000000-0000-4000-a000-00000000000b";
@@ -31,15 +31,19 @@ const load = (p: OpenProvider, uow: IUnitOfWork, id: string) =>
 	uow.findById(p.model.Order, id, ["lines.parts"]);
 const skus = (order: Order) => [...order.lines].map((l) => l.sku);
 
-export type Case = {
+export type Case<P extends OpenProvider = OpenProvider> = {
 	name: string;
-	seed?: (p: OpenProvider) => Promise<void>;
+	seed?: (p: P) => Promise<void>;
 	/** The steps whose SQL is compared. */
-	run: (p: OpenProvider) => Promise<void>;
+	run: (p: P) => Promise<void>;
 	/** Checks the outcome in a fresh unit of work; its SQL isn't compared. */
-	check?: (p: OpenProvider) => Promise<void>;
+	check?: (p: P) => Promise<void>;
 };
 
+const R1 = "00000000-0000-4000-a000-0000000000f1";
+const R2 = "00000000-0000-4000-a000-0000000000f2";
+
+/** The cases every provider runs, memory included. */
 export const cases: Case[] = [
 	{
 		name: "one field changed on a loaded aggregate is written on commit, with no save call",
@@ -398,6 +402,55 @@ export const cases: Case[] = [
 			);
 			await uow.commit();
 			expect(await uow.find(p.model.Order, { where: { customer: "ann" } })).toContain(added);
+		},
+	},
+];
+
+/** The cases only the SQL providers run: they send SQL of their own, through the provider's `transaction()`. */
+export const sqlCases: Case<SqlProvider>[] = [
+	{
+		name: "a repository's own statement runs in the unit of work's transaction, and rolls back with a failed commit",
+		seed: seedOrders,
+		async run(p) {
+			await using uow = p.begin();
+			// No transaction is open yet: the statement must begin it, or it would commit on its own.
+			await p.statement(uow, "insert into uow_contract.receipt (id, amount) values (?, ?)", [
+				R1,
+				5,
+			]);
+			uow.add(new p.model.Order("fay"));
+			const duplicate = new p.model.Order("gus");
+			duplicate.id = B;
+			uow.add(duplicate);
+			await expect(uow.commit()).rejects.toThrow();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			expect(await uow.find(p.model.Receipt)).toEqual([]);
+			expect(await uow.find(p.model.Order, { where: { customer: "fay" } })).toEqual([]);
+		},
+	},
+	{
+		name: "a repository's own statement sees what the unit of work wrote before commit, and others don't",
+		async run(p) {
+			await using uow = p.begin();
+			await p.statement(uow, "insert into uow_contract.receipt (id, amount) values (?, ?)", [
+				R2,
+				7,
+			]);
+			const rows = await p.statement(
+				uow,
+				"select amount from uow_contract.receipt where id = ?",
+				[R2],
+			);
+			expect(rows).toEqual([{ amount: 7 }]);
+			await using other = p.begin();
+			expect(await other.findById(p.model.Receipt, R2)).toBeNull();
+			await uow.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			expect((await uow.findById(p.model.Receipt, R2)).amount).toBe(7);
 		},
 	},
 ];

@@ -40,6 +40,27 @@ Mapping rules for the tracker:
 - **Embedded columns** aren't supported.
 - A **version column** (`version: true`) is checked and incremented on every update.
 
+## A repository's own SQL
+
+The unit of work `typeOrm()` registers is a `TypeOrmUnitOfWork` (data's `TrackingUnitOfWork` over a `TypeOrmRowStore`). Its `transaction()` opens the transaction if none is open and returns the row store, whose `queryRunner` is the unit of work's own connection. A statement run on it commits or rolls back with the unit of work, and sees what it has written in that transaction ([data](../data/README.md#a-repositorys-own-sql)). The `DataSource` is another connection: a statement run on it is outside the unit of work. A repository that needs its own SQL injects the unit of work as `TypeOrmUnitOfWork`:
+
+```ts
+@injectable()
+export class ReceiptRepository extends Repository<Receipt> {
+	public constructor(@injectUnitOfWork() private readonly typeOrm: TypeOrmUnitOfWork) {
+		super(typeOrm, Receipt);
+	}
+
+	public async totalFor(account: string): Promise<number> {
+		const { queryRunner } = await this.typeOrm.transaction();
+		const [row] = await queryRunner.query("select coalesce(sum(amount), 0) as total from receipt where account = $1", [account]);
+		return Number(row.total);
+	}
+}
+```
+
+The query runner also builds queries: `queryRunner.manager.createQueryBuilder()`.
+
 ## Working on this package
 
 For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.

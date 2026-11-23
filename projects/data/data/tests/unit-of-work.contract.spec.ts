@@ -1,6 +1,6 @@
 // The unit-of-work contract on the memory provider: the cases the SQL providers pass against
 // Postgres (unit-of-work.contract.docker.spec.ts), each on a fresh store, checked by outcome.
-// There is no SQL to compare.
+// There is no SQL to compare, and the cases that send SQL of their own (sqlCases) don't run here.
 import "reflect-metadata";
 import { describe, it } from "vitest";
 import { cases } from "./contract/cases.js";

@@ -34,7 +34,18 @@ await uow.find(Order, {
 });
 ```
 
-Operators: a bare value or `null` (equal), `in`, `ne`, `gt`, `gte`, `lt`, `lte`. A reference compares with an entity or its key. For what a query can't express (joins across aggregates, aggregates in SQL), use the provider's own escape hatch inside the repository.
+Operators: a bare value or `null` (equal), `in`, `ne`, `gt`, `gte`, `lt`, `lte`. A reference compares with an entity or its key. For what a query can't express (joins across aggregates, aggregates in SQL), a repository runs its own SQL in the unit of work's transaction.
+
+## A repository's own SQL
+
+A statement `Query<T>` can't express runs in a provider-side repository, on the unit of work's own connection and inside its transaction. Each provider's unit of work has a `transaction()` method that opens the transaction if none is open yet, as a locking `find` does, and returns the provider's own handle: the entity manager on [MikroORM](../data-mikro-orm/README.md#a-repositorys-own-sql), the row store and its query runner on [TypeORM](../data-typeorm/README.md#a-repositorys-own-sql). A statement run through it:
+
+- runs at once, not at commit;
+- commits with the unit of work, or rolls back with it when the commit fails or the unit of work is disposed without one;
+- sees what the unit of work has written in that transaction, such as rows an earlier statement wrote. Changes the unit of work hasn't written yet (everything waiting for `commit()`) aren't in the database, so a statement doesn't see them;
+- bypasses the identity map and change tracking. Rows it writes or reads aren't entities the unit of work tracks: load them with `findById` or `find` to change them.
+
+`IUnitOfWork` itself has no such method: SQL is written for one provider's API and dialect, and the memory provider has none. A repository that needs it is written per provider, injecting that provider's unit of work type.
 
 ## Aggregates and children
 
@@ -133,7 +144,7 @@ The canonical suite is the unit-of-work contract, the cases in `tests/contract/c
 
 A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and four row operations (`select`, `insert`, `update`, `delete`) on plain rows.
 
-MikroORM's unit of work is the reference. The cases are in `tests/contract/cases.ts`. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both SQL providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome. `tests/unit-of-work.contract.spec.ts` runs the same cases on the memory provider, in `pnpm test`, checking outcomes only, since it sends no SQL.
+MikroORM's unit of work is the reference. The cases are in `tests/contract/cases.ts`. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both SQL providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome. `tests/unit-of-work.contract.spec.ts` runs the same cases on the memory provider, in `pnpm test`, checking outcomes only, since it sends no SQL. The cases in `sqlCases` run SQL of their own, through the provider's `transaction()`, so it runs on the SQL providers only.
 
 ### Upgrading MikroORM
 

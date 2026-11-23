@@ -50,7 +50,7 @@ It behaves as Postgres does wherever a repository could tell the difference:
 - **Copies.** Rows are copied in and out, so an object held outside the unit of work can't change what is stored.
 - **SQL's nulls.** An empty value matches only `null` and `{ ne: … }` with a value given. It sorts last ascending and first descending.
 
-What differs: strings compare and sort by code unit, not by the database's collation. Columns have no types, lengths or `NOT NULL` checks beyond the key and required references. And the rows last only as long as the app.
+What differs: strings compare and sort by code unit, not by the database's collation. Columns have no types, lengths or `NOT NULL` checks beyond the key and required references. The rows last only as long as the app. And there is no SQL: a repository that runs its own ([data](../data/README.md#a-repositorys-own-sql)) is written for a SQL provider and doesn't run here.
 
 ## Working on this package
 

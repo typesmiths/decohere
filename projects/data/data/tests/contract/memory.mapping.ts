@@ -10,6 +10,7 @@ export function memoryEntities({
 	Team,
 	Member,
 	Tag,
+	Receipt,
 	OutboxMessage,
 }: Model) {
 	return [
@@ -44,6 +45,7 @@ export function memoryEntities({
 			references: [{ prop: "team", target: Team }],
 		}),
 		mapEntity(Tag, { fields: ["label"], generated: "id" }),
+		mapEntity(Receipt, { fields: ["amount", "memo"] }),
 		mapEntity(OutboxMessage, { fields: ["type", "payload"] }),
 	];
 }

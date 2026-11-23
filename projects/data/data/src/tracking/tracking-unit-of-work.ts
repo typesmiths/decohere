@@ -45,7 +45,11 @@ class UnloadedChildren {
 	}
 }
 
-export class TrackingUnitOfWork implements IUnitOfWork {
+/**
+ * @typeParam S the provider's row store, which {@link transaction} hands to a repository's own
+ * statements.
+ */
+export class TrackingUnitOfWork<S extends RowStore = RowStore> implements IUnitOfWork {
 	/** Per class, by key: every instance this unit of work knows, loaded or only referenced. */
 	private readonly identity = new Map<EntityClass, Map<string, object>>();
 	/** Loaded instances and what they held when loaded or last committed. */
@@ -56,7 +60,7 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 	private released = false;
 
 	public constructor(
-		private readonly store: RowStore,
+		private readonly store: S,
 		private readonly options: TrackingUnitOfWorkOptions = {},
 	) {}
 
@@ -117,6 +121,17 @@ export class TrackingUnitOfWork implements IUnitOfWork {
 	public async beginTransaction() {
 		this.assertUsable();
 		if (!this.store.inTransaction()) await this.store.begin();
+	}
+
+	/**
+	 * The row store, with this unit of work's transaction open (begun now if none is), for a
+	 * provider-side repository's own statements on the same connection. What they write commits or
+	 * rolls back with the unit of work, and they see what it has written. They bypass the identity map
+	 * and change tracking.
+	 */
+	public async transaction(): Promise<S> {
+		await this.beginTransaction();
+		return this.store;
 	}
 
 	public async commit() {

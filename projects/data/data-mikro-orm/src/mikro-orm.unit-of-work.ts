@@ -12,7 +12,6 @@ import {
 	type Where,
 } from "@decohere/data";
 import {
-	type EntityManager,
 	type EntityName,
 	type FilterQuery,
 	type FindOptions,
@@ -20,6 +19,7 @@ import {
 	LockMode,
 	OptimisticLockError as MikroOptimisticLockError,
 } from "@mikro-orm/core";
+import type { EntityManager } from "@mikro-orm/postgresql";
 
 export type MikroOrmUnitOfWorkOptions = {
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
@@ -44,8 +44,20 @@ export class MikroOrmUnitOfWork implements IUnitOfWork {
 		this.em = em.fork({ clear: true, flushMode: FlushMode.COMMIT });
 	}
 
-	/** The entity manager behind this unit of work, for SQL a query can't express (`em.getKysely()`), inside a repository. */
+	/** The entity manager behind this unit of work. For SQL of a repository's own, use {@link transaction}. */
 	public get entityManager(): EntityManager {
+		return this.em;
+	}
+
+	/**
+	 * The entity manager, with this unit of work's transaction open (begun now if none is), for a
+	 * provider-side repository's own SQL: `em.execute()`, `em.getKysely()` or
+	 * `em.createQueryBuilder()` then run on its connection. What they write commits or rolls back
+	 * with the unit of work, and they see what it has written. They bypass the identity map and change
+	 * tracking.
+	 */
+	public async transaction(): Promise<EntityManager> {
+		await this.beginTransaction();
 		return this.em;
 	}
 
