@@ -7,12 +7,7 @@ import {
 } from "@decohere/scribe";
 import pino, { type LogFn } from "pino";
 
-import type { GuardedTransport } from "./pino.transport-guard.js";
-
-export type PinoAdapaterOptions = {
-	options?: pino.LoggerOptions;
-	stream?: pino.DestinationStream;
-};
+import { TransportGuard } from "./transport-guard.service.js";
 
 type EndableStream = {
 	end?: (cb?: (err?: Error | null) => void) => void;
@@ -32,13 +27,22 @@ export class PinoAdapter extends LogAdapter {
 	private _pino: pino.Logger;
 	private readonly options: pino.LoggerOptions;
 	private readonly stream: pino.DestinationStream | undefined;
+	private readonly guard: TransportGuard | undefined;
 	private disposed = false;
 	private retired = false;
 
-	public constructor(options: pino.LoggerOptions, stream?: pino.DestinationStream) {
+	/**
+	 * @param destination where Pino writes: a stream, or a worker transport behind a
+	 *   {@link TransportGuard}. Without one, Pino writes JSON to stdout.
+	 */
+	public constructor(
+		options: pino.LoggerOptions = {},
+		destination?: pino.DestinationStream | TransportGuard,
+	) {
 		super();
 		this.options = options;
-		this.stream = stream;
+		this.guard = destination instanceof TransportGuard ? destination : undefined;
+		this.stream = destination instanceof TransportGuard ? destination.stream : destination;
 	}
 
 	public configure<T extends string = never, CustomOnly extends true | false = false>(
@@ -93,9 +97,8 @@ export class PinoAdapter extends LogAdapter {
 			return;
 		}
 		this.retired = true;
-		const guarded = this.stream as GuardedTransport | undefined;
-		if (typeof guarded?.retire === "function") {
-			guarded.retire("adapter retired");
+		if (this.guard != null) {
+			this.guard.retire("adapter retired");
 			return;
 		}
 		destroyDestination(this.stream);

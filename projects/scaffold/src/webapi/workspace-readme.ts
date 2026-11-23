@@ -60,10 +60,7 @@ export function renderWorkspaceReadme(input: WorkspaceReadmeInput): string {
 		"When `NODE_ENV=production`, the process writes structured JSON to stdout and does not rotate files.",
 		"Ship and retain those streams outside the app (platform logs, a sidecar, or a log agent) so shipping can change without rebuilding.",
 		"",
-		"Override roll path and rotation without changing app code:",
-		"`SCRIBE_LOG_FILE`, `SCRIBE_LOG_SIZE`, `SCRIBE_LOG_FREQUENCY`, `SCRIBE_LOG_KEEP`.",
-		"",
-		'Opt into in-process pretty or roll in production only with `{ when: "always" }` on `scribe.withPinoPretty` / `scribe.withPinoRoll`.',
+		"`src/app.ts` chooses this with `scribe.use(pino({ pretty, roll }))`: change the file, rotation or what production writes there.",
 		"",
 	);
 

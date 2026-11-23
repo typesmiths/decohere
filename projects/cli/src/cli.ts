@@ -2,6 +2,7 @@
 import "./compile-cache.js";
 import "./logger.setup.js";
 import { scribe } from "@decohere/scribe";
+import { pino } from "@decohere/scribe-pino";
 import { cliLogLevel } from "./log-level.js";
 import { productCli } from "./product.js";
 
@@ -10,10 +11,7 @@ const configFile = configIndex !== -1 ? process.argv[configIndex + 1] : undefine
 const logLevelIndex = process.argv.indexOf("--log-level");
 const logLevel = logLevelIndex !== -1 ? process.argv[logLevelIndex + 1] : undefined;
 
-scribe.withPinoPretty({
-	logLevel: cliLogLevel(logLevel),
-	when: "always",
-});
+scribe.use(pino({ pretty: true }), { logLevel: cliLogLevel(logLevel) });
 
 const logger = scribe.logger("@decohere/cli");
 const app = await productCli.create({ configFile, logLevel });
