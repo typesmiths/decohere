@@ -48,7 +48,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "merge_group" ||
                 "${{ github.event_name }}" == "workflow_dispatch" ||
-                "${{ github.ref }}" == refs/heads/release/* ]]; then
+                "$GITHUB_REF" == refs/heads/release/* ]]; then
             echo "full=true" >> "$GITHUB_OUTPUT"
           else
             echo "full=false" >> "$GITHUB_OUTPUT"
