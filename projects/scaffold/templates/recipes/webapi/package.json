@@ -1,7 +1,7 @@
 {
   "scripts": {
     "start": "node dist/release/projects/app-name/es6/src/main.js",
-    "dev": "PORT=app-port flux serve --env-file-if-exists .env --project @workspace-name/app-name",
+    "dev": "flux serve --env-file-if-exists .env --project @workspace-name/app-name",
     "start:app-name": "node dist/release/projects/app-name/es6/src/main.js",
     "package:app-name": "pnpm run build && forge package @workspace-name/app-name",
     "dev:app-name": "PORT=app-port flux serve --env-file-if-exists .env --project @workspace-name/app-name"
