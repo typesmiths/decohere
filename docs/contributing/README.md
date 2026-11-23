@@ -97,6 +97,8 @@ docs/
   guide/                  for developers using Decohere: why, getting started, recipes
   contributing/           for people changing Decohere: this page, architecture/, style/,
                           testing/, ci/, adr/
+    standards/            link to the shared rules in node_modules/@decohere/standards
+                          (pnpm exec standards link); empty until pnpm install
 tools/register.mjs        runs the repo's own TypeScript from source (Flux can't load itself)
 vitest.config.ts          the one Vitest config: unit, docker and e2e projects
 .decohere.js              forge and flux settings for this repo (what @decohere/scaffold ships
