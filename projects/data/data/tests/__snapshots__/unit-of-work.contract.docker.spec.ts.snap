@@ -49,6 +49,14 @@ exports[`unit of work contract > a field loaded on request is kept when an aggre
 
 exports[`unit of work contract > a field loaded on request is left out of a listing 1`] = `[]`;
 
+exports[`unit of work contract > a field loaded on request that wasn't loaded, then assigned, is written on commit 1`] = `
+[
+  "begin",
+  "update algo (document, version) ×1",
+  "commit",
+]
+`;
+
 exports[`unit of work contract > a key the database generates is set on the entity after commit 1`] = `
 [
   "begin",

@@ -69,7 +69,7 @@ const all = await algos.find(); // SELECT without "document"; each algo.document
 const one = await algos.findById(id, { load: ["document"] });
 ```
 
-- **Saving leaves an unloaded field alone.** An aggregate loaded without it can change, and the commit writes only what changed: the column keeps its value. Load the field before changing it.
+- **Saving leaves an unloaded field alone.** An aggregate loaded without it can change, and the commit writes only what changed: the column keeps its value. Assigning the field without loading it is a change like any other: the commit writes the new value, on every provider.
 - **Asking for it later loads it into the same instance.** A `findById` whose instance is in the identity map without the field reads it from the database, and so does a `find` that names it in `load`. Once loaded, `findById` answers from the identity map again.
 - `load` takes the entity's fields, checked by the compiler. Naming one the mapping always loads does nothing more.
 

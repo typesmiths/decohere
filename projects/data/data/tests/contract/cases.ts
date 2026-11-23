@@ -518,6 +518,22 @@ export const cases: Case[] = [
 		},
 	},
 	{
+		name: "a field loaded on request that wasn't loaded, then assigned, is written on commit",
+		seed: seedAlgos,
+		async run(p) {
+			await using uow = p.begin();
+			const algo = await uow.findById(p.model.Algo, ALPHA);
+			expect(algo.document).toBeUndefined();
+			algo.document = { steps: ["replaced"] };
+			await uow.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			const algo = await uow.findById(p.model.Algo, ALPHA, { load: ["document"] });
+			expect(algo).toMatchObject({ version: 2, document: { steps: ["replaced"] } });
+		},
+	},
+	{
 		name: "asking for a field the loaded instance lacks loads it into that instance, by findById or find",
 		seed: seedAlgos,
 		async run(p) {
