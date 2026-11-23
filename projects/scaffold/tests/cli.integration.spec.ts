@@ -1061,6 +1061,21 @@ describe("scaffolder writes a root README with CLI examples", () => {
 		expect(readFileSync("/my-app/README.md", "utf8")).toBe(before);
 	});
 
+	it("lets PORT choose the port for `pnpm dev` in a workspace with one API", async () => {
+		await runCliAsNodeBin(["create", "webapi", "my-app", ...NON_INTERACTIVE]);
+
+		const scripts = (
+			JSON.parse(readFileSync("/my-app/package.json", "utf8")) as {
+				scripts: Record<string, string>;
+			}
+		).scripts;
+		// `PORT=3100 pnpm dev` must listen on 3100: a port in the script would win over the caller's.
+		expect(scripts.dev).not.toContain("PORT=");
+		expect(scripts.dev).toContain("flux serve");
+		// Each API's own script keeps its port, so several run side by side.
+		expect(scripts["dev:api"]).toContain("PORT=3000");
+	});
+
 	it("keeps db:* after webapi add when the workspace already has postgres", async () => {
 		await runCliAsNodeBin(["create", "webapi", "my-app", ...POSTGRES]);
 		await runCliAsNodeBin(["add", "api", "billing", "-d", "my-app", ...NON_INTERACTIVE], {
