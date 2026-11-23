@@ -69,7 +69,9 @@ export class ServeAction implements Action<ServeOptions> {
 
 		for (const deferred of classified.defer) {
 			const script = resolveDeferScript(deferred.scripts);
-			if (script == null) continue;
+			if (script == null) {
+				continue;
+			}
 			const project = this.findProject(options.configuration, deferred.name);
 			this.deferredScripts.start({
 				label: deferred.projectDirectory,

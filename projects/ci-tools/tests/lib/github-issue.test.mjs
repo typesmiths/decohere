@@ -9,8 +9,12 @@ function fakeGh(issues) {
 	const calls = [];
 	const run = (args, input) => {
 		calls.push({ args, input });
-		if (args[1] === "list") return JSON.stringify(issues);
-		if (args[1] === "create") return "https://github.com/typesmiths/decohere/issues/42\n";
+		if (args[1] === "list") {
+			return JSON.stringify(issues);
+		}
+		if (args[1] === "create") {
+			return "https://github.com/typesmiths/decohere/issues/42\n";
+		}
 		return "";
 	};
 	return { run, calls };

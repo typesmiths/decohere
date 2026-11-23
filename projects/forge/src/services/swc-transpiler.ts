@@ -125,7 +125,9 @@ export class SwcTranspiler implements Transformer {
 		baseConfig: Options,
 	): TransformResponse {
 		const swcOptions = this.#swcConfigFactory.createFileConfig(file, baseConfig);
-		if (content === "") return SwcTranspiler.skippedEmpty(file, swcOptions);
+		if (content === "") {
+			return SwcTranspiler.skippedEmpty(file, swcOptions);
+		}
 
 		try {
 			const transformed = transformSync(content, swcOptions);
@@ -153,7 +155,9 @@ export class SwcTranspiler implements Transformer {
 		project?: Project,
 	): Promise<TransformResponse> {
 		const swcOptions = this.#swcConfigFactory.createFileConfig(file, baseConfig);
-		if (content === "") return SwcTranspiler.skippedEmpty(file, swcOptions, project);
+		if (content === "") {
+			return SwcTranspiler.skippedEmpty(file, swcOptions, project);
+		}
 
 		try {
 			const transformed = await transform(content, swcOptions);

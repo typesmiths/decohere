@@ -54,7 +54,9 @@ export function parseLcovByProject(content) {
 		}
 
 		const project = getProjectFromPath(sourcePath);
-		if (project == null || totalLines === 0) continue;
+		if (project == null || totalLines === 0) {
+			continue;
+		}
 
 		const current = byProject.get(project) ?? { totalLines: 0, coveredLines: 0 };
 		current.totalLines += totalLines;
@@ -111,7 +113,9 @@ export function parseLcovFiles(content) {
 			}
 		}
 
-		if (sourcePath.length === 0 || totalLines === 0) continue;
+		if (sourcePath.length === 0 || totalLines === 0) {
+			continue;
+		}
 
 		files.push({
 			sourcePath,

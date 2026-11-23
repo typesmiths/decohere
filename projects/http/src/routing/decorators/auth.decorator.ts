@@ -52,7 +52,9 @@ export function getAuthorizeOptions(
 ): AuthorizeOptions | undefined {
 	// Method-level overrides class-level
 	const methodLevel = getMeta<AuthorizeOptions>(MetadataKeys.authorize, handlerFn);
-	if (methodLevel !== undefined) return methodLevel;
+	if (methodLevel !== undefined) {
+		return methodLevel;
+	}
 	return getMeta<AuthorizeOptions>(MetadataKeys.authorize, controllerPrototype);
 }
 

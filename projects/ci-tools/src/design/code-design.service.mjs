@@ -51,7 +51,9 @@ export class CodeDesign {
 			for (const file of this.files(dir)) {
 				const rel = relative(this.root, file);
 				if (SPEC.test(file)) {
-					if (!relative(dir, file).startsWith("src/")) add("specsAway", rel);
+					if (!relative(dir, file).startsWith("src/")) {
+						add("specsAway", rel);
+					}
 					continue;
 				}
 				if (
@@ -72,39 +74,52 @@ export class CodeDesign {
 	measureFile(file, rel, name, bins, add) {
 		const text = readFileSync(file, "utf8");
 		const base = basename(file).replace(/\.(ts|mts)$/, "");
-		if (BANNED.test(base)) add("bannedNames", rel);
+		if (BANNED.test(base)) {
+			add("bannedNames", rel);
+		}
 		const role = base.split(".");
-		if (base !== "index" && (role.length < 2 || !this.roles.has(role.at(-1))))
+		if (base !== "index" && (role.length < 2 || !this.roles.has(role.at(-1)))) {
 			add("noRole", rel);
+		}
 		const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
 		const isPluginFile = role.at(-1) === "plugin";
 		if (name !== "config" && !bins.has(relative(this.root, file))) {
-			for (let i = countEnvReads(source); i > 0; i--) add("envReads", rel);
+			for (let i = countEnvReads(source); i > 0; i--) {
+				add("envReads", rel);
+			}
 		}
 		let classes = 0;
 		for (const statement of source.statements) {
-			if (ts.isClassDeclaration(statement)) classes++;
-			if (!isExported(statement)) continue;
+			if (ts.isClassDeclaration(statement)) {
+				classes++;
+			}
+			if (!isExported(statement)) {
+				continue;
+			}
 			if (ts.isFunctionDeclaration(statement)) {
 				const fn = statement.name?.text ?? "default";
 				// A .plugin.ts file holds a plugin factory, whatever writer or module it returns.
-				if (!isPluginFile && !isAllowedFunction(fn, statement))
+				if (!isPluginFile && !isAllowedFunction(fn, statement)) {
 					add("looseFunctions", `${rel}: ${fn}`);
+				}
 			}
 			if (ts.isVariableStatement(statement)) {
 				for (const declaration of statement.declarationList.declarations) {
 					const init = declaration.initializer;
 					const variable = declaration.name.getText();
 					if (init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init))) {
-						if (!isAllowedFunction(variable, init))
+						if (!isAllowedFunction(variable, init)) {
 							add("looseFunctions", `${rel}: ${variable}`);
+						}
 					} else if (init && ts.isObjectLiteralExpression(init) && holdsFunctions(init)) {
 						add("namespaceObjects", `${rel}: ${variable}`);
 					}
 				}
 			}
 		}
-		if (classes > 1) add("severalClasses", rel);
+		if (classes > 1) {
+			add("severalClasses", rel);
+		}
 	}
 
 	/** @private Every package under projects/, with the source files its bins start from. */
@@ -113,9 +128,13 @@ export class CodeDesign {
 		const found = [];
 		const visit = (dir) => {
 			for (const entry of readdirSync(dir)) {
-				if (entry === "node_modules" || entry === "__fixtures__" || entry === "dist") continue;
+				if (entry === "node_modules" || entry === "__fixtures__" || entry === "dist") {
+					continue;
+				}
 				const path = join(dir, entry);
-				if (!statSync(path).isDirectory()) continue;
+				if (!statSync(path).isDirectory()) {
+					continue;
+				}
 				if (!existsSync(join(path, "package.json"))) {
 					visit(path);
 					continue;
@@ -155,13 +174,19 @@ export class CodeDesign {
 		const out = [];
 		const visit = (current) => {
 			for (const entry of readdirSync(current)) {
-				if (["node_modules", "dist", "e2e", "__fixtures__"].includes(entry)) continue;
+				if (["node_modules", "dist", "e2e", "__fixtures__"].includes(entry)) {
+					continue;
+				}
 				const path = join(current, entry);
 				if (statSync(path).isDirectory()) {
 					// A nested package is measured on its own.
-					if (path !== dir && existsSync(join(path, "package.json"))) continue;
+					if (path !== dir && existsSync(join(path, "package.json"))) {
+						continue;
+					}
 					visit(path);
-				} else out.push(path);
+				} else {
+					out.push(path);
+				}
 			}
 		};
 		visit(dir);
@@ -207,9 +232,13 @@ function isExported(statement) {
  * @param {ts.FunctionLikeDeclaration} fn
  */
 function isAllowedFunction(name, fn) {
-	if (/^(is|has)[A-Z]/.test(name) || /^define[A-Z]/.test(name)) return true;
+	if (/^(is|has)[A-Z]/.test(name) || /^define[A-Z]/.test(name)) {
+		return true;
+	}
 	const returns = fn.type?.getText() ?? "";
-	if (/Plugin\b|Decorator\b/.test(returns)) return true;
+	if (/Plugin\b|Decorator\b/.test(returns)) {
+		return true;
+	}
 	const body = fn.body?.getText() ?? "";
 	// A factory returning `(builder) => …`, or a decorator returning `(target…) => …`.
 	return /return \(?(builder|target|_target)\b/.test(body);

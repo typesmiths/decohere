@@ -75,7 +75,9 @@ export class TypeOrmRowStore implements RowStore {
 	}
 
 	public async release() {
-		if (!this.runner.isReleased) await this.runner.release();
+		if (!this.runner.isReleased) {
+			await this.runner.release();
+		}
 	}
 
 	public inTransaction() {
@@ -99,8 +101,12 @@ export class TypeOrmRowStore implements RowStore {
 				direction === "desc" ? "DESC" : "ASC",
 			);
 		}
-		if (query.limit !== undefined) qb.limit(query.limit);
-		if (query.lock === "update") qb.setLock("pessimistic_write");
+		if (query.limit !== undefined) {
+			qb.limit(query.limit);
+		}
+		if (query.lock === "update") {
+			qb.setLock("pessimistic_write");
+		}
 		const raw = await qb.getRawMany<Row>();
 		const driver = this.dataSource.driver;
 		return raw.map((r) =>
@@ -141,7 +147,9 @@ export class TypeOrmRowStore implements RowStore {
 			.updateEntity(false)
 			.execute();
 		const [inserted] = result.raw as Row[];
-		if (inserted === undefined) return null;
+		if (inserted === undefined) {
+			return null;
+		}
 		const driver = this.dataSource.driver;
 		return Object.fromEntries(
 			generated.map((c) => [
@@ -163,7 +171,9 @@ export class TypeOrmRowStore implements RowStore {
 			.update(meta.target)
 			.set(this.entityShaped(type, changes));
 		this.where(qb, columns, key, "");
-		if (version) this.where(qb, columns, { [version.prop]: version.expected }, "");
+		if (version) {
+			this.where(qb, columns, { [version.prop]: version.expected }, "");
+		}
 		const result = await qb.execute();
 		return result.affected ?? 0;
 	}
@@ -197,7 +207,9 @@ export class TypeOrmRowStore implements RowStore {
 
 	private map(type: EntityClass): Mapped {
 		const known = this.mapped.get(type);
-		if (known) return known;
+		if (known) {
+			return known;
+		}
 		const meta = this.dataSource.getMetadata(type);
 		if (typeof meta.target !== "function") {
 			throw new DataConfigurationError(`${meta.name} must be mapped to a class to be tracked`);
@@ -231,10 +243,14 @@ export class TypeOrmRowStore implements RowStore {
 					`${meta.name}.${column.propertyPath}: embedded columns aren't supported`,
 				);
 			}
-			if (referenceFor(column) || column.isVirtual) continue;
+			if (referenceFor(column) || column.isVirtual) {
+				continue;
+			}
 			fields.push(column.propertyName);
 			// `select: false`: loaded only when a query asks for it.
-			if (!column.isSelect) lazy.push(column.propertyName);
+			if (!column.isSelect) {
+				lazy.push(column.propertyName);
+			}
 			columns.set(column.propertyName, column);
 		}
 		const model: EntityModel = {
@@ -295,7 +311,9 @@ export class TypeOrmRowStore implements RowStore {
 	) {
 		for (const [prop, condition] of Object.entries(where ?? {})) {
 			const column = columns.get(prop);
-			if (!column) throw new DataConfigurationError(`Unknown field "${prop}"`);
+			if (!column) {
+				throw new DataConfigurationError(`Unknown field "${prop}"`);
+			}
 			const name = alias ? this.column(alias, column) : this.escape(column.databaseName);
 			const param = `p${this.parameter++}`;
 			qb.andWhere(this.condition(name, param, column, condition, qb));
@@ -310,7 +328,9 @@ export class TypeOrmRowStore implements RowStore {
 		condition: Comparison<unknown>,
 		qb: { setParameter(k: string, v: unknown): unknown },
 	): string {
-		if (condition === null) return `${name} IS NULL`;
+		if (condition === null) {
+			return `${name} IS NULL`;
+		}
 		const operator = comparison.operatorOf(condition);
 		if (!operator) {
 			qb.setParameter(param, this.persistent(column, condition));
@@ -319,14 +339,18 @@ export class TypeOrmRowStore implements RowStore {
 		const [op, operand] = operator;
 		if (op === "in") {
 			const values = operand as unknown[];
-			if (values.length === 0) return "1 = 0";
+			if (values.length === 0) {
+				return "1 = 0";
+			}
 			qb.setParameter(
 				param,
 				values.map((v) => this.persistent(column, v)),
 			);
 			return `${name} IN (:...${param})`;
 		}
-		if (op === "ne" && operand === null) return `${name} IS NOT NULL`;
+		if (op === "ne" && operand === null) {
+			return `${name} IS NOT NULL`;
+		}
 		qb.setParameter(param, this.persistent(column, operand));
 		return `${name} ${SQL_OPERATORS[op]} :${param}`;
 	}
@@ -337,7 +361,9 @@ export class TypeOrmRowStore implements RowStore {
 
 	private columnOf(meta: EntityMetadata, columns: Map<string, ColumnMetadata>, prop: string) {
 		const column = columns.get(prop);
-		if (!column) throw new DataConfigurationError(`${meta.name} has no field "${prop}"`);
+		if (!column) {
+			throw new DataConfigurationError(`${meta.name} has no field "${prop}"`);
+		}
 		return column;
 	}
 

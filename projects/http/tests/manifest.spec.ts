@@ -16,10 +16,14 @@ function readWorkspaceManifests(): Map<string, Manifest> {
 		for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
 			const path = join(dir, entry.name);
 			if (entry.isDirectory()) {
-				if (!["node_modules", "dist", "__fixtures__"].includes(entry.name)) walk(path);
+				if (!["node_modules", "dist", "__fixtures__"].includes(entry.name)) {
+					walk(path);
+				}
 			} else if (entry.name === "package.json") {
 				const manifest: Manifest = JSON.parse(fs.readFileSync(path, "utf8"));
-				if (manifest.name != null) manifests.set(manifest.name, manifest);
+				if (manifest.name != null) {
+					manifests.set(manifest.name, manifest);
+				}
 			}
 		}
 	};
@@ -32,7 +36,9 @@ function findInstalled(name: string, manifests: Map<string, Manifest>): Set<stri
 	const installed = new Set<string>();
 	const visit = (packageName: string) => {
 		for (const dependency of Object.keys(manifests.get(packageName)?.dependencies ?? {})) {
-			if (installed.has(dependency)) continue;
+			if (installed.has(dependency)) {
+				continue;
+			}
 			installed.add(dependency);
 			visit(dependency);
 		}

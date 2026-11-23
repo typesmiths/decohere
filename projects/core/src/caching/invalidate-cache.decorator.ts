@@ -34,8 +34,12 @@ const buildGetKey = (
 	method: string | ((...args: never[]) => unknown),
 	keyFn?: (...args: unknown[]) => string,
 ) => {
-	if (typeof method === "string") return () => method;
-	if (keyFn) return (_instance: object, args: unknown[]) => keyFn(...args);
+	if (typeof method === "string") {
+		return () => method;
+	}
+	if (keyFn) {
+		return (_instance: object, args: unknown[]) => keyFn(...args);
+	}
 	return (instance: object, args: unknown[]) =>
 		Caching.generateCacheKey(instance, method.name, args);
 };

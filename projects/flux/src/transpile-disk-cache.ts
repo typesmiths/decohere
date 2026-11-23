@@ -55,14 +55,18 @@ export class TranspileDiskCache {
 
 	private optionsHash(options: object): string {
 		const cached = this.optionsHashes.get(options);
-		if (cached != null) return cached;
+		if (cached != null) {
+			return cached;
+		}
 		const hash = createHash("sha256").update(JSON.stringify(options)).digest("hex");
 		this.optionsHashes.set(options, hash);
 		return hash;
 	}
 
 	public readSync(key: string): string | undefined {
-		if (this.disabled) return undefined;
+		if (this.disabled) {
+			return undefined;
+		}
 		try {
 			return fs.readFileSync(this.entryPath(key), "utf8");
 		} catch (error) {
@@ -71,7 +75,9 @@ export class TranspileDiskCache {
 	}
 
 	public async read(key: string): Promise<string | undefined> {
-		if (this.disabled) return undefined;
+		if (this.disabled) {
+			return undefined;
+		}
 		try {
 			return await fs.promises.readFile(this.entryPath(key), "utf8");
 		} catch (error) {
@@ -80,7 +86,9 @@ export class TranspileDiskCache {
 	}
 
 	public writeSync(key: string, code: string): void {
-		if (this.disabled) return;
+		if (this.disabled) {
+			return;
+		}
 		const file = this.entryPath(key);
 		const temp = this.tempPath(file);
 		try {
@@ -93,7 +101,9 @@ export class TranspileDiskCache {
 	}
 
 	public async write(key: string, code: string): Promise<void> {
-		if (this.disabled) return;
+		if (this.disabled) {
+			return;
+		}
 		const file = this.entryPath(key);
 		const temp = this.tempPath(file);
 		try {
@@ -107,21 +117,29 @@ export class TranspileDiskCache {
 
 	/** Deletes entries older than 30 days, if it hasn't done so in the last day. */
 	public async pruneIfDue(now = Date.now()): Promise<void> {
-		if (this.disabled) return;
+		if (this.disabled) {
+			return;
+		}
 		const marker = path.join(this.dir, PRUNE_MARKER);
 		try {
 			const last = await fs.promises.stat(marker).then(
 				(stat) => stat.mtimeMs,
 				(error: NodeJS.ErrnoException) => {
-					if (error.code === "ENOENT") return 0;
+					if (error.code === "ENOENT") {
+						return 0;
+					}
 					throw error;
 				},
 			);
-			if (now - last < PRUNE_EVERY_MS) return;
+			if (now - last < PRUNE_EVERY_MS) {
+				return;
+			}
 			await fs.promises.mkdir(this.dir, { recursive: true });
 			await fs.promises.writeFile(marker, "");
 			for (const shard of await fs.promises.readdir(this.dir, { withFileTypes: true })) {
-				if (!shard.isDirectory()) continue;
+				if (!shard.isDirectory()) {
+					continue;
+				}
 				const shardDir = path.join(this.dir, shard.name);
 				for (const entry of await fs.promises.readdir(shardDir)) {
 					// Old entries, and temp files a crashed process left mid-write.
@@ -130,12 +148,15 @@ export class TranspileDiskCache {
 						(stat) => stat.mtimeMs,
 						(error: NodeJS.ErrnoException) => {
 							// Renamed or removed by another process since the listing: nothing to prune.
-							if (error.code === "ENOENT") return undefined;
+							if (error.code === "ENOENT") {
+								return undefined;
+							}
 							throw error;
 						},
 					);
-					if (mtime != null && now - mtime > MAX_AGE_MS)
+					if (mtime != null && now - mtime > MAX_AGE_MS) {
 						await fs.promises.rm(file, { force: true });
+					}
 				}
 			}
 		} catch (error) {
@@ -153,12 +174,16 @@ export class TranspileDiskCache {
 
 	/** A missing entry is a miss; any other read error turns the cache off. */
 	private missOrDisable(error: unknown): undefined {
-		if ((error as NodeJS.ErrnoException).code !== "ENOENT") this.disable("read", error);
+		if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+			this.disable("read", error);
+		}
 		return undefined;
 	}
 
 	private disable(operation: string, error: unknown): void {
-		if (this.disabled) return;
+		if (this.disabled) {
+			return;
+		}
 		this.disabled = true;
 		this.logger.warn(
 			`Transpile cache turned off for this run: could not ${operation} ${this.dir} (${String(error)}). ` +

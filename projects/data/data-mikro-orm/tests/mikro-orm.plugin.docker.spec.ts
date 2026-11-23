@@ -41,7 +41,9 @@ class StaticConfig implements IConfigurationService {
 	public constructor(private readonly connection: ConnectionInfo) {}
 	public async get<T extends object>(type: Constructable<T> | string): Promise<T> {
 		const config = new DatabaseConfig();
-		if (type === DatabaseConfig) config.dataSources = [this.connection];
+		if (type === DatabaseConfig) {
+			config.dataSources = [this.connection];
+		}
 		return config as unknown as T;
 	}
 }

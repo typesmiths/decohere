@@ -20,7 +20,9 @@ export class Npm extends Shell implements PackageManager {
 	 * `dist/release` to npm, so it gets a leading `./`.
 	 */
 	private static folderSpec(directory: string): string {
-		if (path.isAbsolute(directory) || /^\.\.?([/\\]|$)/.test(directory)) return directory;
+		if (path.isAbsolute(directory) || /^\.\.?([/\\]|$)/.test(directory)) {
+			return directory;
+		}
 		return `./${directory}`;
 	}
 

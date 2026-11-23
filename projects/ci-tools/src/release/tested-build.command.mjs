@@ -25,7 +25,9 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 		const response = await fetch(`${base}/${path}`, {
 			headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
 		});
-		if (!response.ok) throw new Error(`GitHub answered ${response.status} to GET ${path}`);
+		if (!response.ok) {
+			throw new Error(`GitHub answered ${response.status} to GET ${path}`);
+		}
 		return response.json();
 	};
 
@@ -34,7 +36,9 @@ if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 		console.error(`Tested by ${found.url} (${found.event})`);
 		console.log(found.runId);
 	} catch (error) {
-		if (!(error instanceof TestedBuildError)) throw error;
+		if (!(error instanceof TestedBuildError)) {
+			throw error;
+		}
 		console.error(`::error::${error.message}`);
 		process.exit(1);
 	}

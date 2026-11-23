@@ -37,11 +37,15 @@ export class TransportGuard {
 
 	/** Stops writing: reports `reason` once and destroys the transport. Later calls do nothing. */
 	public retire(reason = "retired"): void {
-		if (this.isRetired) return;
+		if (this.isRetired) {
+			return;
+		}
 		this.isRetired = true;
 		process.stderr.write(`[scribe-pino] transport retired: ${reason}\n`);
 		const stream = this.transport as WritableLike;
-		if (typeof stream.destroy !== "function") return;
+		if (typeof stream.destroy !== "function") {
+			return;
+		}
 		try {
 			stream.destroy();
 		} catch (err) {
@@ -66,6 +70,8 @@ export class TransportGuard {
 
 	private complete(encodingOrCb: unknown, cb: unknown): void {
 		const done = typeof encodingOrCb === "function" ? encodingOrCb : cb;
-		if (typeof done === "function") done();
+		if (typeof done === "function") {
+			done();
+		}
 	}
 }

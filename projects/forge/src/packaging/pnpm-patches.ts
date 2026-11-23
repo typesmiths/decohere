@@ -53,7 +53,9 @@ async function read(rootDir: string): Promise<PnpmPatch[]> {
 
 	const byKey = new Map<string, PnpmPatch>();
 	for (const [where, entries] of sources) {
-		if (entries == null) continue;
+		if (entries == null) {
+			continue;
+		}
 		if (!isRecord(entries)) {
 			throw new ForgeError(`${where} must map package names to patch files.`);
 		}
@@ -105,7 +107,9 @@ async function apply(
 	shipper: string,
 ): Promise<PatchReport> {
 	const report: PatchReport = { applied: [], skipped: [] };
-	if (patches.length === 0) return report;
+	if (patches.length === 0) {
+		return report;
+	}
 
 	const installed = await installedPackages(path.join(packageDir, "node_modules"));
 	const writes = new Map<string, string | null>();
@@ -122,7 +126,9 @@ async function apply(
 		const used = new Set<PnpmPatch>();
 		for (const copy of copies) {
 			const patch = choose(forName, copy.version);
-			if (patch == null) continue;
+			if (patch == null) {
+				continue;
+			}
 			used.add(patch);
 			const fileDiffs = diffs.get(patch.file) ?? (await readPatch(patch, rootDir));
 			diffs.set(patch.file, fileDiffs);
@@ -131,7 +137,9 @@ async function apply(
 		}
 
 		for (const patch of forName) {
-			if (used.has(patch) || patch.spec == null) continue;
+			if (used.has(patch) || patch.spec == null) {
+				continue;
+			}
 			const versions = [...new Set(copies.map((copy) => `${name}@${copy.version}`))];
 			throw new ForgeError(
 				`${patch.file} is for ${patch.key}, but ${shipper} ships ${versions.join(", ")}. ` +
@@ -211,10 +219,14 @@ async function stage(
 
 /** Every package npm installed, including copies nested under another package. */
 async function installedPackages(nodeModules: string): Promise<InstalledPackage[]> {
-	if (!(await io.directoryExists(nodeModules))) return [];
+	if (!(await io.directoryExists(nodeModules))) {
+		return [];
+	}
 	const found: InstalledPackage[] = [];
 	for (const entry of await fs.readdir(nodeModules, { withFileTypes: true })) {
-		if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+		if (!entry.isDirectory() || entry.name.startsWith(".")) {
+			continue;
+		}
 		const dirs = entry.name.startsWith("@")
 			? (await fs.readdir(path.join(nodeModules, entry.name), { withFileTypes: true }))
 					.filter((scoped) => scoped.isDirectory())

@@ -10,7 +10,9 @@ describe("unit of work contract on the memory provider", () => {
 	for (const { name, seed, run, check } of cases) {
 		it(name, async () => {
 			const p = openMemory();
-			if (seed) await seed(p);
+			if (seed) {
+				await seed(p);
+			}
 			p.reads();
 			await run(p);
 			await check?.(p);

@@ -13,10 +13,14 @@ type AnyFn = (...args: unknown[]) => unknown;
 type TimingLevel = "info" | "trace";
 
 function serializeArgs(args: unknown[]): string {
-	if (args.length === 0) return "";
+	if (args.length === 0) {
+		return "";
+	}
 	return args
 		.map((arg) => {
-			if (Array.isArray(arg)) return `[${arg.map(String).join(", ")}]`;
+			if (Array.isArray(arg)) {
+				return `[${arg.map(String).join(", ")}]`;
+			}
 			const s = String(arg);
 			return s.length > 60 ? `${s.slice(0, 57)}...` : s;
 		})
@@ -54,7 +58,9 @@ export function trace(
 	propertyKey: string,
 	descriptor: PropertyDescriptor,
 ): PropertyDescriptor {
-	if (!isTraceEnabled()) return descriptor;
+	if (!isTraceEnabled()) {
+		return descriptor;
+	}
 	const className = (target as { constructor: { name: string } }).constructor.name;
 	descriptor.value = wrapWithTiming(
 		descriptor.value as AnyFn,
@@ -80,12 +86,18 @@ export function timed(
 }
 
 export function Trace(constructor: { name: string; prototype: object }): void {
-	if (!isTraceEnabled()) return;
+	if (!isTraceEnabled()) {
+		return;
+	}
 	const className = constructor.name;
 	for (const key of Object.getOwnPropertyNames(constructor.prototype)) {
-		if (key === "constructor") continue;
+		if (key === "constructor") {
+			continue;
+		}
 		const descriptor = Object.getOwnPropertyDescriptor(constructor.prototype, key);
-		if (descriptor == null || typeof descriptor.value !== "function") continue;
+		if (descriptor == null || typeof descriptor.value !== "function") {
+			continue;
+		}
 		descriptor.value = wrapWithTiming(descriptor.value as AnyFn, className, key, "trace");
 		Object.defineProperty(constructor.prototype, key, descriptor);
 	}

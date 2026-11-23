@@ -49,7 +49,9 @@ function edits(orm: Orm): SourceEdit[] {
 			apply: (source) => {
 				const anchor = /^[ \t]*\.withServices\(\((\w+)\) => \{[ \t]*$/m;
 				const services = anchor.exec(source)?.[1];
-				if (services == null) return undefined;
+				if (services == null) {
+					return undefined;
+				}
 				const line = `\t${services}.registerRequestScoped(UserService);`;
 				return AppSource.insertAfter(anchor, line)(source);
 			},
@@ -87,10 +89,14 @@ export class UsersStep {
 
 	public apply(workspace: string, targets: AppTarget[], env: Record<string, string>): void {
 		const ready = this.check(targets);
-		if (Object.keys(env).length > 0) this.changes.setEnv(env);
+		if (Object.keys(env).length > 0) {
+			this.changes.setEnv(env);
+		}
 		for (const { name, port } of targets) {
 			const orm = ready.get(name);
-			if (orm == null) continue;
+			if (orm == null) {
+				continue;
+			}
 			const app = new WorkspaceApp(this.changes, name);
 			const names = { workspace, app: name, port };
 			this.templates.apply(this.changes, "steps/users", names, { replaces: ["steps/auth0"] });

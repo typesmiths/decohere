@@ -17,7 +17,9 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 async function eventually(predicate: () => boolean, timeoutMs = 2000) {
 	const start = Date.now();
 	while (!predicate()) {
-		if (Date.now() - start > timeoutMs) throw new Error("timed out waiting for watch events");
+		if (Date.now() - start > timeoutMs) {
+			throw new Error("timed out waiting for watch events");
+		}
 		await sleep(20);
 	}
 }
@@ -31,7 +33,9 @@ describe("io.watch on a real filesystem", () => {
 
 	afterEach(() => {
 		close?.();
-		if (dir) rmSync(dir, { recursive: true, force: true });
+		if (dir) {
+			rmSync(dir, { recursive: true, force: true });
+		}
 	});
 
 	it("keeps reporting changes to a file after it is replaced by an atomic save", async () => {

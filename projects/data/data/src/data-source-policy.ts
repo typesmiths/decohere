@@ -50,7 +50,9 @@ export function assertSynchronizeAllowed(
 	nodeEnv: string | undefined = process.env.NODE_ENV,
 ): void {
 	const synchronize: unknown = info.synchronize;
-	if (synchronize == null || synchronize === false || isDevelopmentEnv(nodeEnv)) return;
+	if (synchronize == null || synchronize === false || isDevelopmentEnv(nodeEnv)) {
+		return;
+	}
 	throw new DataConfigurationError(
 		`Data source "${info.name}" sets synchronize, which is allowed only in development (NODE_ENV is ${JSON.stringify(nodeEnv ?? "")}). Migrations own the schema elsewhere.`,
 	);
@@ -66,7 +68,9 @@ export function assertMigrateOnStartAllowed(
 	nodeEnv: string | undefined = process.env.NODE_ENV,
 ): void {
 	const migrateOnStart: unknown = info.migrateOnStart;
-	if (migrateOnStart == null || migrateOnStart === false) return;
+	if (migrateOnStart == null || migrateOnStart === false) {
+		return;
+	}
 	if (!isDevelopmentEnv(nodeEnv)) {
 		throw new DataConfigurationError(
 			`Data source "${info.name}" sets migrateOnStart, which is allowed only in development (NODE_ENV is ${JSON.stringify(nodeEnv ?? "")}). Run db migrate as a release step instead.`,
@@ -111,7 +115,9 @@ export function shouldBootstrapDatabase(
 
 /** A data source that will be bootstrapped must have every password the bootstrap needs. */
 export function assertBootstrapCredentials(info: ConnectionInfo): void {
-	if (isTrusted(info)) return;
+	if (isTrusted(info)) {
+		return;
+	}
 	if (has(info.migrateUsername) && !has(info.migratePassword)) {
 		throw new DataConfigurationError(
 			`Data source "${info.name}" has migrateUsername but no migratePassword. Set migratePassword, or auth: trust for a local server that trusts every connection.`,

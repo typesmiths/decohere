@@ -1,10 +1,15 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "ignorePatterns": ["**/dist/**", "**/__fixtures__/**", "**/watchdog.js", "**/bootloader.js"],
+  "rules": {
+    "curly": ["error", "all"]
+  },
   "overrides": [
     {
       "files": ["projects/ci-tools/**"],
-      "rules": { "unicorn/no-invalid-fetch-options": "off" }
+      "rules": {
+        "unicorn/no-invalid-fetch-options": "off"
+      }
     }
   ]
 }

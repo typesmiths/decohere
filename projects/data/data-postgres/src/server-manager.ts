@@ -156,7 +156,9 @@ export class PostgresServerManager {
 			}
 
 			const owner = await databaseOwner(pool, database);
-			if (owner !== adminUser) await roles.borrow(owner);
+			if (owner !== adminUser) {
+				await roles.borrow(owner);
+			}
 
 			// Owned by the database owner (the migrate role, when there is one), like `public`.
 			await pool.query(createSchemaQuery(schema, owner).text);
@@ -250,7 +252,9 @@ async function granted(pool: Pool, query: SqlQuery): Promise<boolean> {
  * answers true for a list when any one of them is held. */
 async function hasAll(pool: Pool, query: (privilege: string) => SqlQuery): Promise<boolean> {
 	for (const privilege of ["USAGE", "CREATE"]) {
-		if (!(await granted(pool, query(privilege)))) return false;
+		if (!(await granted(pool, query(privilege)))) {
+			return false;
+		}
 	}
 	return true;
 }
@@ -279,8 +283,12 @@ class BorrowedRoles {
 	) {}
 
 	public async borrow(role: string): Promise<void> {
-		if (this.borrowed.includes(role)) return;
-		if (await granted(this.pool, hasRolePrivilegesQuery(this.adminUser, role))) return;
+		if (this.borrowed.includes(role)) {
+			return;
+		}
+		if (await granted(this.pool, hasRolePrivilegesQuery(this.adminUser, role))) {
+			return;
+		}
 		try {
 			await this.pool.query(grantRoleMembershipQuery(this.adminUser, role).text);
 		} catch (err) {

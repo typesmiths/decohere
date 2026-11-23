@@ -11,7 +11,9 @@ export function openMemory(): OpenProvider {
 	let reads = 0;
 	class CountingRowStore extends MemoryRowStore {
 		public override select(type: EntityClass, query: RowQuery): Promise<Row[]> {
-			if (query.lock == null) reads++;
+			if (query.lock == null) {
+				reads++;
+			}
 			return super.select(type, query);
 		}
 	}

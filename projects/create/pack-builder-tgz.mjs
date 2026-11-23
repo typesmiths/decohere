@@ -30,13 +30,17 @@ export function collectWorkspacePackages(rootDir) {
 			return;
 		}
 		for (const entry of entries) {
-			if (entry.name === "node_modules" || entry.name === ".git") continue;
+			if (entry.name === "node_modules" || entry.name === ".git") {
+				continue;
+			}
 			const path = join(dir, entry.name);
 			if (entry.isDirectory()) {
 				walk(path);
 				continue;
 			}
-			if (entry.name !== "package.json") continue;
+			if (entry.name !== "package.json") {
+				continue;
+			}
 			const pkg = JSON.parse(readFileSync(path, "utf8"));
 			if (typeof pkg.name === "string" && pkg.name.startsWith("@decohere/")) {
 				found.push({ name: pkg.name, dir });
@@ -54,7 +58,9 @@ export function collectWorkspacePackages(rootDir) {
 export function fileSpec(fromDir, pkgDir) {
 	let rel = relative(fromDir, pkgDir) || ".";
 	rel = rel.replaceAll("\\", "/");
-	if (!rel.startsWith(".")) rel = `./${rel}`;
+	if (!rel.startsWith(".")) {
+		rel = `./${rel}`;
+	}
 	return `file:${rel}`;
 }
 
@@ -71,11 +77,15 @@ export function rewriteDecohereDepsToFile(pkg, fromDir, packages) {
 	const byName = new Map(packages.map((item) => [item.name, item.dir]));
 	const from = resolve(fromDir);
 	const rewrite = (deps) => {
-		if (deps == null || typeof deps !== "object" || Array.isArray(deps)) return deps;
+		if (deps == null || typeof deps !== "object" || Array.isArray(deps)) {
+			return deps;
+		}
 		const next = { .../** @type {Record<string, unknown>} */ (deps) };
 		for (const name of Object.keys(next)) {
 			const dir = byName.get(name);
-			if (dir == null || resolve(dir) === from) continue;
+			if (dir == null || resolve(dir) === from) {
+				continue;
+			}
 			next[name] = fileSpec(fromDir, dir);
 		}
 		return next;
@@ -147,7 +157,9 @@ function parseArgs(argv) {
 	const parsed = {};
 	for (let i = 0; i < argv.length; i++) {
 		const arg = argv[i];
-		if (arg == null || !arg.startsWith("--")) continue;
+		if (arg == null || !arg.startsWith("--")) {
+			continue;
+		}
 		const key = arg.slice(2);
 		const value = argv[i + 1];
 		if (value == null || value.startsWith("--")) {

@@ -36,9 +36,13 @@ const wildcards = pathEntries
 /** The source file a `paths` key names: exact, else a wildcard's `<sub>.ts` or `<sub>/index.ts`. */
 function aliasFor(specifier) {
 	const exact = aliases.get(specifier);
-	if (exact != null) return exact;
+	if (exact != null) {
+		return exact;
+	}
 	for (const [prefix, dir] of wildcards) {
-		if (!specifier.startsWith(prefix)) continue;
+		if (!specifier.startsWith(prefix)) {
+			continue;
+		}
 		const sub = path.join(dir, specifier.slice(prefix.length));
 		return [`${sub}.ts`, path.join(sub, "index.ts")].find((file) => existsSync(file));
 	}
@@ -64,7 +68,9 @@ process.setSourceMapsEnabled(true);
 registerHooks({
 	resolve(specifier, context, nextResolve) {
 		const alias = aliasFor(specifier);
-		if (alias) return nextResolve(pathToFileURL(alias).href, context);
+		if (alias) {
+			return nextResolve(pathToFileURL(alias).href, context);
+		}
 
 		if (
 			specifier.startsWith(".") &&

@@ -63,12 +63,19 @@ class SseParser {
 		const colon = line.indexOf(":");
 		const field = colon === -1 ? line : line.slice(0, colon);
 		let value = colon === -1 ? "" : line.slice(colon + 1);
-		if (value.startsWith(" ")) value = value.slice(1);
+		if (value.startsWith(" ")) {
+			value = value.slice(1);
+		}
 		this.hasFields = true;
-		if (field === "data") this.data.push(value);
-		else if (field === "event") this.current.event = value;
-		else if (field === "id") this.current.id = value;
-		else if (field === "retry") this.current.retry = Number(value);
+		if (field === "data") {
+			this.data.push(value);
+		} else if (field === "event") {
+			this.current.event = value;
+		} else if (field === "id") {
+			this.current.id = value;
+		} else if (field === "retry") {
+			this.current.retry = Number(value);
+		}
 	}
 }
 

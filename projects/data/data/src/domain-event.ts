@@ -17,8 +17,11 @@ function raisesEvents(entity: object): entity is RaisesEvents {
 function collect(entities: Iterable<object>, toOutbox: OutboxMapper): object[] {
 	const rows: object[] = [];
 	for (const entity of entities) {
-		if (raisesEvents(entity))
-			for (const event of entity.pullEvents()) rows.push(toOutbox(event));
+		if (raisesEvents(entity)) {
+			for (const event of entity.pullEvents()) {
+				rows.push(toOutbox(event));
+			}
+		}
 	}
 	return rows;
 }

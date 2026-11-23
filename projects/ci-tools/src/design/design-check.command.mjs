@@ -53,7 +53,9 @@ export function runDesignCheck(options = {}) {
 					`design: ${pkg}  ${RULES[rule]}  ${was} → ${now}  (+${now - was}), among:\n  ${where.join("\n  ")}`,
 				);
 			}
-			if (now < was) fell.push(`design: ${pkg}  ${RULES[rule]}  ${was} → ${now}`);
+			if (now < was) {
+				fell.push(`design: ${pkg}  ${RULES[rule]}  ${was} → ${now}`);
+			}
 		}
 	}
 

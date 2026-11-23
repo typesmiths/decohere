@@ -36,7 +36,9 @@ export function getPackageScriptPath(
 	const bins: string[] = [];
 	for (let dir = path.resolve(options.cwd); ; dir = path.dirname(dir)) {
 		bins.push(path.join(dir, "node_modules", ".bin"));
-		if (dir === root || path.dirname(dir) === dir) break;
+		if (dir === root || path.dirname(dir) === dir) {
+			break;
+		}
 	}
 	return [...bins, current].filter((entry) => entry !== "").join(path.delimiter);
 }

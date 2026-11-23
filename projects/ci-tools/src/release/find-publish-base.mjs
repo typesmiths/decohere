@@ -24,7 +24,9 @@ function tryGit(args, cwd, notFound) {
 	try {
 		return git(args, cwd);
 	} catch (error) {
-		if (error.status === notFound) return undefined;
+		if (error.status === notFound) {
+			return undefined;
+		}
 		throw error;
 	}
 }
@@ -36,7 +38,9 @@ function tryGit(args, cwd, notFound) {
  */
 export function findPublishBase(sha, cwd = process.cwd()) {
 	const parent = tryGit(["rev-parse", "--verify", "--quiet", `${sha}^1`], cwd, 1);
-	if (parent == null) return undefined;
+	if (parent == null) {
+		return undefined;
+	}
 	const tag = tryGit(
 		["describe", "--tags", "--abbrev=0", "--match", "v[0-9]*", parent],
 		cwd,
@@ -47,5 +51,7 @@ export function findPublishBase(sha, cwd = process.cwd()) {
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
 	const base = findPublishBase(process.argv[2]);
-	if (base != null) console.log(base);
+	if (base != null) {
+		console.log(base);
+	}
 }

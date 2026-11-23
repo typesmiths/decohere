@@ -16,7 +16,9 @@ function isOlderOrSame(version, than) {
 	const parts = (text) => VERSION.exec(text)?.slice(1).map(Number) ?? [0, 0, 0];
 	const [a, b] = [parts(version), parts(than)];
 	for (const index of [0, 1, 2]) {
-		if (a[index] !== b[index]) return a[index] < b[index];
+		if (a[index] !== b[index]) {
+			return a[index] < b[index];
+		}
 	}
 	return !version.includes("-") && !than.includes("-");
 }

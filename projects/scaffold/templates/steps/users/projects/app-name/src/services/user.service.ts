@@ -33,7 +33,9 @@ export class UserService {
 
 		const existing = await this.users.findBySub(sub);
 		if (existing) {
-			if (!existing.email && email) existing.email = email;
+			if (!existing.email && email) {
+				existing.email = email;
+			}
 			if (existing.displayName === existing.sub && displayFromToken) {
 				existing.displayName = displayFromToken;
 			}

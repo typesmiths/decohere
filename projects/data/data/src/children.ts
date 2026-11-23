@@ -14,16 +14,22 @@ export class ChildList<T> extends Array<T> implements Children<T> {
 
 	public static of<T>(...items: T[]): ChildList<T> {
 		const list = new ChildList<T>();
-		for (const item of items) list.add(item);
+		for (const item of items) {
+			list.add(item);
+		}
 		return list;
 	}
 
 	public add(item: T) {
-		if (!this.includes(item)) this.push(item);
+		if (!this.includes(item)) {
+			this.push(item);
+		}
 	}
 
 	public remove(item: T) {
 		const at = this.indexOf(item);
-		if (at >= 0) this.splice(at, 1);
+		if (at >= 0) {
+			this.splice(at, 1);
+		}
 	}
 }

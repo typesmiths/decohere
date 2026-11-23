@@ -5,7 +5,9 @@ import { join } from "node:path";
 /** The Prettier the workspace pins, so the scaffolder formats as `pnpm run lint` will. */
 function prettierOf(targetDir: string): string {
 	const manifest = join(targetDir, "package.json");
-	if (!existsSync(manifest)) return "prettier";
+	if (!existsSync(manifest)) {
+		return "prettier";
+	}
 	const pkg = JSON.parse(readFileSync(manifest, "utf8")) as {
 		devDependencies?: Record<string, string>;
 	};

@@ -62,7 +62,9 @@ async function* ticker(signal: AbortSignal, intervalMs: number): AsyncGenerator<
 					{ once: true },
 				);
 			});
-			if (!signal.aborted) yield `tick ${++tick}`;
+			if (!signal.aborted) {
+				yield `tick ${++tick}`;
+			}
 		}
 	} finally {
 		probe.timersRunning -= 1;
@@ -107,7 +109,9 @@ class FeedController {
 	public async *live(@Signal() signal: AbortSignal): SseStream {
 		void this.resource;
 		yield { id: "0", data: "connected" };
-		for await (const message of ticker(signal, 10)) yield message;
+		for await (const message of ticker(signal, 10)) {
+			yield message;
+		}
 	}
 
 	@Sse()
@@ -318,8 +322,9 @@ class SecretConfigService implements IConfigurationService {
 		return [];
 	}
 	public async get<T extends object>(type: Constructable<T> | string): Promise<T> {
-		if (Object.is(type, AuthConfig))
+		if (Object.is(type, AuthConfig)) {
 			return Object.assign(new AuthConfig(), secretConfig) as unknown as T;
+		}
 		return {} as T;
 	}
 }
@@ -437,7 +442,9 @@ function services() {
 async function waitFor(condition: () => boolean, timeoutMs = 2000) {
 	const deadline = Date.now() + timeoutMs;
 	while (!condition()) {
-		if (Date.now() > deadline) throw new Error("condition not met in time");
+		if (Date.now() > deadline) {
+			throw new Error("condition not met in time");
+		}
 		await sleep(5);
 	}
 }

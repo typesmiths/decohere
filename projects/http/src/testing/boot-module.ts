@@ -28,7 +28,9 @@ export async function bootModule(options: BootModuleOptions): Promise<TestApp> {
 	let builder = Builder.create(new ServiceContainerBuilder()).use(
 		http(options.provider, { controllers: [...options.controllers] }),
 	);
-	if (options.services) builder = builder.withServices(options.services);
+	if (options.services) {
+		builder = builder.withServices(options.services);
+	}
 	options.configure?.(builder);
 	return startTestApp(builder.build());
 }

@@ -69,7 +69,9 @@ export function resolveIssue(options, run = gh) {
 	const { title, comment } = options;
 	const repo = options.repo ? ["--repo", options.repo] : [];
 	const open = pickIssue(listIssues(title, repo, run), title);
-	if (open == null || open.state !== "OPEN") return null;
+	if (open == null || open.state !== "OPEN") {
+		return null;
+	}
 	run(["issue", "close", String(open.number), ...repo, "--comment", comment]);
 	return open.number;
 }

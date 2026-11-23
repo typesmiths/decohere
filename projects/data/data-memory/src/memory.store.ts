@@ -94,8 +94,11 @@ export class MemoryStore {
 		for (const [type, writes] of tx.writes) {
 			const table = this.table(type);
 			for (const [key, row] of writes) {
-				if (row === null) table.delete(key);
-				else table.set(key, row);
+				if (row === null) {
+					table.delete(key);
+				} else {
+					table.set(key, row);
+				}
 			}
 		}
 		this.end(tx);
@@ -109,17 +112,27 @@ export class MemoryStore {
 	public select(tx: MemoryTransaction, type: EntityClass, query: RowQuery): Promise<Row[]> {
 		return this.statement(tx, async () => {
 			const model = this.model(type);
-			for (const prop of Object.keys(query.where ?? {})) this.assertProp(model, prop);
-			for (const prop of Object.keys(query.orderBy ?? {})) this.assertProp(model, prop);
-			for (const prop of query.load ?? []) this.assertProp(model, prop);
+			for (const prop of Object.keys(query.where ?? {})) {
+				this.assertProp(model, prop);
+			}
+			for (const prop of Object.keys(query.orderBy ?? {})) {
+				this.assertProp(model, prop);
+			}
+			for (const prop of query.load ?? []) {
+				this.assertProp(model, prop);
+			}
 			let found = this.query(tx, type, query);
 			if (query.lock === "update") {
 				// Lock what matched, then read again: a row another transaction changed while this one
 				// waited is read as it now is, and dropped if it no longer matches.
 				for (;;) {
 					const unlocked = found.filter(([key]) => !this.holds(tx, type, key, "update"));
-					if (unlocked.length === 0) break;
-					for (const [key] of unlocked) await this.acquire(tx, type, key, "update");
+					if (unlocked.length === 0) {
+						break;
+					}
+					for (const [key] of unlocked) {
+						await this.acquire(tx, type, key, "update");
+					}
 					found = this.query(tx, type, query);
 				}
 			}
@@ -136,7 +149,9 @@ export class MemoryStore {
 	public insert(tx: MemoryTransaction, type: EntityClass, rows: Row[]): Promise<Row[]> {
 		return this.statement(tx, async () => {
 			const generated: Row[] = [];
-			for (const input of rows) generated.push(await this.insertRow(tx, type, input, "fail"));
+			for (const input of rows) {
+				generated.push(await this.insertRow(tx, type, input, "fail"));
+			}
 			return generated;
 		});
 	}
@@ -159,15 +174,21 @@ export class MemoryStore {
 	): Promise<number> {
 		return this.statement(tx, async () => {
 			const model = this.model(type);
-			for (const prop of Object.keys(changes)) this.assertProp(model, prop);
+			for (const prop of Object.keys(changes)) {
+				this.assertProp(model, prop);
+			}
 			const key = this.keyOf(model, keyRow);
 			const changesKey = model.key.some(
 				(prop) => prop in changes && !equal(changes[prop], keyRow[prop]),
 			);
 			await this.acquire(tx, type, key, changesKey ? "update" : "no-key-update");
 			const current = this.row(tx, type, key);
-			if (current == null) return 0;
-			if (version && !equal(current[version.prop], version.expected)) return 0;
+			if (current == null) {
+				return 0;
+			}
+			if (version && !equal(current[version.prop], version.expected)) {
+				return 0;
+			}
 			const next = { ...current, ...(copy(changes) as Row) };
 			await this.checkReferences(tx, model, next, Object.keys(changes));
 			if (!changesKey) {
@@ -194,7 +215,9 @@ export class MemoryStore {
 				const key = this.keyOf(model, keyRow);
 				await this.acquire(tx, type, key, "update");
 				const row = this.row(tx, type, key);
-				if (row == null) continue;
+				if (row == null) {
+					continue;
+				}
 				this.write(tx, type, key, null);
 				deleted.push({ model, row });
 			}
@@ -212,7 +235,9 @@ export class MemoryStore {
 						);
 					}
 					await this.acquire(tx, child.type, key, "update");
-					if (this.row(tx, child.type, key) == null) continue;
+					if (this.row(tx, child.type, key) == null) {
+						continue;
+					}
 					this.write(tx, child.type, key, null);
 					deleted.push({ model: child, row: referencing });
 				}
@@ -252,7 +277,9 @@ export class MemoryStore {
 			out[model.generated] = next;
 		}
 		for (const prop of model.key) {
-			if (row[prop] == null) throw new DataError(`${model.name}: key ${prop} is empty`);
+			if (row[prop] == null) {
+				throw new DataError(`${model.name}: key ${prop} is empty`);
+			}
 		}
 		await this.checkReferences(
 			tx,
@@ -263,7 +290,9 @@ export class MemoryStore {
 		const key = this.keyOf(model, row);
 		await this.acquire(tx, type, key, "update");
 		if (this.row(tx, type, key)) {
-			if (onConflict === "skip") return null;
+			if (onConflict === "skip") {
+				return null;
+			}
 			throw new DataError(`${model.name} ${this.describe(model, row)} already exists`);
 		}
 		this.write(tx, type, key, row);
@@ -280,7 +309,9 @@ export class MemoryStore {
 			found.sort(([, a], [, b]) => {
 				for (const [prop, direction] of orderBy) {
 					const order = sortOrder(a[prop] ?? null, b[prop] ?? null, direction);
-					if (order !== 0) return order;
+					if (order !== 0) {
+						return order;
+					}
 				}
 				return 0;
 			});
@@ -294,17 +325,24 @@ export class MemoryStore {
 		const writes = tx.writes.get(type);
 		for (const [key, row] of table) {
 			const written = writes?.get(key);
-			if (written === undefined) yield [key, row];
-			else if (written !== null) yield [key, written];
+			if (written === undefined) {
+				yield [key, row];
+			} else if (written !== null) {
+				yield [key, written];
+			}
 		}
 		for (const [key, row] of writes ?? []) {
-			if (row !== null && !table.has(key)) yield [key, row];
+			if (row !== null && !table.has(key)) {
+				yield [key, row];
+			}
 		}
 	}
 
 	private row(tx: MemoryTransaction, type: EntityClass, key: string): Row | undefined {
 		const written = tx.writes.get(type)?.get(key);
-		if (written !== undefined) return written ?? undefined;
+		if (written !== undefined) {
+			return written ?? undefined;
+		}
 		return this.table(type).get(key);
 	}
 
@@ -334,10 +372,14 @@ export class MemoryStore {
 		props: string[],
 	) {
 		for (const ref of model.references) {
-			if (!props.includes(ref.prop)) continue;
+			if (!props.includes(ref.prop)) {
+				continue;
+			}
 			const value = row[ref.prop];
 			if (value == null) {
-				if (ref.nullable) continue;
+				if (ref.nullable) {
+					continue;
+				}
 				throw new DataError(`${model.name}.${ref.prop} can't be empty`);
 			}
 			const target = this.model(ref.target);
@@ -358,14 +400,19 @@ export class MemoryStore {
 			key: string;
 			row: Row;
 		}[] = [];
-		if (parent.key.length !== 1) return found;
+		if (parent.key.length !== 1) {
+			return found;
+		}
 		const value = row[parent.key[0]];
 		for (const child of this.models.values()) {
 			for (const ref of child.references) {
-				if (ref.target !== parent.type) continue;
+				if (ref.target !== parent.type) {
+					continue;
+				}
 				for (const [key, candidate] of this.rows(tx, child.type)) {
-					if (equal(candidate[ref.prop], value))
+					if (equal(candidate[ref.prop], value)) {
 						found.push({ child, ref, key, row: candidate });
+					}
 				}
 			}
 		}
@@ -406,8 +453,12 @@ export class MemoryStore {
 				.map(([other]) => other);
 			if (blocking.length === 0) {
 				const mine = holders.get(tx);
-				if (mine == null) tx.held.push({ type, key });
-				if (mine == null || STRENGTH[mode] > STRENGTH[mine]) holders.set(tx, mode);
+				if (mine == null) {
+					tx.held.push({ type, key });
+				}
+				if (mine == null || STRENGTH[mode] > STRENGTH[mine]) {
+					holders.set(tx, mode);
+				}
 				return;
 			}
 			tx.waitingFor = new Set(blocking);
@@ -430,8 +481,12 @@ export class MemoryStore {
 	private waitsOnItself(tx: MemoryTransaction): boolean {
 		const seen = new Set<MemoryTransaction>();
 		const visit = (other: MemoryTransaction): boolean => {
-			if (other === tx) return true;
-			if (seen.has(other)) return false;
+			if (other === tx) {
+				return true;
+			}
+			if (seen.has(other)) {
+				return false;
+			}
 			seen.add(other);
 			return [...other.waitingFor].some(visit);
 		};
@@ -443,7 +498,9 @@ export class MemoryStore {
 			const byKey = this.locks.get(type);
 			const holders = byKey?.get(key);
 			holders?.delete(tx);
-			if (holders?.size === 0) byKey?.delete(key);
+			if (holders?.size === 0) {
+				byKey?.delete(key);
+			}
 		}
 		tx.finish();
 	}
@@ -467,7 +524,9 @@ export class MemoryStore {
 	}
 
 	private assertOpen(tx: MemoryTransaction) {
-		if (tx.finished) throw new DataError("The transaction has ended");
+		if (tx.finished) {
+			throw new DataError("The transaction has ended");
+		}
 	}
 
 	private assertProp(model: MemoryEntity, prop: string) {
@@ -493,19 +552,39 @@ export class MemoryStore {
 
 /** Whether a stored value meets a condition, with SQL's nulls: only `null` and `ne` match an empty value. */
 function matches(value: unknown, condition: Comparison<unknown>): boolean {
-	if (condition === null) return value === null;
+	if (condition === null) {
+		return value === null;
+	}
 	const operator = comparison.operatorOf(condition);
-	if (!operator) return value !== null && equal(value, condition);
+	if (!operator) {
+		return value !== null && equal(value, condition);
+	}
 	const [op, operand] = operator;
-	if (op === "ne" && operand === null) return value !== null;
-	if (value === null) return false;
-	if (op === "in") return (operand as unknown[]).some((v) => equal(value, v));
-	if (op === "ne") return !equal(value, operand);
-	if (operand === null) return false;
+	if (op === "ne" && operand === null) {
+		return value !== null;
+	}
+	if (value === null) {
+		return false;
+	}
+	if (op === "in") {
+		return (operand as unknown[]).some((v) => equal(value, v));
+	}
+	if (op === "ne") {
+		return !equal(value, operand);
+	}
+	if (operand === null) {
+		return false;
+	}
 	const order = compare(value, operand);
-	if (op === "gt") return order > 0;
-	if (op === "gte") return order >= 0;
-	if (op === "lt") return order < 0;
+	if (op === "gt") {
+		return order > 0;
+	}
+	if (op === "gte") {
+		return order >= 0;
+	}
+	if (op === "lt") {
+		return order < 0;
+	}
 	return order <= 0;
 }
 
@@ -513,7 +592,9 @@ function matches(value: unknown, condition: Comparison<unknown>): boolean {
 function sortOrder(a: unknown, b: unknown, direction: "asc" | "desc"): number {
 	const sign = direction === "desc" ? -1 : 1;
 	if (a === null || b === null) {
-		if (a === b) return 0;
+		if (a === b) {
+			return 0;
+		}
 		return (a === null ? 1 : -1) * sign;
 	}
 	return compare(a, b) * sign;
@@ -526,12 +607,16 @@ function compare(a: unknown, b: unknown): number {
 	if (kind !== typeof y || !["number", "string", "bigint", "boolean"].includes(kind)) {
 		throw new DataError(`Can't compare ${String(a)} with ${String(b)}`);
 	}
-	if ((x as number) < (y as number)) return -1;
+	if ((x as number) < (y as number)) {
+		return -1;
+	}
 	return (x as number) > (y as number) ? 1 : 0;
 }
 
 function equal(a: unknown, b: unknown): boolean {
-	if (a instanceof Date && b instanceof Date) return a.getTime() === b.getTime();
+	if (a instanceof Date && b instanceof Date) {
+		return a.getTime() === b.getTime();
+	}
 	if (a !== null && b !== null && typeof a === "object" && typeof b === "object") {
 		return JSON.stringify(a) === JSON.stringify(b);
 	}

@@ -115,7 +115,9 @@ export class Link implements Action<LinkOptions> {
 			await fs.rm(peerNodeModulesDir, { recursive: true, force: true });
 			for (const project of projects) {
 				const pkg = await project.getPackageJson();
-				if (!pkg.name) continue;
+				if (!pkg.name) {
+					continue;
+				}
 				const outDir = path.resolve(project.getOutDir());
 				const peerSymlink = path.join(peerNodeModulesDir, ...pkg.name.split("/"));
 				await fs.mkdir(path.dirname(peerSymlink), { recursive: true });

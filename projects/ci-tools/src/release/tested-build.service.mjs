@@ -53,7 +53,9 @@ export class TestedBuild {
 			for (;;) {
 				const runs = await this.runs(sha, event);
 				const passed = runs.find((run) => run.conclusion === "success");
-				if (passed != null) return this.withBuild(sha, passed, event);
+				if (passed != null) {
+					return this.withBuild(sha, passed, event);
+				}
 				const running = runs.filter((run) => run.status !== "completed");
 				if (running.length === 0) {
 					notes.push(

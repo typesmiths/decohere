@@ -42,7 +42,9 @@ export function containerArgvFromHost(argv: string[]): string[] {
 			i++;
 			continue;
 		}
-		if (arg != null) stripped.push(arg);
+		if (arg != null) {
+			stripped.push(arg);
+		}
 	}
 	return toProductArgv(stripped);
 }
@@ -73,7 +75,9 @@ export function resolveLaunch(argv: string[], cwd = process.cwd()): LaunchPlan {
 			i++;
 			continue;
 		}
-		if (arg != null) withoutD.push(arg);
+		if (arg != null) {
+			withoutD.push(arg);
+		}
 	}
 
 	const product = toProductArgv(withoutD);

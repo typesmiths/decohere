@@ -67,7 +67,9 @@ export class Container implements IContainer {
 	): T {
 		const registrations = this.serviceRegistry.getRegistration(key);
 		if (registrations == null || registrations.length === 0) {
-			if (optional) return undefined;
+			if (optional) {
+				return undefined;
+			}
 			const requiredBy = path.length === 0 ? "" : ` (required by ${describePath(path, key)})`;
 			throw new ResolveError(
 				`Nothing is registered for ${describeKey(key)}${requiredBy}. Register it, or mark the parameter @optional().`,
@@ -181,14 +183,18 @@ export class Container implements IContainer {
 	 * root asking for it gets itself.
 	 */
 	private assertInAScope(registration: ServiceRegistration) {
-		if (this !== this.rootScope || registration.key === LifetimeScopeToken) return;
+		if (this !== this.rootScope || registration.key === LifetimeScopeToken) {
+			return;
+		}
 		throw new ResolveError(
 			`${describeKey(registration.key)} is request-scoped: resolve it from a scope (beginScope), or make it a singleton. Kept on the root, one instance would be shared by every request.`,
 		);
 	}
 
 	private assertNoCycle(registration: ServiceRegistration, path: ResolutionPath) {
-		if (!path.includes(registration)) return;
+		if (!path.includes(registration)) {
+			return;
+		}
 		throw new ResolveError(
 			`Circular dependency: ${describePath(path, registration.key)}. Break the cycle, e.g. by resolving one side lazily from the LifetimeScope.`,
 		);
@@ -201,10 +207,13 @@ export class Container implements IContainer {
 	 * singleton asking for it gets the root, which is the scope it lives in.
 	 */
 	private assertNotCaptive(registration: ServiceRegistration, path: ResolutionPath) {
-		if (registration.scope !== Scopes.request || registration.key === LifetimeScopeToken)
+		if (registration.scope !== Scopes.request || registration.key === LifetimeScopeToken) {
 			return;
+		}
 		const singleton = path.find((owner) => owner.scope === Scopes.singleton);
-		if (singleton == null) return;
+		if (singleton == null) {
+			return;
+		}
 		throw new ResolveError(
 			`Singleton ${describeKey(singleton.key)} depends on request-scoped ${describeKey(registration.key)} (${describePath(path, registration.key)}). A singleton would keep the first request's instance forever: make ${describeKey(singleton.key)} request-scoped, or resolve ${describeKey(registration.key)} per request from the LifetimeScope.`,
 		);
@@ -253,7 +262,9 @@ export class Container implements IContainer {
 			const token = injectTokens.get(index);
 			const key = token?.key ?? param;
 			if (key == null || key === Object || (token?.key == null && isArrayType(param))) {
-				if (token?.optional) return undefined;
+				if (token?.optional) {
+					return undefined;
+				}
 				throw new ResolveError(
 					`Cannot tell what to inject for constructor parameter ${index} of ${describePath(path)}: its type is not a class at run time (an interface, an array, or a type-only import). Add @inject(token) to the parameter.`,
 				);

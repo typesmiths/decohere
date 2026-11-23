@@ -138,7 +138,9 @@ export const cases: Case[] = [
 			const pear = [...a.lines].find((l) => l.sku === "pear");
 			// A copy: removing from the collection while iterating it would skip items.
 			const parts = [...pear.parts];
-			for (const part of parts) pear.parts.remove(part);
+			for (const part of parts) {
+				pear.parts.remove(part);
+			}
 			a.lines.remove(pear);
 			a.addLine("quince", 5);
 			await uow.commit();
@@ -251,7 +253,9 @@ export const cases: Case[] = [
 		async run(p) {
 			await using uow = p.begin();
 			const tags = [new p.model.Tag("new"), new p.model.Tag("sale")];
-			for (const tag of tags) uow.add(tag);
+			for (const tag of tags) {
+				uow.add(tag);
+			}
 			await uow.commit();
 			expect(tags.map((t) => typeof t.id)).toEqual(["number", "number"]);
 			expect(await uow.findById(p.model.Tag, tags[1].id)).toBe(tags[1]);
@@ -363,7 +367,9 @@ export const cases: Case[] = [
 				assert.equal(scope.resolve(UNIT_OF_WORK), uow);
 				const order = await uow.findById(p.model.Order, B);
 				order.note = note;
-				if (!fail) await uow.commit();
+				if (!fail) {
+					await uow.commit();
+				}
 				return order;
 			};
 			const [ok, failed] = await Promise.all([
@@ -385,7 +391,9 @@ export const cases: Case[] = [
 			uow.add(order);
 			expect(await uow.findById(p.model.Order, order.id)).toBe(order);
 			// "Find it, or add it": found, so not added again.
-			if (!(await uow.findById(p.model.Order, order.id))) uow.add(new p.model.Order("ann"));
+			if (!(await uow.findById(p.model.Order, order.id))) {
+				uow.add(new p.model.Order("ann"));
+			}
 			await uow.commit();
 		},
 		async check(p) {

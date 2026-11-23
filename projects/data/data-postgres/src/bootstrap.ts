@@ -38,7 +38,9 @@ export async function bootstrapDataSources(
 	}
 
 	const toBootstrap = dataSources.filter((info) => shouldBootstrapDatabase(info, nodeEnv));
-	for (const info of toBootstrap) assertBootstrapCredentials(info);
+	for (const info of toBootstrap) {
+		assertBootstrapCredentials(info);
+	}
 
 	for (const group of byServerAndDatabase(toBootstrap)) {
 		const [first] = group;

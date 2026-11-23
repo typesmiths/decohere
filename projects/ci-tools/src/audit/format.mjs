@@ -35,7 +35,9 @@ function fromNpmV2(data) {
 	for (const vuln of Object.values(data?.vulnerabilities ?? {})) {
 		const vias = Array.isArray(vuln.via) ? vuln.via : [];
 		for (const via of vias) {
-			if (via == null || typeof via !== "object") continue;
+			if (via == null || typeof via !== "object") {
+				continue;
+			}
 			const url = via.url ?? "";
 			const key = url || `${via.name ?? vuln.name}:${via.title ?? ""}`;
 			const existing = byKey.get(key);
@@ -77,7 +79,9 @@ export function parseAudit(data) {
 
 	advisories.sort((a, b) => {
 		const d = SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity);
-		if (d !== 0) return d;
+		if (d !== 0) {
+			return d;
+		}
 		return String(a.module).localeCompare(String(b.module));
 	});
 
@@ -93,8 +97,12 @@ export function formatLog(parsed) {
 		lines.push(
 			`  [${a.severity}] ${a.module} ${id}: ${a.title} (vulnerable ${a.vulnerable}; patched ${a.patched})`,
 		);
-		if (a.url) lines.push(`    ${a.url}`);
-		if (a.paths[0]) lines.push(`    ${a.paths[0]}`);
+		if (a.url) {
+			lines.push(`    ${a.url}`);
+		}
+		if (a.paths[0]) {
+			lines.push(`    ${a.paths[0]}`);
+		}
 	}
 	return `${lines.join("\n")}\n`;
 }
@@ -123,7 +131,9 @@ export function formatMarkdown(parsed) {
 		const link = a.url ? `[${id}](${a.url})` : id;
 		lines.push(`- **${a.severity}** \`${a.module}\` ${link} — ${a.title}`);
 		lines.push(`  - vulnerable: \`${a.vulnerable}\`; patched: \`${a.patched}\``);
-		if (a.paths[0]) lines.push(`  - ${a.paths[0]}`);
+		if (a.paths[0]) {
+			lines.push(`  - ${a.paths[0]}`);
+		}
 	}
 	return `${lines.join("\n")}\n`;
 }

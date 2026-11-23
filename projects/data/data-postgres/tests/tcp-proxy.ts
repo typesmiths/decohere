@@ -40,7 +40,9 @@ export async function startTcpProxy(
 		throw new Error("The TCP proxy has no port");
 	}
 	const cutAll = () => {
-		for (const socket of open) socket.destroy();
+		for (const socket of open) {
+			socket.destroy();
+		}
 	};
 	return {
 		host: "127.0.0.1",

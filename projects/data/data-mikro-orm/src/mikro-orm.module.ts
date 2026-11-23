@@ -110,10 +110,14 @@ export class MikroOrmModule {
 					connection: connectionInfo,
 					migrations,
 					connect: async () => {
-						if (connected) return;
+						if (connected) {
+							return;
+						}
 						await orm.connect();
 						const status = await orm.checkConnection();
-						if ("reason" in status) throw new Error(status.reason, { cause: status.error });
+						if ("reason" in status) {
+							throw new Error(status.reason, { cause: status.error });
+						}
 						connected = true;
 					},
 					synchronize: () => synchronize(orm),
@@ -160,7 +164,9 @@ function migrationTarget(
 	module: MikroOrmModuleConfig,
 	open: () => Promise<void>,
 ): MigrationTarget | undefined {
-	if (module.database == null) return undefined;
+	if (module.database == null) {
+		return undefined;
+	}
 	return {
 		dataSource: connection.name,
 		source: { connection, migrations: module.migrations ?? [], applicationName },
@@ -191,7 +197,9 @@ async function synchronize(orm: MikroORM) {
 		dropTables: false,
 		wrap: false,
 	});
-	for (const statement of statements(sql)) await orm.schema.execute(statement);
+	for (const statement of statements(sql)) {
+		await orm.schema.execute(statement);
+	}
 }
 
 /**
@@ -228,7 +236,9 @@ function readinessCheck(name: string | symbol, orm: MikroORM): IReadinessCheck {
 		name: `mikro-orm:${String(name)}`,
 		async check() {
 			const status = await orm.checkConnection();
-			if ("reason" in status) throw new Error(status.reason, { cause: status.error });
+			if ("reason" in status) {
+				throw new Error(status.reason, { cause: status.error });
+			}
 		},
 	};
 }
@@ -252,7 +262,9 @@ export function mikroOrm(
 		// root container own it, as one of its first, so it closes last: after hosted services
 		// and the services that use it.
 		builder.registerPostBuildStep((container) => {
-			for (const { name } of configured.sources) container.resolve(mikroOrmToken(name));
+			for (const { name } of configured.sources) {
+				container.resolve(mikroOrmToken(name));
+			}
 		});
 		// Connecting, and what changes the database, wait for the app to start: building connects
 		// nothing. The step is retried while the database is down, and holds back the hosted services.

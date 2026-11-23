@@ -24,7 +24,9 @@ function parseArgs(argv) {
 			continue;
 		}
 		const next = args[i + 1];
-		if (next == null) throw new Error(`Missing value for ${arg}`);
+		if (next == null) {
+			throw new Error(`Missing value for ${arg}`);
+		}
 		switch (arg) {
 			case "--repo":
 				flags.repo = next;
@@ -48,8 +50,9 @@ function parseArgs(argv) {
 				break;
 			case "--estimate": {
 				const value = Number.parseFloat(next);
-				if (!Number.isFinite(value) || value < 0)
+				if (!Number.isFinite(value) || value < 0) {
 					throw new Error(`Invalid --estimate value: ${next}`);
+				}
 				flags.estimate = value;
 				i += 1;
 				break;
@@ -70,8 +73,9 @@ function parseArgs(argv) {
 
 function runGh(args) {
 	const result = spawnSync("gh", args, { encoding: "utf8", env: process.env });
-	if (result.status !== 0)
+	if (result.status !== 0) {
 		throw new Error(result.stderr || result.stdout || `gh command failed: ${args.join(" ")}`);
+	}
 	return result.stdout;
 }
 
@@ -81,7 +85,9 @@ function runGhJson(args) {
 
 function splitRepo(repo) {
 	const [owner, name] = repo.split("/");
-	if (!owner || !name) throw new Error(`Invalid repo format: ${repo}. Expected owner/name`);
+	if (!owner || !name) {
+		throw new Error(`Invalid repo format: ${repo}. Expected owner/name`);
+	}
 	return { owner, name };
 }
 
@@ -101,7 +107,9 @@ function getIssue(repo, issueNumber) {
 		`number=${issueNumber}`,
 	]);
 	const issue = response?.data?.repository?.issue;
-	if (!issue) throw new Error(`Issue #${issueNumber} not found in ${repo}`);
+	if (!issue) {
+		throw new Error(`Issue #${issueNumber} not found in ${repo}`);
+	}
 	return issue;
 }
 
@@ -110,7 +118,9 @@ function getProjectByTitle(org, projectTitle) {
 	const response = runGhJson(["api", "graphql", "-f", `query=${query}`, "-f", `org=${org}`]);
 	const projects = response?.data?.organization?.projectsV2?.nodes ?? [];
 	const project = projects.find((p) => p.title === projectTitle);
-	if (!project) throw new Error(`Project "${projectTitle}" not found for org "${org}"`);
+	if (!project) {
+		throw new Error(`Project "${projectTitle}" not found for org "${org}"`);
+	}
 	return project;
 }
 
@@ -155,8 +165,9 @@ function computeMissing(issue, projectTitle, sprintFieldName, estimateFieldName)
 
 function getRequiredField(project, fieldName) {
 	const field = (project?.fields?.nodes ?? []).find((node) => node?.name === fieldName);
-	if (!field?.id)
+	if (!field?.id) {
 		throw new Error(`Field "${fieldName}" not found on project "${project.title}"`);
+	}
 	return field;
 }
 
@@ -220,15 +231,17 @@ function applySprintValue(project, projectId, itemId, sprintFieldName, iteration
 		const iteration = sprintField.configuration.iterations.find(
 			(v) => v.title === iterationName,
 		);
-		if (!iteration)
+		if (!iteration) {
 			throw new Error(`Iteration "${iterationName}" not found in field "${sprintFieldName}"`);
+		}
 		setProjectItemIterationField(projectId, itemId, sprintField.id, iteration.id);
 		return;
 	}
 	if (sprintField?.options) {
 		const option = sprintField.options.find((v) => v.name === iterationName);
-		if (!option)
+		if (!option) {
 			throw new Error(`Option "${iterationName}" not found in field "${sprintFieldName}"`);
+		}
 		setProjectItemSingleSelectField(projectId, itemId, sprintField.id, option.id);
 		return;
 	}
@@ -259,11 +272,14 @@ if (args.apply) {
 
 	let refreshed = getIssue(args.repo, args.issueNumber);
 	let refreshedItem = getProjectItem(refreshed, args.project);
-	if (!project) project = getProjectByTitle(owner, args.project);
-	if (!refreshedItem)
+	if (!project) {
+		project = getProjectByTitle(owner, args.project);
+	}
+	if (!refreshedItem) {
 		throw new Error(
 			`Issue #${args.issueNumber} is still not assigned to project "${args.project}"`,
 		);
+	}
 
 	if (missing.sprint && args.iteration) {
 		applySprintValue(project, project.id, refreshedItem.id, args.sprintField, args.iteration);
@@ -272,8 +288,9 @@ if (args.apply) {
 	}
 
 	if (missing.estimate) {
-		if (args.estimate == null)
+		if (args.estimate == null) {
 			throw new Error("Issue is missing estimate. Re-run with --estimate <days> --apply");
+		}
 		const estimateField = getRequiredField(project, args.estimateField);
 		setProjectItemNumberField(project.id, refreshedItem.id, estimateField.id, args.estimate);
 	}

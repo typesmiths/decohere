@@ -45,7 +45,9 @@ function parse(text: string): FileDiff[] {
 	let deletedFile = false;
 
 	const finish = () => {
-		if (current == null) return;
+		if (current == null) {
+			return;
+		}
 		if (current.hunks.length === 0 && current.gitPaths != null && (newFile || deletedFile)) {
 			// An empty file added or removed: git writes no ---/+++ lines and no hunks.
 			const [oldPath, newPath] = current.gitPaths;
@@ -139,8 +141,12 @@ function parseHunk(lines: readonly string[], start: number): [Hunk, number] {
 	while (i < lines.length) {
 		const line = lines[i];
 		if (line.startsWith("\\")) {
-			if (last === " " || last === "-") hunk.oldEndsWithoutNewline = true;
-			if (last === " " || last === "+") hunk.newEndsWithoutNewline = true;
+			if (last === " " || last === "-") {
+				hunk.oldEndsWithoutNewline = true;
+			}
+			if (last === " " || last === "+") {
+				hunk.newEndsWithoutNewline = true;
+			}
 			i++;
 			continue;
 		}
@@ -174,7 +180,9 @@ function parseHunk(lines: readonly string[], start: number): [Hunk, number] {
 
 function stripPrefix(raw: string): string | null {
 	const pathPart = raw.split("\t")[0].trim();
-	if (pathPart === "/dev/null") return null;
+	if (pathPart === "/dev/null") {
+		return null;
+	}
 	const slash = pathPart.indexOf("/");
 	return slash === -1 ? pathPart : pathPart.slice(slash + 1);
 }
@@ -195,7 +203,9 @@ function apply(content: string | undefined, diff: FileDiff): string | null {
 	const source = content ?? "";
 	let endsWithNewline = source === "" || source.endsWith("\n");
 	const lines = source === "" ? [] : source.split("\n");
-	if (source.endsWith("\n")) lines.pop();
+	if (source.endsWith("\n")) {
+		lines.pop();
+	}
 
 	let offset = 0;
 	let floor = 0;
@@ -233,9 +243,13 @@ function locate(
 ): number | undefined {
 	const last = lines.length - hunk.oldLines.length;
 	const fits = (at: number) => {
-		if (at < floor || at > last) return false;
+		if (at < floor || at > last) {
+			return false;
+		}
 		for (let i = 0; i < hunk.oldLines.length; i++) {
-			if (lines[at + i] !== hunk.oldLines[i]) return false;
+			if (lines[at + i] !== hunk.oldLines[i]) {
+				return false;
+			}
 		}
 		// The file's last line and the hunk must agree on whether a newline follows it.
 		if (hunk.oldLines.length > 0 && at === last) {
@@ -244,8 +258,12 @@ function locate(
 		return !hunk.oldEndsWithoutNewline;
 	};
 	for (let distance = 0; distance <= lines.length; distance++) {
-		if (fits(expected - distance)) return expected - distance;
-		if (fits(expected + distance)) return expected + distance;
+		if (fits(expected - distance)) {
+			return expected - distance;
+		}
+		if (fits(expected + distance)) {
+			return expected + distance;
+		}
 	}
 	return undefined;
 }

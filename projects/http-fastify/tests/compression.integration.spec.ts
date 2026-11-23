@@ -127,10 +127,18 @@ type Wire = {
 };
 
 function decode(encoding: string | string[] | undefined, raw: Buffer): string {
-	if (raw.length === 0) return "";
-	if (encoding === "br") return brotliDecompressSync(raw).toString("utf8");
-	if (encoding === "gzip") return gunzipSync(raw).toString("utf8");
-	if (encoding === "deflate") return inflateSync(raw).toString("utf8");
+	if (raw.length === 0) {
+		return "";
+	}
+	if (encoding === "br") {
+		return brotliDecompressSync(raw).toString("utf8");
+	}
+	if (encoding === "gzip") {
+		return gunzipSync(raw).toString("utf8");
+	}
+	if (encoding === "deflate") {
+		return inflateSync(raw).toString("utf8");
+	}
 	return raw.toString("utf8");
 }
 

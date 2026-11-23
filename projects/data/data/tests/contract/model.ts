@@ -26,7 +26,9 @@ export function defineModel() {
 
 		public addLine(sku: string, quantity: number, parts: string[] = []) {
 			const line = new Line(sku, quantity);
-			for (const name of parts) line.parts.add(new Part(name));
+			for (const name of parts) {
+				line.parts.add(new Part(name));
+			}
 			this.lines.add(line);
 			return line;
 		}

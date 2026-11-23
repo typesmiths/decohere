@@ -30,8 +30,12 @@ export function extractFailure(log) {
 	const all = cleanLines(log);
 
 	let end = all.findLastIndex((line) => EXIT_LINE.test(line));
-	if (end === -1) end = all.findLastIndex((line) => line.startsWith("##[error]"));
-	if (end === -1) return { reason: NO_REASON, lines: [] };
+	if (end === -1) {
+		end = all.findLastIndex((line) => line.startsWith("##[error]"));
+	}
+	if (end === -1) {
+		return { reason: NO_REASON, lines: [] };
+	}
 
 	const start = all.findLastIndex(
 		(line, index) => index < end && line.startsWith("##[group]Run"),
@@ -107,7 +111,9 @@ async function github(path, token, accept = "application/vnd.github+json") {
 	const response = await fetch(`https://api.github.com/${path}`, {
 		headers: { authorization: `Bearer ${token}`, accept },
 	});
-	if (!response.ok) throw new Error(`GET ${path}: ${response.status} ${response.statusText}`);
+	if (!response.ok) {
+		throw new Error(`GET ${path}: ${response.status} ${response.statusText}`);
+	}
 	return response;
 }
 
@@ -120,7 +126,9 @@ async function failedJobs(repo, runId, attempt, token) {
 		);
 		const batch = (await response.json()).jobs;
 		jobs.push(...batch);
-		if (batch.length < 100) break;
+		if (batch.length < 100) {
+			break;
+		}
 	}
 	return jobs.filter((job) => job.conclusion === "failure");
 }
@@ -154,7 +162,9 @@ async function main() {
 	for (const { job, step, reason } of failures) {
 		console.log(errorCommand(`${job} / ${step}`, reason));
 	}
-	if (summaryPath && failures.length > 0) appendFileSync(summaryPath, formatSummary(failures));
+	if (summaryPath && failures.length > 0) {
+		appendFileSync(summaryPath, formatSummary(failures));
+	}
 }
 
 if (process.argv[1] != null && import.meta.url === pathToFileURL(process.argv[1]).href) {

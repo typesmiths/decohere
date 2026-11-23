@@ -50,7 +50,9 @@ const projectCoverage = parseLcovByProject(readFileSync(lcovPath, "utf8"));
 for (const [project, metrics] of [...projectCoverage.entries()].sort(([a], [b]) =>
 	a.localeCompare(b),
 )) {
-	if (metrics.totalLines === 0) continue;
+	if (metrics.totalLines === 0) {
+		continue;
+	}
 	const pct = Number(((metrics.coveredLines / metrics.totalLines) * 100).toFixed(1));
 	const projectBadgePath = path.join(projectBadgesDirectory, `${project}.svg`);
 	writeFileSync(projectBadgePath, createBadgeSvg(project, `${pct}%`, getColor(pct)));

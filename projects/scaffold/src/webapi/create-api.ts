@@ -62,7 +62,9 @@ function addApp(changes: WorkspaceChanges, workspace: string, target: AppTarget)
 	new Templates().apply(changes, RECIPE, { workspace, app: target.name, port: target.port });
 	const path = ".devcontainer/devcontainer.json";
 	const devcontainer = changes.read(path);
-	if (devcontainer == null) return;
+	if (devcontainer == null) {
+		return;
+	}
 	const label = target.name === DEFAULT_WEBAPI_NAME ? "API" : target.name;
 	const ports = JSON.stringify({
 		forwardPorts: [target.port],
@@ -125,10 +127,18 @@ export async function scaffoldApi(options: ApiOptions): Promise<void> {
 			port: first.port,
 		});
 	}
-	for (const target of targets) addApp(changes, workspace, target);
-	if (orm != null) new PostgresStep(changes).apply(workspace, targets, orm);
-	if (withAuth0) new Auth0Step(changes).apply(workspace, targets, auth0Env);
-	if (withUsers) new UsersStep(changes).apply(workspace, targets, adminEnv);
+	for (const target of targets) {
+		addApp(changes, workspace, target);
+	}
+	if (orm != null) {
+		new PostgresStep(changes).apply(workspace, targets, orm);
+	}
+	if (withAuth0) {
+		new Auth0Step(changes).apply(workspace, targets, auth0Env);
+	}
+	if (withUsers) {
+		new UsersStep(changes).apply(workspace, targets, adminEnv);
+	}
 	const written = changes.commit();
 
 	await finish(targetDir, workspace, names, { add: options.add === true, install, written });
@@ -157,9 +167,13 @@ async function askInstall(
 	targetDir: string,
 	mode: "yes" | "no" | undefined,
 ): Promise<Install> {
-	if (process.env.DECOHERE_BUILDER === "1") return undefined;
+	if (process.env.DECOHERE_BUILDER === "1") {
+		return undefined;
+	}
 	const pm = detectPackageManager(targetDir) ?? (await promptForPackageManager());
-	if (mode != null) return { pm, run: mode === "yes" };
+	if (mode != null) {
+		return { pm, run: mode === "yes" };
+	}
 	const answer = await ask("\nInstall dependencies now? [yes/no] (yes): ", "yes");
 	return { pm, run: answer.toLowerCase() !== "no" };
 }
@@ -174,7 +188,9 @@ async function finish(
 	// `.devcontainer/post-create.sh`.
 	if (done.install != null) {
 		const paths = done.add ? done.written : ["."];
-		if (paths.length > 0) formatScaffoldedFiles(targetDir, paths);
+		if (paths.length > 0) {
+			formatScaffoldedFiles(targetDir, paths);
+		}
 	}
 	if (done.install?.run) {
 		console.log(`\nScaffolded ${workspace}. Installing dependencies...\n`);
@@ -187,7 +203,9 @@ async function finish(
 	}
 	console.log(`\nDone! ${done.install.run ? "Next" : "To get started:"} steps:\n`);
 	if (done.add) {
-		if (!done.install.run) console.log(`  ${done.install.pm.name} install`);
+		if (!done.install.run) {
+			console.log(`  ${done.install.pm.name} install`);
+		}
 		console.log(`  pnpm run dev:${names[0]}`);
 		console.log(`  pnpm run package:${names[0]} && docker build projects/${names[0]}`);
 	} else {

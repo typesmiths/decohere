@@ -26,13 +26,17 @@ function signal(child: ChildProcess, name: NodeJS.Signals): void {
 		process.kill(-child.pid, name);
 	} catch (error) {
 		// The whole group has already gone, which is what we wanted.
-		if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error;
+		if ((error as NodeJS.ErrnoException).code !== "ESRCH") {
+			throw error;
+		}
 	}
 }
 
 /** Resolves true once the package manager has exited, or false if it hasn't within `ms`. */
 function waitForExit(child: ChildProcess, ms: number): Promise<boolean> {
-	if (child.exitCode != null || child.signalCode != null) return Promise.resolve(true);
+	if (child.exitCode != null || child.signalCode != null) {
+		return Promise.resolve(true);
+	}
 	return new Promise((resolve) => {
 		const timer = setTimeout(() => resolve(false), ms);
 		child.once("exit", () => {
@@ -63,7 +67,9 @@ export class DeferredScriptRunner implements AsyncDisposable {
 			detached: USE_PROCESS_GROUP,
 		});
 		child.on("exit", (code, signal) => {
-			if (signal) return;
+			if (signal) {
+				return;
+			}
 			if (code != null && code !== 0) {
 				this.logger.warn(`deferred ${options.label} exited with ${code}`);
 			}
@@ -77,7 +83,9 @@ export class DeferredScriptRunner implements AsyncDisposable {
 		await Promise.all(
 			children.map(async (child) => {
 				signal(child, "SIGTERM");
-				if (!(await waitForExit(child, STOP_TIMEOUT_MS))) signal(child, "SIGKILL");
+				if (!(await waitForExit(child, STOP_TIMEOUT_MS))) {
+					signal(child, "SIGKILL");
+				}
 			}),
 		);
 	}

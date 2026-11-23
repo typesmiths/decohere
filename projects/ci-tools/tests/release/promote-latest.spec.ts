@@ -56,11 +56,14 @@ function fakeRun(registry: Registry) {
 		if (verb === "view" && third === "time") {
 			return ok(JSON.stringify({ [VERSION]: new Date(PUBLISHED).toISOString() }));
 		}
-		if (verb === "dist-tag" && sub === "ls")
+		if (verb === "dist-tag" && sub === "ls") {
 			return ok(`dev: ${registry.dev ?? "x"}\nlatest: ${latest[third ?? ""]}\n`);
+		}
 		if (verb === "dist-tag" && sub === "add") {
 			const [, name, version] = /^(.+)@(.+)$/.exec(third ?? "") ?? [];
-			if (registry.failMoving?.includes(name ?? "")) return { status: 1, stdout: "" };
+			if (registry.failMoving?.includes(name ?? "")) {
+				return { status: 1, stdout: "" };
+			}
 			moves.push(name ?? "");
 			latest[name ?? ""] = version ?? "";
 			return ok();

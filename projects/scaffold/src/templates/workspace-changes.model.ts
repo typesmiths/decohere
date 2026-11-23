@@ -21,7 +21,9 @@ export class WorkspaceChanges {
 
 	public read(path: string): string | undefined {
 		const pending = this.#pending.get(path);
-		if (pending != null) return pending;
+		if (pending != null) {
+			return pending;
+		}
 		const full = join(this.root, path);
 		return existsSync(full) ? readFileSync(full, "utf8") : undefined;
 	}
@@ -51,7 +53,11 @@ export class WorkspaceChanges {
 			this.#byHand.push({ file, lines: [...lines] });
 			return;
 		}
-		for (const line of lines) if (!entry.lines.includes(line)) entry.lines.push(line);
+		for (const line of lines) {
+			if (!entry.lines.includes(line)) {
+				entry.lines.push(line);
+			}
+		}
 	}
 
 	public get byHand(): readonly ByHand[] {
@@ -60,11 +66,15 @@ export class WorkspaceChanges {
 
 	/** Prints what the user has to change by hand, where a file no longer has the shape it was given. */
 	public printByHand(): void {
-		if (this.#byHand.length === 0) return;
+		if (this.#byHand.length === 0) {
+			return;
+		}
 		console.log("\n  These files don't have the shape this command can change safely:");
 		for (const { file, lines } of this.#byHand) {
 			console.log(`\n    ${file}`);
-			for (const line of lines) console.log(`      ${line}`);
+			for (const line of lines) {
+				console.log(`      ${line}`);
+			}
 		}
 		console.log("");
 	}

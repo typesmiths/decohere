@@ -43,11 +43,16 @@ function readManifest(dir: string): Manifest {
 
 function findBuiltPackages(dir: string, found = new Map<string, string>()) {
 	for (const entry of readdirSync(dir, { withFileTypes: true })) {
-		if (!entry.isDirectory()) continue;
+		if (!entry.isDirectory()) {
+			continue;
+		}
 		const path = join(dir, entry.name);
 		const name = existsSync(join(path, "package.json")) ? readManifest(path).name : undefined;
-		if (name) found.set(name, path);
-		else findBuiltPackages(path, found);
+		if (name) {
+			found.set(name, path);
+		} else {
+			findBuiltPackages(path, found);
+		}
 	}
 	return found;
 }
@@ -64,25 +69,33 @@ function install(app: string, built: Map<string, string>, leaveOut?: string) {
 	const copied = new Set<string>();
 	const copyBuilt = (name: string) => {
 		const from = built.get(name);
-		if (from === undefined || copied.has(name)) return;
+		if (from === undefined || copied.has(name)) {
+			return;
+		}
 		copied.add(name);
 		const to = join(modules, name);
 		cpSync(from, to, {
 			recursive: true,
 			filter: (path) => !/\/tests(\/|$)/.test(path.slice(from.length)),
 		});
-		for (const dependency of declaredBy(readManifest(to))) copyBuilt(dependency);
+		for (const dependency of declaredBy(readManifest(to))) {
+			copyBuilt(dependency);
+		}
 	};
 
 	for (const name of declaredBy(readManifest(app))) {
-		if (name === leaveOut) continue;
+		if (name === leaveOut) {
+			continue;
+		}
 		if (name.startsWith("@decohere/")) {
 			copyBuilt(name);
 			continue;
 		}
 		const from = join(REPO, "node_modules", name);
 		// A tool the repo doesn't use, such as the generated app's formatter, has no types to offer.
-		if (!existsSync(from)) continue;
+		if (!existsSync(from)) {
+			continue;
+		}
 		mkdirSync(dirname(join(modules, name)), { recursive: true });
 		symlinkSync(from, join(modules, name));
 	}

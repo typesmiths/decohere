@@ -31,8 +31,12 @@ export class Subject<T> implements Observable<T> {
 				errors.push(error);
 			}
 		}
-		if (errors.length === 1) throw errors[0];
-		if (errors.length > 1) throw new AggregateError(errors, "Subject listeners threw");
+		if (errors.length === 1) {
+			throw errors[0];
+		}
+		if (errors.length > 1) {
+			throw new AggregateError(errors, "Subject listeners threw");
+		}
 	}
 
 	public asObservable(): Observable<T> {

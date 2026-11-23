@@ -47,11 +47,15 @@ export function memory(config: MemoryModuleConfig[] | MemoryModuleConfig): Build
 				}
 			}
 		});
-		if (modules.every((m) => m.seed == null)) return;
+		if (modules.every((m) => m.seed == null)) {
+			return;
+		}
 		builder.registerStartStep(async () => {
 			for (const module of modules) {
 				const store = stores.get(module);
-				if (module.seed == null || store == null) continue;
+				if (module.seed == null || store == null) {
+					continue;
+				}
 				await using unitOfWork = new TrackingUnitOfWork(new MemoryRowStore(store), {
 					outbox: module.outbox,
 				});

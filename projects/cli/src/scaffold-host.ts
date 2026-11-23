@@ -44,7 +44,9 @@ class HostWebapiAction extends WebapiAction {
 @injectable()
 class HostAddApiAction extends AddApiAction {
 	public override async run(options: AddApiOptions): Promise<ActionResponse> {
-		if (!hasDecohereTools()) return needsDevContainer("api");
+		if (!hasDecohereTools()) {
+			return needsDevContainer("api");
+		}
 		return super.run(options);
 	}
 }
@@ -57,7 +59,9 @@ export class HostCreateModule extends CreateModule {
 @injectable()
 class HostAddAuth0Action extends AddAuth0Action {
 	public override async run(options: AddAuth0Options): Promise<ActionResponse> {
-		if (!hasDecohereTools()) return needsDevContainer("auth0");
+		if (!hasDecohereTools()) {
+			return needsDevContainer("auth0");
+		}
 		return super.run(options);
 	}
 }
@@ -65,7 +69,9 @@ class HostAddAuth0Action extends AddAuth0Action {
 @injectable()
 class HostAddPostgresAction extends AddPostgresAction {
 	public override async run(options: AddPostgresOptions): Promise<ActionResponse> {
-		if (!hasDecohereTools()) return needsDevContainer("postgres");
+		if (!hasDecohereTools()) {
+			return needsDevContainer("postgres");
+		}
 		return super.run(options);
 	}
 }
@@ -73,7 +79,9 @@ class HostAddPostgresAction extends AddPostgresAction {
 @injectable()
 class HostAddUsersAction extends AddUsersAction {
 	public override async run(options: AddUsersOptions): Promise<ActionResponse> {
-		if (!hasDecohereTools()) return needsDevContainer("users");
+		if (!hasDecohereTools()) {
+			return needsDevContainer("users");
+		}
 		return super.run(options);
 	}
 }
@@ -91,7 +99,9 @@ export class HostAddModule extends AddModule {
 @injectable()
 class HostAuth0LoginAction extends Auth0LoginAction {
 	public override async run(): Promise<ActionResponse> {
-		if (!hasDecohereTools()) return needsDevContainer("login");
+		if (!hasDecohereTools()) {
+			return needsDevContainer("login");
+		}
 		return super.run();
 	}
 }
@@ -99,7 +109,9 @@ class HostAuth0LoginAction extends Auth0LoginAction {
 @injectable()
 class HostAuth0ConfigureAction extends Auth0ConfigureAction {
 	public override async run(options: Auth0ConfigureOptions): Promise<ActionResponse> {
-		if (!hasDecohereTools()) return needsDevContainer("configure");
+		if (!hasDecohereTools()) {
+			return needsDevContainer("configure");
+		}
 		return super.run(options);
 	}
 }
@@ -107,7 +119,9 @@ class HostAuth0ConfigureAction extends Auth0ConfigureAction {
 @injectable()
 class HostAuth0TokenAction extends Auth0TokenAction {
 	public override async run(options: Auth0TokenOptions): Promise<ActionResponse> {
-		if (!hasDecohereTools()) return needsDevContainer("token");
+		if (!hasDecohereTools()) {
+			return needsDevContainer("token");
+		}
 		return super.run(options);
 	}
 }

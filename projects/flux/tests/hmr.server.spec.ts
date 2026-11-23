@@ -543,7 +543,9 @@ describe("HotReloadServer — dependency graph walk", () => {
 		const internal = new HotReloadServer() as unknown as Internal;
 		for (const [file, parents] of Object.entries(importers)) {
 			internal.dependencies.set(file, parents);
-			for (const p of [file, ...parents]) internal.loader.setSourceFile(p, {});
+			for (const p of [file, ...parents]) {
+				internal.loader.setSourceFile(p, {});
+			}
 		}
 		return internal;
 	}

@@ -17,7 +17,9 @@ const options = { jsc: { target: "esnext" } };
 function cacheIn(cacheDir: string) {
 	vi.stubEnv("DECOHERE_CACHE_DIR", cacheDir);
 	const cache = TranspileDiskCache.forWorkspace("/unused");
-	if (cache == null) throw new Error("expected a cache");
+	if (cache == null) {
+		throw new Error("expected a cache");
+	}
 	return cache;
 }
 

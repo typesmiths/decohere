@@ -253,10 +253,14 @@ export class Project extends mixwith(HasPackageJson, HasTsConfig) {
 			const fromSrc = built?.match(/(?:^|\/)(src\/.+)$/)?.[1];
 			const source =
 				fromSrc == null ? undefined : sourceFileFor(path.join(projectRoot, fromSrc));
-			if (source != null) return source;
+			if (source != null) {
+				return source;
+			}
 		}
 		const conventional = path.join(projectRoot, "src/index.ts");
-		if (main == null || existsSync(conventional)) return conventional;
+		if (main == null || existsSync(conventional)) {
+			return conventional;
+		}
 		return path.join(projectRoot, main);
 	}
 
@@ -268,16 +272,24 @@ export class Project extends mixwith(HasPackageJson, HasTsConfig) {
 	 */
 	public getSourceExports(): Record<string, string> {
 		const exports = this.packageJson?.exports;
-		if (exports == null || typeof exports === "string") return {};
+		if (exports == null || typeof exports === "string") {
+			return {};
+		}
 		const projectRoot = path.join(this.rootDir, this.projectDirectory);
 		const sources: Record<string, string> = {};
 		for (const [subpath, target] of Object.entries(exports)) {
-			if (!subpath.startsWith("./") || subpath.includes("*")) continue;
+			if (!subpath.startsWith("./") || subpath.includes("*")) {
+				continue;
+			}
 			const built = firstExportTarget(target);
 			const fromSrc = built?.match(/(?:^|\/)(src\/.+)$/)?.[1];
-			if (fromSrc == null) continue;
+			if (fromSrc == null) {
+				continue;
+			}
 			const source = sourceFileFor(path.join(projectRoot, fromSrc));
-			if (source != null) sources[subpath] = source;
+			if (source != null) {
+				sources[subpath] = source;
+			}
 		}
 		return sources;
 	}
@@ -338,10 +350,14 @@ export class Project extends mixwith(HasPackageJson, HasTsConfig) {
 
 /** The first path an exports value gives, preferring the conditions that name runtime code. */
 function firstExportTarget(value: PackageExports): string | undefined {
-	if (typeof value === "string") return value;
+	if (typeof value === "string") {
+		return value;
+	}
 	for (const condition of ["import", "default", "require", "node", "types"]) {
 		const nested = value[condition];
-		if (nested != null) return firstExportTarget(nested);
+		if (nested != null) {
+			return firstExportTarget(nested);
+		}
 	}
 	return undefined;
 }

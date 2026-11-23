@@ -24,7 +24,9 @@ export class DbAction implements Action<DbOptions> {
 
 	public async run(options: DbOptions): Promise<ActionResponse> {
 		const picked = pickApi(this.apis(), options.api);
-		if (typeof picked === "string") return ActionResponse.Error(DbAction.name, picked);
+		if (typeof picked === "string") {
+			return ActionResponse.Error(DbAction.name, picked);
+		}
 		try {
 			await flux.run(picked.entry, { args: options.args, workspace: this.workspace });
 		} catch (err) {
@@ -63,13 +65,19 @@ function pickApi(projects: Api[], name: string | undefined): Api | string {
 	const list = apis.map((a) => a.folder).join(", ");
 	if (name != null) {
 		const named = projects.find((p) => p.folder === name || p.packageName === name);
-		if (named == null) return `No project named ${name} in this workspace.`;
+		if (named == null) {
+			return `No project named ${name} in this workspace.`;
+		}
 		if (!apis.includes(named)) {
 			return `${name} has no ${DB_ENTRY}.${list ? ` Projects with one: ${list}.` : ""}`;
 		}
 		return named;
 	}
-	if (apis.length === 1) return apis[0];
-	if (apis.length === 0) return `No project in this workspace has a ${DB_ENTRY}.`;
+	if (apis.length === 1) {
+		return apis[0];
+	}
+	if (apis.length === 0) {
+		return `No project in this workspace has a ${DB_ENTRY}.`;
+	}
 	return `Several projects have a ${DB_ENTRY}: ${list}. Name one with --api <name>.`;
 }

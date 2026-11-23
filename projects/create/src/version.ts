@@ -29,7 +29,9 @@ function resolveCreateMetadata() {
 			}
 		} catch {}
 		const parent = dirname(dir);
-		if (parent === dir) break;
+		if (parent === dir) {
+			break;
+		}
 		dir = parent;
 	}
 

@@ -46,11 +46,15 @@ if (entries.length === 0) {
 /** Parse a single changeset file → { packages: Record<string, string>, body: string } */
 function parseEntry(content) {
 	const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
-	if (!match) return null;
+	if (!match) {
+		return null;
+	}
 	const packages = {};
 	for (const line of match[1].split("\n")) {
 		const m = line.match(/^"([^"]+)"\s*:\s*(\w+)/);
-		if (m) packages[m[1]] = m[2];
+		if (m) {
+			packages[m[1]] = m[2];
+		}
 	}
 	return { packages, body: match[2].trim() };
 }

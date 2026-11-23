@@ -54,10 +54,16 @@ function parseJsonOutput<T>(stdout: string): T {
 	const start = stdout.indexOf("{");
 	const arrayStart = stdout.indexOf("[");
 	let idx = -1;
-	if (start === -1) idx = arrayStart;
-	else if (arrayStart === -1) idx = start;
-	else idx = Math.min(start, arrayStart);
-	if (idx < 0) throw new Error(`Expected JSON from auth0 CLI, got: ${stdout.slice(0, 200)}`);
+	if (start === -1) {
+		idx = arrayStart;
+	} else if (arrayStart === -1) {
+		idx = start;
+	} else {
+		idx = Math.min(start, arrayStart);
+	}
+	if (idx < 0) {
+		throw new Error(`Expected JSON from auth0 CLI, got: ${stdout.slice(0, 200)}`);
+	}
 	return JSON.parse(stdout.slice(idx)) as T;
 }
 
@@ -80,7 +86,9 @@ function runAuth0(args: string[]): string {
 
 	if (result.status !== 0) {
 		const stderr = result.stderr ?? "";
-		if (isAuthError(stderr)) throw new Auth0AuthError(stderr);
+		if (isAuthError(stderr)) {
+			throw new Auth0AuthError(stderr);
+		}
 		throw new Error(stderr || `auth0 exited with code ${result.status}`);
 	}
 
@@ -129,7 +137,9 @@ export function listApis(): Array<{ identifier: string; name: string }> {
 		const out = runAuth0(["apis", "list", "--json", "--no-input"]);
 		return parseJsonOutput(out);
 	} catch (err) {
-		if (err instanceof Auth0AuthError) throw err;
+		if (err instanceof Auth0AuthError) {
+			throw err;
+		}
 		return [];
 	}
 }
@@ -169,7 +179,9 @@ export function listApiScopes(identifier: string): string[] {
 			.map((scope) => (typeof scope === "string" ? scope : (scope.value ?? scope.name ?? "")))
 			.filter((scope) => scope.length > 0);
 	} catch (err) {
-		if (err instanceof Auth0AuthError) throw err;
+		if (err instanceof Auth0AuthError) {
+			throw err;
+		}
 		return [];
 	}
 }
@@ -180,7 +192,9 @@ export function assignUserPermissions(
 	audience: string,
 	permissions: readonly string[],
 ): void {
-	if (permissions.length === 0) return;
+	if (permissions.length === 0) {
+		return;
+	}
 	runAuth0([
 		"api",
 		"post",
@@ -287,7 +301,9 @@ export type Auth0App = { client_id: string; name: string };
 /** Create or reuse a machine app, which can get a token with no browser and no user. */
 export function ensureM2mApp(name: string): { client_id: string; reused: boolean } {
 	const existing = listApps().find((app) => app.name === name);
-	if (existing != null) return { client_id: existing.client_id, reused: true };
+	if (existing != null) {
+		return { client_id: existing.client_id, reused: true };
+	}
 
 	const out = runAuth0([
 		"apps",
@@ -301,7 +317,9 @@ export function ensureM2mApp(name: string): { client_id: string; reused: boolean
 	]);
 	const app = parseJsonOutput<{ client_id?: string; clientId?: string }>(out);
 	const clientId = app.client_id ?? app.clientId;
-	if (!clientId) throw new Error("Auth0's response to creating the app had no client_id.");
+	if (!clientId) {
+		throw new Error("Auth0's response to creating the app had no client_id.");
+	}
 	return { client_id: clientId, reused: false };
 }
 
@@ -379,7 +397,9 @@ export function listApps(): Auth0App[] {
 			}))
 			.filter((a) => a.client_id && a.name);
 	} catch (err) {
-		if (err instanceof Auth0AuthError) throw err;
+		if (err instanceof Auth0AuthError) {
+			throw err;
+		}
 		return [];
 	}
 }
@@ -431,7 +451,9 @@ export function enableConnectionForClient(connectionName: string, clientId: stri
 		"--no-input",
 	]);
 	const { clients } = parseJsonOutput<{ clients: Array<{ client_id: string }> }>(clientsOut);
-	if (clients.some((c) => c.client_id === clientId)) return;
+	if (clients.some((c) => c.client_id === clientId)) {
+		return;
+	}
 
 	// Dedicated enabled-clients endpoint (enabled_clients on connection PATCH is deprecated).
 	runAuth0([
@@ -467,7 +489,9 @@ export function findUserByEmail(email: string): { user_id: string; email: string
 	]);
 	const users = parseJsonOutput<Array<{ user_id?: string; email?: string }>>(out);
 	const user = users.find((u) => u.user_id && u.email);
-	if (!user?.user_id || !user.email) return null;
+	if (!user?.user_id || !user.email) {
+		return null;
+	}
 	return { user_id: user.user_id, email: user.email };
 }
 
@@ -525,7 +549,9 @@ export function createAdminDatabaseUser(input: {
 			username: input.username,
 		};
 	} catch (err) {
-		if (!isUserAlreadyExistsError(err)) throw err;
+		if (!isUserAlreadyExistsError(err)) {
+			throw err;
+		}
 
 		const existing = findUserByEmail(input.email);
 		if (!existing) {

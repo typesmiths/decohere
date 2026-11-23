@@ -35,6 +35,8 @@ export type PinoOptions = {
 export function pino(options: PinoOptions = {}): PinoAdapter {
 	const pretty = options.pretty === true ? {} : options.pretty || undefined;
 	const transport = options.transport ?? new PinoTargets(pretty, options.roll).transport;
-	if (transport == null) return new PinoAdapter(options.logger);
+	if (transport == null) {
+		return new PinoAdapter(options.logger);
+	}
 	return new PinoAdapter(options.logger, new TransportGuard(pinoLogger.transport(transport)));
 }

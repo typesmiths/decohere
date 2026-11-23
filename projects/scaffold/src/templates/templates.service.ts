@@ -63,7 +63,9 @@ export class Templates {
 			}
 			const merged = this.#merge.merge(target, existing, content);
 			if (merged != null) {
-				if (merged !== existing) changes.write(target, merged);
+				if (merged !== existing) {
+					changes.write(target, merged);
+				}
 				continue;
 			}
 			if (
@@ -105,12 +107,16 @@ export class Templates {
 	/** A template file's text for one app: placeholders filled in, @decohere/* at this version. */
 	private contentOf(folder: string, path: string, filler: TemplateNames): string {
 		const text = filler.fill(readFileSync(join(this.dir, folder, path), "utf8"));
-		if (posix.basename(path) !== "package.json") return text;
+		if (posix.basename(path) !== "package.json") {
+			return text;
+		}
 		const manifest = JSON.parse(text) as Record<string, Record<string, string> | undefined>;
 		for (const key of ["dependencies", "devDependencies"]) {
 			for (const name of Object.keys(manifest[key] ?? {})) {
 				const deps = manifest[key];
-				if (deps != null && name.startsWith("@decohere/")) deps[name] = CREATE_VERSION;
+				if (deps != null && name.startsWith("@decohere/")) {
+					deps[name] = CREATE_VERSION;
+				}
 			}
 		}
 		return `${JSON.stringify(manifest, null, 2)}\n`;

@@ -34,7 +34,9 @@ const DEFAULT_TS_OPTIONS: ts.CompilerOptions = {
  */
 export function tsCompilerOptions(tsconfig: Tsconfig): ts.CompilerOptions {
 	const { filePath } = tsconfig;
-	if (filePath == null) return { ...DEFAULT_TS_OPTIONS };
+	if (filePath == null) {
+		return { ...DEFAULT_TS_OPTIONS };
+	}
 	const result = ts.parseConfigFileTextToJson(filePath, fs.readFileSync(filePath, "utf8"));
 	if (result.error) {
 		throw new ForgeError(

@@ -101,7 +101,9 @@ export function promoteLatest(options) {
 			log(`already there: ${name}`);
 			continue;
 		}
-		if (npm("dist-tag", "add", `${name}@${version}`, "latest").status !== 0) failed.push(name);
+		if (npm("dist-tag", "add", `${name}@${version}`, "latest").status !== 0) {
+			failed.push(name);
+		}
 	}
 
 	const wrong = packages.filter((name) => !failed.includes(name) && !onLatest(name));

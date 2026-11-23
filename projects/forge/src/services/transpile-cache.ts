@@ -14,12 +14,16 @@ import { version as swcVersion } from "@swc/core";
  * Flux keeps its entries in the `flux` folder inside it; `forge clean` removes the folder.
  */
 function directory(rootDir: string, env: NodeJS.ProcessEnv = process.env): string | null {
-	if (env.DECOHERE_CACHE === "0") return null;
+	if (env.DECOHERE_CACHE === "0") {
+		return null;
+	}
 	if (env.DECOHERE_CACHE_DIR != null && env.DECOHERE_CACHE_DIR !== "") {
 		return path.resolve(env.DECOHERE_CACHE_DIR);
 	}
 	const nodeModules = path.join(rootDir, "node_modules");
-	if (existsSync(nodeModules)) return path.join(nodeModules, ".cache", "decohere");
+	if (existsSync(nodeModules)) {
+		return path.join(nodeModules, ".cache", "decohere");
+	}
 	if (env.XDG_CACHE_HOME != null && env.XDG_CACHE_HOME !== "") {
 		return path.join(env.XDG_CACHE_HOME, "decohere");
 	}

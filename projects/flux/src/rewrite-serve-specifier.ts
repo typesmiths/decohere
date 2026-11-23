@@ -56,11 +56,17 @@ function resolveRelativeWatchedTs(
 	parentUrl: string,
 	isWatchedTs: (absolutePath: string) => boolean,
 ): string | null {
-	if (packageAliases.isBareSpecifier(specifier)) return null;
-	if (!(specifier.startsWith(".") || specifier.startsWith("/"))) return null;
+	if (packageAliases.isBareSpecifier(specifier)) {
+		return null;
+	}
+	if (!(specifier.startsWith(".") || specifier.startsWith("/"))) {
+		return null;
+	}
 
 	const parentClean = parentUrl.split("?")[0];
-	if (parentClean == null || parentClean === "") return null;
+	if (parentClean == null || parentClean === "") {
+		return null;
+	}
 
 	let resolved: URL;
 	try {
@@ -68,7 +74,9 @@ function resolveRelativeWatchedTs(
 	} catch {
 		return null;
 	}
-	if (resolved.protocol !== "file:") return null;
+	if (resolved.protocol !== "file:") {
+		return null;
+	}
 
 	return watchedTs(fileURLToPath(resolved), isWatchedTs);
 }

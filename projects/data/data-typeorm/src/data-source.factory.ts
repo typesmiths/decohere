@@ -34,7 +34,9 @@ function omitProvisionFields(options: ConnectionOptions) {
  */
 export class ManagedDataSource extends DataSource {
 	public async [Symbol.asyncDispose]() {
-		if (this.isInitialized) await this.destroy();
+		if (this.isInitialized) {
+			await this.destroy();
+		}
 	}
 }
 

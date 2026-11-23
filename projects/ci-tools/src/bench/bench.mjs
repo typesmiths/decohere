@@ -94,9 +94,13 @@ function forgeBuildSuite() {
 				},
 			},
 		);
-		if (result.status !== 0) throw new Error(`vitest bench exited ${result.status}`);
+		if (result.status !== 0) {
+			throw new Error(`vitest bench exited ${result.status}`);
+		}
 		// vitest swallows errors in bench callbacks, so a missing file means it failed.
-		if (!existsSync(outJson)) throw new Error("vitest bench wrote no output JSON");
+		if (!existsSync(outJson)) {
+			throw new Error("vitest bench wrote no output JSON");
+		}
 		return fromVitest(JSON.parse(readFileSync(outJson, "utf8")));
 	} finally {
 		rmSync(tmpDir, { recursive: true, force: true });
@@ -112,7 +116,9 @@ const SUITES = {
 };
 
 function currentSha() {
-	if (process.env.GITHUB_SHA) return process.env.GITHUB_SHA;
+	if (process.env.GITHUB_SHA) {
+		return process.env.GITHUB_SHA;
+	}
 	return execFileSync("git", ["rev-parse", "HEAD"], {
 		cwd: WORKSPACE_ROOT,
 		encoding: "utf8",

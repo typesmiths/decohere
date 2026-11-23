@@ -265,7 +265,9 @@ export class PackageDeployable implements Action<PackageOptions> {
 		options: PackageOptions,
 	): Promise<void> {
 		const config = path.join(path.resolve(this.workspace.rootDir), "config");
-		if (!(await io.directoryExists(config))) return;
+		if (!(await io.directoryExists(config))) {
+			return;
+		}
 
 		const entries = await fs.readdir(config, { withFileTypes: true });
 		const files = entries.filter((entry) => !entry.isDirectory()).map((entry) => entry.name);

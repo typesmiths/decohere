@@ -81,7 +81,9 @@ class FluxServe {
 	}
 
 	private check() {
-		if (this.waiter != null && this.boots() >= this.waiter.boots) this.waiter.resolve();
+		if (this.waiter != null && this.boots() >= this.waiter.boots) {
+			this.waiter.resolve();
+		}
 	}
 
 	/** Resolves once the app has booted `boots` times; fails with the output on timeout or exit. */
@@ -108,7 +110,9 @@ class FluxServe {
 	}
 
 	public async stop(): Promise<void> {
-		if (this.child.exitCode != null) return;
+		if (this.child.exitCode != null) {
+			return;
+		}
 		const exited = new Promise((resolve) => this.child.once("exit", resolve));
 		this.child.kill("SIGTERM");
 		await exited;

@@ -29,8 +29,12 @@ export class RootCommand extends DecohereCommand {
 				envFile?: string;
 				envFileIfExists?: string;
 			}>();
-			if (envFile) process.loadEnvFile(envFile);
-			if (envFileIfExists) loadEnvFileIfExists(envFileIfExists);
+			if (envFile) {
+				process.loadEnvFile(envFile);
+			}
+			if (envFileIfExists) {
+				loadEnvFileIfExists(envFileIfExists);
+			}
 		});
 
 		for (const mod of modules) {
@@ -60,6 +64,8 @@ function loadEnvFileIfExists(path: string): void {
 	try {
 		process.loadEnvFile(path);
 	} catch (err) {
-		if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+		if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
+			throw err;
+		}
 	}
 }

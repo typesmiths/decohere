@@ -182,7 +182,9 @@ describe("hosted services", () => {
 			public start(signal: AbortSignal) {
 				// The ledger position feed: minutes of loading, started in the background.
 				void sleep(10_000).then(() => {
-					if (!signal.aborted) this.warm = true;
+					if (!signal.aborted) {
+						this.warm = true;
+					}
 				});
 			}
 		}
@@ -278,7 +280,9 @@ describe("hosted services", () => {
 			public warm = false;
 			public start() {}
 			public async check() {
-				if (!this.warm) throw new Error("still loading positions");
+				if (!this.warm) {
+					throw new Error("still loading positions");
+				}
 			}
 		}
 		app = await builder()
@@ -325,7 +329,9 @@ describe("hosted services", () => {
 				public async start() {
 					this.attempts += 1;
 					events.push(`flaky attempt ${this.attempts}`);
-					if (this.attempts <= failures) throw new Error("feed unreachable");
+					if (this.attempts <= failures) {
+						throw new Error("feed unreachable");
+					}
 				}
 				public stop() {
 					events.push("flaky stopped");
@@ -337,7 +343,9 @@ describe("hosted services", () => {
 		async function until(condition: () => Promise<boolean> | boolean, timeoutMs = 2_000) {
 			const deadline = Date.now() + timeoutMs;
 			while (!(await condition())) {
-				if (Date.now() > deadline) throw new Error("condition not met in time");
+				if (Date.now() > deadline) {
+					throw new Error("condition not met in time");
+				}
 				await sleep(5);
 			}
 		}

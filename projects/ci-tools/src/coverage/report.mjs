@@ -30,18 +30,24 @@ function parseArgs(argv) {
 		}
 		if (arg === "--top") {
 			const parsed = Number(argv[index + 1]);
-			if (!Number.isNaN(parsed) && parsed > 0) options.top = parsed;
+			if (!Number.isNaN(parsed) && parsed > 0) {
+				options.top = parsed;
+			}
 			index += 1;
 			continue;
 		}
-		if (arg === "--json") options.json = true;
+		if (arg === "--json") {
+			options.json = true;
+		}
 	}
 
 	return options;
 }
 
 function formatLineRanges(lines) {
-	if (lines.length === 0) return "-";
+	if (lines.length === 0) {
+		return "-";
+	}
 	const ranges = [];
 	let rangeStart = lines[0];
 	let previous = lines[0];
@@ -114,7 +120,9 @@ const filtered = files.filter((file) => {
 			? file.project != null
 			: file.sourcePath.startsWith(options.pathPrefix);
 	}
-	if (file.project !== options.project) return false;
+	if (file.project !== options.project) {
+		return false;
+	}
 	return options.pathPrefix == null || file.sourcePath.startsWith(options.pathPrefix);
 });
 

@@ -116,8 +116,12 @@ function from(
  */
 function getPassedFieldNames([first, second]: readonly unknown[]): string[] {
 	const names: string[] = [];
-	if (!(first instanceof Error) && isFields(first)) names.push(...Object.keys(first));
-	if (!(second instanceof Error) && isFields(second)) names.push(...Object.keys(second));
+	if (!(first instanceof Error) && isFields(first)) {
+		names.push(...Object.keys(first));
+	}
+	if (!(second instanceof Error) && isFields(second)) {
+		names.push(...Object.keys(second));
+	}
 	return names;
 }
 

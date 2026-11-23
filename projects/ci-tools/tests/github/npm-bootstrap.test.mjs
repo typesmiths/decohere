@@ -50,7 +50,9 @@ function fakeNpm({ packages = {}, loggedIn = true, failPosting = [] } = {}) {
 	const published = [];
 	const npm = (args, { otp } = {}) => {
 		calls.push(`${args.join(" ")}${otp ? ` [otp ${otp}]` : ""}`);
-		if (args[0] === "whoami") return { status: loggedIn ? 0 : 1, output: "" };
+		if (args[0] === "whoami") {
+			return { status: loggedIn ? 0 : 1, output: "" };
+		}
 		// A first publish creates the name, with no Trusted Publishers yet.
 		if (args[0] === "publish") {
 			const stub = JSON.parse(readFileSync(`${args[1]}/package.json`, "utf8"));
@@ -66,8 +68,12 @@ function fakeNpm({ packages = {}, loggedIn = true, failPosting = [] } = {}) {
 		}
 		const trust = /\/-\/package\/(.+)\/trust$/.exec(url);
 		const name = decodeURIComponent(trust?.[1] ?? new URL(url).pathname.slice(1));
-		if (!(name in packages)) return new Response("not found", { status: 404 });
-		if (trust == null) return new Response(JSON.stringify({ name }));
+		if (!(name in packages)) {
+			return new Response("not found", { status: 404 });
+		}
+		if (trust == null) {
+			return new Response(JSON.stringify({ name }));
+		}
 		// Like npm: Trusted Publishers need a code, even to read them.
 		if (headers.get("npm-otp") == null) {
 			return new Response('{"message":"Unauthorized"}', {
@@ -76,7 +82,9 @@ function fakeNpm({ packages = {}, loggedIn = true, failPosting = [] } = {}) {
 			});
 		}
 		if (init.method === "POST") {
-			if (failPosting.includes(name)) return new Response("denied", { status: 403 });
+			if (failPosting.includes(name)) {
+				return new Response("denied", { status: 403 });
+			}
 			posts.push({ name, body: JSON.parse(String(init.body)), otp: headers.get("npm-otp") });
 			return new Response("[]");
 		}

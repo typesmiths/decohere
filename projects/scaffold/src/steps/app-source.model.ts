@@ -19,9 +19,13 @@ const IMPORT_STATEMENT = /^import\b[^;]*;[ \t]*$/gm;
 
 function addImports(source: string, imports: readonly string[]): string {
 	const missing = [...new Set(imports)].filter((line) => !source.includes(line));
-	if (missing.length === 0) return source;
+	if (missing.length === 0) {
+		return source;
+	}
 	const lastImport = [...source.matchAll(IMPORT_STATEMENT)].at(-1);
-	if (lastImport == null) return `${missing.join("\n")}\n${source}`;
+	if (lastImport == null) {
+		return `${missing.join("\n")}\n${source}`;
+	}
 	const end = lastImport.index + lastImport[0].length;
 	return `${source.slice(0, end)}\n${missing.join("\n")}${source.slice(end)}`;
 }
@@ -40,7 +44,9 @@ function lineAt(source: string, anchor: RegExp): { start: number; end: number } 
 		anchor.source,
 		anchor.flags.includes("m") ? anchor.flags : `${anchor.flags}m`,
 	).exec(source);
-	if (match == null) return undefined;
+	if (match == null) {
+		return undefined;
+	}
 	const start = source.lastIndexOf("\n", match.index) + 1;
 	const newline = source.indexOf("\n", match.index);
 	return { start, end: newline === -1 ? source.length : newline };
@@ -61,7 +67,9 @@ export class AppSource {
 	public static insertAfter(anchor: RegExp, text: string) {
 		return (source: string): string | undefined => {
 			const line = lineAt(source, anchor);
-			if (line == null) return undefined;
+			if (line == null) {
+				return undefined;
+			}
 			const added = indented(source.slice(line.start, line.end), text);
 			return `${source.slice(0, line.end)}\n${added}${source.slice(line.end)}`;
 		};
@@ -71,7 +79,9 @@ export class AppSource {
 	public static insertBefore(anchor: RegExp, text: string) {
 		return (source: string): string | undefined => {
 			const line = lineAt(source, anchor);
-			if (line == null) return undefined;
+			if (line == null) {
+				return undefined;
+			}
 			const added = indented(source.slice(line.start, line.end), text);
 			return `${source.slice(0, line.start)}${added}\n${source.slice(line.start)}`;
 		};
@@ -102,7 +112,9 @@ export class AppSource {
 		const source = this.changes.read(path);
 		const pending = edits.filter((item) => source == null || !item.isDone(source));
 		if (pending.length === 0 || source == null) {
-			if (pending.length > 0) this.changes.tellByHand(path, byHandLines(pending));
+			if (pending.length > 0) {
+				this.changes.tellByHand(path, byHandLines(pending));
+			}
 			return;
 		}
 		let result = source;

@@ -40,8 +40,9 @@ class SecretConfigService implements IConfigurationService {
 		return [];
 	}
 	public async get<T extends object>(type: Constructable<T> | string): Promise<T> {
-		if (Object.is(type, AuthConfig))
+		if (Object.is(type, AuthConfig)) {
 			return Object.assign(new AuthConfig(), secretConfig) as unknown as T;
+		}
 		return {} as T;
 	}
 }

@@ -45,7 +45,9 @@ export function forgeBuild(options?: ForgeBuildOptions) {
 	let workspace: Workspace | null = null;
 
 	const initWorkspace = async () => {
-		if (workspace !== null) return;
+		if (workspace !== null) {
+			return;
+		}
 		logger.debug(
 			`Loading Forge workspace (buildConfig: ${buildConfig}, workspaceRoot: ${workspaceRoot})`,
 		);
@@ -61,7 +63,9 @@ export function forgeBuild(options?: ForgeBuildOptions) {
 
 	const baseConfigFor = (project: Project | undefined): Options => {
 		const cached = baseConfigs.get(project);
-		if (cached != null) return cached;
+		if (cached != null) {
+			return cached;
+		}
 		const config = transpiler.createBaseConfig(BuildTargets.es6, {
 			aliasPaths: true,
 			tsConfig: project?.getTsConfigSync(),
@@ -116,7 +120,9 @@ export function forgeBuild(options?: ForgeBuildOptions) {
 				BuildTargets.es6,
 				baseConfigFor(project),
 			);
-			if (!response || response.outcome !== "success") return null;
+			if (!response || response.outcome !== "success") {
+				return null;
+			}
 
 			const result = { code: response.code, map: null };
 			transformCache.set(id, { content: code, result });

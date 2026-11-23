@@ -36,7 +36,9 @@ const bumpTypes = new Set();
 for (const filePath of pendingChangesets) {
 	const content = await readFile(path.join(root, filePath), "utf8");
 	const match = content.match(/^---\n([\s\S]*?)\n---/);
-	if (!match) continue;
+	if (!match) {
+		continue;
+	}
 	for (const line of match[1].split("\n")) {
 		const m = line.match(/^"([^"]+)"\s*:\s*(\w+)/);
 		if (m) {

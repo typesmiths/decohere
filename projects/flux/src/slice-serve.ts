@@ -119,9 +119,13 @@ export function classifySliceProjects(
 	const skip: SliceProjectView[] = [];
 	for (const project of inSlice) {
 		const kind = classifySliceProject(project);
-		if (kind === "flux") flux.push(project);
-		else if (kind === "defer") defer.push(project);
-		else skip.push(project);
+		if (kind === "flux") {
+			flux.push(project);
+		} else if (kind === "defer") {
+			defer.push(project);
+		} else {
+			skip.push(project);
+		}
 	}
 	return { flux, defer, skip };
 }

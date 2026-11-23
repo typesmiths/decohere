@@ -57,7 +57,9 @@ function pick(app: BuiltApp, name: string | undefined): MigrationTarget {
 
 function folder(options: DbCommandOptions, dataSource: string): URL {
 	const { directory } = options;
-	if (directory instanceof URL) return directory;
+	if (directory instanceof URL) {
+		return directory;
+	}
 	const found = directory[dataSource];
 	if (found == null) {
 		throw new DbCommandError(
@@ -69,8 +71,9 @@ function folder(options: DbCommandOptions, dataSource: string): URL {
 
 function nameArgument(positionals: string[], command: string): string {
 	const [name] = positionals;
-	if (name == null)
+	if (name == null) {
 		throw new DbCommandError(`db ${command} needs a name, such as add-expiry\n\n${USAGE}`);
+	}
 	return name;
 }
 
@@ -103,10 +106,14 @@ async function run(app: BuiltApp, argv: string[], options: DbCommandOptions): Pr
 		},
 	});
 	const [command, ...rest] = positionals;
-	if (command == null) throw new DbCommandError(USAGE);
+	if (command == null) {
+		throw new DbCommandError(USAGE);
+	}
 	const target = pick(app, values["data-source"]);
 	const container = app.services;
-	if (REACHES_DATABASE.has(command)) await target.open();
+	if (REACHES_DATABASE.has(command)) {
+		await target.open();
+	}
 
 	switch (command) {
 		case "migrate": {
@@ -116,7 +123,9 @@ async function run(app: BuiltApp, argv: string[], options: DbCommandOptions): Pr
 				dryRun: values["dry-run"],
 				log: out,
 			});
-			if (applied.length === 0) out("Nothing to apply");
+			if (applied.length === 0) {
+				out("Nothing to apply");
+			}
 			return;
 		}
 		case "baseline": {
@@ -131,12 +140,16 @@ async function run(app: BuiltApp, argv: string[], options: DbCommandOptions): Pr
 				dryRun: values["dry-run"],
 				log: out,
 			});
-			if (recorded.length === 0) out("Nothing to record");
+			if (recorded.length === 0) {
+				out("Nothing to record");
+			}
 			return;
 		}
 		case "revert": {
 			const reverted = await target.migrator.revert(target.source, { container, log: out });
-			if (reverted == null) out("Nothing to revert");
+			if (reverted == null) {
+				out("Nothing to revert");
+			}
 			return;
 		}
 		case "status": {

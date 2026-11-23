@@ -32,7 +32,9 @@ const SIGNAL_EXIT_CODES = { SIGINT: 130, SIGTERM: 143, SIGHUP: 129 } as const;
  */
 export async function launch(argv: string[]): Promise<never> {
 	const plan = resolveLaunch(argv);
-	if (hasDecohereTools()) runHere(plan);
+	if (hasDecohereTools()) {
+		runHere(plan);
+	}
 	if (plan.kind === "project") {
 		console.error(OPEN_DEV_CONTAINER_MESSAGE);
 		process.exit(1);
@@ -47,9 +49,13 @@ function writesProject({ containerArgv }: LaunchPlan): boolean {
 
 /** A new project only goes into an empty folder, so a copy can never overwrite someone's files. */
 function refuseFolderWithFiles(targetDir: string): void {
-	if (!existsSync(targetDir)) return;
+	if (!existsSync(targetDir)) {
+		return;
+	}
 	const files = readdirSync(targetDir).filter((name) => name !== ".git");
-	if (files.length === 0) return;
+	if (files.length === 0) {
+		return;
+	}
 	console.error(
 		`\n  ${targetDir} already has files in it.\n` +
 			"  Choose a new folder. To change an existing project, run `pnpm decohere add` in its Dev Container.\n",
@@ -64,7 +70,9 @@ function generateAdminPassword(): string {
 
 /** Store it in the Linux key store, if there is one. The value goes over stdin, never in argv. */
 function saveToKeyStore(projectName: string, password: string): boolean {
-	if (process.platform !== "linux") return false;
+	if (process.platform !== "linux") {
+		return false;
+	}
 	const stored = spawnSync(
 		"secret-tool",
 		[
@@ -91,7 +99,9 @@ function saveAdminPassword(targetDir: string, projectName: string, password: str
 	const email = existsSync(env)
 		? readFileSync(env, "utf8").match(/^AUTH0_ADMIN_USER_EMAIL=(.+)$/m)?.[1]
 		: undefined;
-	if (email == null) return;
+	if (email == null) {
+		return;
+	}
 
 	const folder = join(homedir(), ".config", "decohere");
 	const file = join(folder, `${projectName}.env`);
@@ -225,7 +235,9 @@ export async function runInBuilder(argv: string[]): Promise<never> {
 	const plan = resolveLaunch(argv);
 	const { targetDir, containerArgv, projectName } = plan;
 	const copyOut = writesProject(plan);
-	if (copyOut) refuseFolderWithFiles(targetDir);
+	if (copyOut) {
+		refuseFolderWithFiles(targetDir);
+	}
 	assertDockerAvailable();
 
 	const name = `decohere-create-${randomBytes(6).toString("hex")}`;
@@ -254,7 +266,9 @@ export async function runInBuilder(argv: string[]): Promise<never> {
 			env: { ...process.env, [ADMIN_PASSWORD_ENV]: adminPassword },
 		},
 	);
-	if (created.status !== 0) process.exit(created.status ?? 1);
+	if (created.status !== 0) {
+		process.exit(created.status ?? 1);
+	}
 
 	for (const [signal, code] of Object.entries(SIGNAL_EXIT_CODES)) {
 		process.once(signal, () => {

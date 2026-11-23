@@ -48,7 +48,9 @@ async function mockProcessAndCaptureServer() {
 	});
 	const originalProcessOnce = process.once.bind(process);
 	vi.spyOn(process, "once").mockImplementation((event: string, ...args: unknown[]) => {
-		if (event === "SIGINT") resolveSigint();
+		if (event === "SIGINT") {
+			resolveSigint();
+		}
 		return (originalProcessOnce as (...a: unknown[]) => NodeJS.Process)(event, ...args);
 	});
 
@@ -95,7 +97,9 @@ function isRunning(pid: number): boolean {
 		process.kill(pid, 0);
 		return true;
 	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code === "ESRCH") return false;
+		if ((error as NodeJS.ErrnoException).code === "ESRCH") {
+			return false;
+		}
 		throw error;
 	}
 }
