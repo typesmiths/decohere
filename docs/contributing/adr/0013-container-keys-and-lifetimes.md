@@ -10,7 +10,7 @@ Crucible's container keyed every registration by a string: a class's `name`, a s
 - Two classes with the same name (a `TokenService` in each of two bounded contexts) collided, `Symbol("TokenService")` collided with a class `TokenService`, and minified class names broke injection.
 - A missing dependency resolved to `null` with a log warning, and the app failed later, far from the cause. Optional parameters (`dep?: Foo`) relied on that `null`.
 - A dependency cycle overflowed the stack.
-- A singleton depending on a request-scoped service, directly or through a transient, kept one instance for the life of the process (a *captive dependency*), e.g. a repository pinning one `QueryRunner` for every request.
+- A singleton depending on a request-scoped service, directly or through a transient, kept one instance for the life of the process (a *captive dependency*), e.g. a repository pinning one `QueryRunner` for every request. Resolving a request-scoped service from the root container did the same, with no singleton involved: the root cached it like any scope and handed it to every later caller.
 - Each `beginScope` copied the whole registration map, so every request paid for every registration.
 
 ## Decision
@@ -19,6 +19,7 @@ Crucible's container keyed every registration by a string: a class's `name`, a s
 - **A missing dependency throws** `ResolveError`, naming the chain that needed it (`App → Router → Symbol(AuthorizationService)`). A parameter that may be absent says so with `@optional()` and receives `undefined`, so a default value applies. `resolveMany` still returns `[]`. A parameter whose run-time type is not a class (an interface, an array, a dropped import: `Object` or `Array`) throws asking for `@inject`, unless it is `@optional()`.
 - **Cycles throw** `ResolveError` listing the cycle. The container tracks what it is constructing on each resolution path, so the check is a lookup.
 - **Captive dependencies throw.** Resolving a request-scoped service while a singleton is being constructed (anywhere up the path) throws, naming both and the chain. `LifetimeScopeToken` is exempt: a singleton asking for its scope gets the root container and resolves request-scoped services from a scope it begins.
+- **The root holds no request-scoped instances.** Resolving a request-scoped service from the root throws, whoever asks: a test calling `resolve` on the container, or a singleton calling `resolve` on the root it was given. The root may still resolve its own `LifetimeScopeToken`.
 - **A scope looks up through its parent.** It holds only its own `LifetimeScopeToken`, so beginning one copies nothing.
 - Checks run when a service is first resolved, not when the container is built.
 
@@ -40,3 +41,4 @@ Rejected:
 ## History
 
 - 2026-10-21: Decided.
+- 2026-11-23: A request-scoped service resolved from the root throws too. It was cached on the root and shared by every request, silently.

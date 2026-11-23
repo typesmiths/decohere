@@ -5,7 +5,7 @@ Scribe is Decohere's logging. Code logs through a facade, `scribe.logger(name)`,
 | Package | Source | Role |
 |---|---|---|
 | [`@decohere/scribe`](scribe) | `projects/scribe/scribe/src` | The facade, with no dependencies: `scribe.logger(name)`, the `LogAdapter` base providers extend, the default `ConsoleAdapter`, and `CaptureAdapter` for tests (`@decohere/scribe/testing`) |
-| [`@decohere/scribe-pino`](scribe-pino) | `projects/scribe/scribe-pino/src` | The Pino provider (`PinoAdapter`), with the pretty and rolling-file recipes (Node) |
+| [`@decohere/scribe-pino`](scribe-pino) | `projects/scribe/scribe-pino/src` | The Pino provider: `pino()`, which `scribe.use` installs, and `PinoAdapter`, with pretty lines and rolling files (Node) |
 | [`@decohere/scribe-console`](scribe-console) | `projects/scribe/scribe-console/src` | The JSON console provider (`JsonConsoleAdapter`), for Workers, browsers, Deno, Bun and Node |
 
 Application and library code call `scribe.logger(name)`. The app's composition root picks the provider: the console by default, Pino through `@decohere/scribe-pino`, JSON lines through `@decohere/scribe-console`, or your own. Transports, pretty printers and file rotation are set up there, not in domain packages.
@@ -26,7 +26,7 @@ Decohere chose the facade for the monorepo and published packages: **call sites 
 
 ```bash
 npm i @decohere/scribe
-# optional Pino binding + recipe peers (Node):
+# optional Pino writer, with the peers pretty lines and rolling files need (Node):
 npm i @decohere/scribe-pino pino-pretty pino-roll
 # or JSON lines through console (Workers, browsers, Deno, Bun, Node):
 npm i @decohere/scribe-console
@@ -40,28 +40,29 @@ log.info("ready");
 log.error(new Error("boom"));
 ```
 
-Out of the box, Scribe uses an in-process `ConsoleAdapter` (writes through `console.log`). No adapter package required for that path. The first `scribe.logger(...)` without a prior `configure` / recipe prints a one-time `console.warn` reminder to wire a real adapter at the composition root — treat the console fallback as convenience for scripts and tests, not production.
+Out of the box, Scribe uses an in-process `ConsoleAdapter` (writes through `console.log`). No adapter package required for that path. The first `scribe.logger(...)` before any `scribe.use` prints a one-time `console.warn` reminder to wire a real adapter at the composition root — treat the console fallback as convenience for scripts and tests, not production.
 
-For structured JSON (and optional pretty / rolling-file transports), import the Pino package at the composition root:
+For structured JSON (and optional pretty lines or rolling files), add Pino at the composition root:
 
 ```ts
-import "@decohere/scribe-pino"; // side-effect: registers withPino* + module augmentation
 import { scribe } from "@decohere/scribe";
+import { pino } from "@decohere/scribe-pino";
 
-scribe.withPinoPretty().and.withPinoRoll({ file: "logs/my-app.log" });
+scribe.use(pino({ pretty: true, roll: { file: "logs/my-app.log" } }));
 
 const log = scribe.logger("Api");
 log.info("listening");
 ```
 
-Import `@decohere/scribe-pino` **before** calling `withPino*` so runtime methods exist. The import also pulls in TypeScript module augmentation so those methods type-check.
+Options, and how to choose them per environment: [Pino](#pino-decoherescribe-pino).
 
 ## Public surface (`@decohere/scribe`)
 
 | Symbol | Role |
 |---|---|
 | `scribe.logger(name?, customLevels?)` | Named logger; default levels `fatal` … `trace` |
-| `scribe.configure({ adapter, options?, tap? })` | Install an adapter (and an entry tap); returns `(name?) => Logger` |
+| `scribe.use(adapter, { logLevel?, customLevels?, tap? }?)` | Write through `adapter` from now on; returns `(name?) => Logger` |
+| `scribe.configure({ adapter, options?, tap? })` | The same, with the settings in one object |
 | `scribe.flush(cb?)` / `scribe.stop()` | Drain / dispose the active adapter |
 | `scribe.addContextSource(source)` | Add fields from what the caller is doing now (a request, a job) to every line; returns a remover |
 | `LoggerAdapter` / `LogAdapter` | Contract and base class for writers |
@@ -83,17 +84,14 @@ When you do not pass an explicit `logLevel`, Scribe reads the first non-empty of
 2. `SCRIBE_LOG_LEVEL`
 3. `LOGGING_LEVEL`
 
-Invalid values are ignored. Explicit `options.logLevel` (including recipe / `withPino` levels) always wins.
+Invalid values are ignored. A level passed to `scribe.use` or `scribe.configure` always wins.
 
 ## Plugging in an adapter
 
 ```ts
 import { ConsoleAdapter, scribe } from "@decohere/scribe";
 
-const getLogger = scribe.configure({
-  adapter: new ConsoleAdapter(),
-  options: { logLevel: "debug" },
-});
+const getLogger = scribe.use(new ConsoleAdapter(), { logLevel: "debug" });
 
 const log = getLogger("Checkout");
 log.debug("cart opened");
@@ -108,10 +106,7 @@ import { ConsoleAdapter, scribe } from "@decohere/scribe";
 
 const customLevels = { audit: 35, metric: 25 } as const;
 
-const getLogger = scribe.configure({
-  adapter: new ConsoleAdapter(),
-  options: { logLevel: "trace", customLevels },
-});
+const getLogger = scribe.use(new ConsoleAdapter(), { logLevel: "trace", customLevels });
 
 const log = getLogger("Billing");
 log.audit("invoice sealed"); // typed
@@ -120,15 +115,6 @@ log.metric("latency_ms", { value: 12 }); // typed
 ```
 
 `customOnly: true` drops the default level methods and keeps only your map.
-
-### Type-safe recipe methods (module augmentation)
-
-Adapters that add fluent helpers (e.g. `scribe.withPinoPretty()`) do **not** fork the facade package. They:
-
-1. **Augment** the `scribe` class/namespace with `declare module "@decohere/scribe" { … }` so TypeScript knows the new static methods after you import the adapter package.
-2. **Install** the implementations at runtime with core's `@extension(scribe, { static: true })`.
-
-That pairing is how you get autocomplete and checking for `withPino*` without putting Pino types into `@decohere/scribe`.
 
 ## Structured logging
 
@@ -243,106 +229,60 @@ expect(capture.at("error")).toEqual([
 capture.clear();
 ```
 
-## Pino recipes (`@decohere/scribe-pino`)
+## Pino (`@decohere/scribe-pino`)
 
-Pretty and roll are **development conveniences**. When `NODE_ENV=production`, recipes with the default `when: "development"` attach **no** in-process transports — Pino writes structured JSON to stdout for an external shipper. Opt in with `{ when: "always" }` only when you intentionally want pretty/roll inside the process in production.
-
-### Pretty (local)
+`pino(options?)` makes a Pino writer; `scribe.use` installs it. Importing the package changes nothing on its own.
 
 ```ts
-scribe.withPinoPretty();
-scribe.withPinoPretty("debug");
-scribe.withPinoPretty({ colorize: true, logLevel: "debug", when: "always" });
+import { scribe } from "@decohere/scribe";
+import { pino } from "@decohere/scribe-pino";
+
+scribe.use(pino()); // JSON lines on stdout
 ```
 
-### Rolling files (local)
+| Option | What it does |
+|---|---|
+| `pretty: true` or `{ colorize }` | Colourised lines through pino-pretty, for a terminal |
+| `roll: { file, size?, frequency?, keep?, mkdir?, symlink? }` | Rolling log files through pino-roll. Defaults: `10m`, `daily`, keep `14`, `mkdir: true`, `symlink: false` |
+| `transport` | Any other Pino transport, in place of `pretty` and `roll` |
+| `logger` | Pino's own logger options, over the ones Scribe sets |
+
+With both `pretty` and `roll`, every entry goes to both. The level, custom levels and the tap go to `scribe.use`: `scribe.use(pino(), { logLevel: "debug" })`.
+
+### Development and production
+
+Pretty lines and rolling files are for a developer's machine. In production, write JSON to stdout and let the platform ship it. `pino()` doesn't read the environment, so the app's entry decides, as a scaffolded app's `src/app.ts` does:
 
 ```ts
-scribe.withPinoRoll({ file: "logs/my-app.log" });
+const development = process.env.NODE_ENV !== "production";
+scribe.use(pino(development ? { pretty: true, roll: { file: "logs/my-app.log" } } : {}));
 ```
 
-Defaults when options/env omit a value: size `10m`, frequency `daily`, keep `14`, `mkdir: true`, `symlink: false`.
+To let operators move the log file without a code change, read the variable there too: `roll: { file: process.env.LOG_FILE ?? "logs/my-app.log" }`.
 
-`symlink: true` can race under multi-worker or Flux HMR; leave it off unless you know you need a stable path pointer.
-
-### Chain pretty + roll
-
-```ts
-scribe.withPinoPretty().and.withPinoRoll({ file: "logs/my-app.log" });
-// or
-scribe.withPinoRoll({ file: "logs/my-app.log" }).and.withPinoPretty();
-```
-
-### Low-level transport config
-
-```ts
-scribe.withPino(
-  {
-    environment: "development",
-    transports: {
-      target: "pino-pretty",
-      options: { colorize: true },
-    },
-  },
-  "debug",
-);
-```
-
-`withPinoCustom` accepts Scribe options (including `customLevels`) plus the same transport config shape.
-
-### Roll overrides (owned by `withPinoRoll`)
-
-Ops can redirect rotation **without changing app code**. Pass a default `file` in source; override at deploy time via env.
-
-| Variable | Overrides | Default if unset |
-|---|---|---|
-| `SCRIBE_LOG_FILE` | `options.file` | (required option) |
-| `SCRIBE_LOG_SIZE` | `options.size` | `10m` |
-| `SCRIBE_LOG_FREQUENCY` | `options.frequency` | `daily` (numeric strings become numbers) |
-| `SCRIBE_LOG_KEEP` | `options.keep` | `14` |
-
-Precedence:
-
-- **File:** `SCRIBE_LOG_FILE` (trimmed non-empty) → `options.file`
-- **Size / frequency / keep:** explicit option → matching `SCRIBE_LOG_*` → recipe default
-
-Blank env values are ignored. Do not re-read these vars in `main.ts` — the recipe already owns them.
-
-```bash
-SCRIBE_LOG_FILE=/var/log/my-app.log \
-SCRIBE_LOG_SIZE=50m \
-SCRIBE_LOG_FREQUENCY=hourly \
-SCRIBE_LOG_KEEP=30 \
-NODE_ENV=development \
-node dist/main.js
-```
+`symlink: true` can race when several processes roll the same file, or on Flux reloads; leave it off unless you need a stable path to the newest file.
 
 ### Lifecycle
 
-Pino worker transports must drain on shutdown and on Flux HMR reboot:
+Pino worker transports must drain on shutdown and on a Flux reload:
 
 ```ts
 await scribe.stop(); // or rely on Flux disposing the entry that calls stop
 scribe.flush(() => process.exit(0));
 ```
 
-Transport `error` events are written to stderr so a dead worker does not take down the process by Node’s default unhandled-error behavior. Prefer fixing the underlying failure (symlink races, disk, etc.) rather than ignoring stderr spam.
+A worker transport is wrapped in a `TransportGuard`: if it dies, logging stops with one line on stderr instead of crashing the process. Fix the cause (a symlink race, a full disk) rather than live with the line.
 
 ### Custom levels with Pino
 
 ```ts
-scribe.withPinoCustom({
-  scribe: {
-    logLevel: "trace",
-    customLevels: { audit: 35 },
-  },
-});
+scribe.use(pino(), { logLevel: "trace", customLevels: { audit: 35 } });
 
 const log = scribe.logger<"audit">("Payments");
 log.audit("settled");
 ```
 
-Same generic `Logger<CustomLevels>` typing as the facade — the adapter forwards custom levels into Pino.
+Same generic `Logger<CustomLevels>` typing as the facade: the adapter forwards custom levels into Pino.
 
 ## Roll your own adapter
 
@@ -501,7 +441,7 @@ Decohere libraries depend on `@decohere/scribe` and call `scribe.logger(...)`. Y
 ```ts
 import pino from "pino";
 import { scribe } from "@decohere/scribe";
-import "@decohere/scribe-pino";
+import { pino as scribePino } from "@decohere/scribe-pino";
 // somewhere inside @decohere/http (or another decohere package):
 //   const log = scribe.logger("Http");
 //   log.info("request");
@@ -511,8 +451,8 @@ const appLog = pino({ level: "info" });
 appLog.info("boot");
 
 // Decohere packages still write through Scribe’s active adapter (console by
-// default, or a *second* Pino root if you call withPino*).
-scribe.withPinoPretty(); // creates its own pino() — not appLog
+// default, or a *second* Pino root once you add one).
+scribe.use(scribePino({ pretty: true })); // creates its own pino() — not appLog
 ```
 
 So you get either:
@@ -520,8 +460,8 @@ So you get either:
 | Composition root | Result |
 |---|---|
 | Do nothing | App → your Pino; Decohere libs → Scribe console |
-| `scribe.withPinoPretty()` / `withPinoRoll` / `PinoAdapter` | App → your Pino; Decohere libs → **another** Pino root (duplicate workers / files / levels) |
-| Drop direct Pino; only use Scribe recipes | One writer — but you give up your existing `pino` handle |
+| `scribe.use(pino(…))` or `PinoAdapter` | App → your Pino; Decohere libs → **another** Pino root (duplicate workers / files / levels) |
+| Drop direct Pino; only use Scribe | One writer — but you give up your existing `pino` handle |
 
 There is no way yet to hand Scribe an existing Pino logger.
 
@@ -532,7 +472,7 @@ Prefer one owner of logging in the composition root: either configure Scribe wit
 - Shipping Pino, Winston, or file rotation inside `@decohere/scribe`
 - Depending on `@decohere/scribe-pino` from domain libraries (depend on `@decohere/scribe` only)
 - Using in-process roll/pretty as the production shipping strategy
-- Teaching apps to duplicate `process.env.SCRIBE_LOG_*` plumbing next to `withPinoRoll`
+- Reading the environment inside a writer: the app's entry decides what to pass
 - Replacing platform log shipping (stdout collectors, sidecars, agents)
 - A second application-facing API on top of Scribe (call `scribe.logger`, not the adapter)
 
@@ -540,7 +480,6 @@ Prefer one owner of logging in the composition root: either configure Scribe wit
 
 | Package / doc | Role |
 |---|---|
-| [`@decohere/core`](../core) | `@extension` used by adapter packages |
 | [Spying on Scribe loggers](../../docs/contributing/testing/how-tos/spying-on-scribe-loggers.md) | Test doubles without fighting Pino |
 | [ADR 0016](../../docs/contributing/adr/0016-scribe-on-any-runtime.md) | Why the facade runs anywhere and writers are adapter packages |
 
@@ -551,7 +490,7 @@ For contributors to Decohere: how the package is laid out and tested. Using it n
 `@decohere/scribe` holds the facade and the contract providers implement (`LogAdapter` and `LogEntryAdapter`); `scribe-pino` and `scribe-console` implement it, and import only the facade. Each `src/` is flat today:
 
 - `scribe/src`: the facade (`logger.factory.ts`), the adapter base classes (`logger.adapter.ts`, `log-entry.adapter.ts`), `ConsoleAdapter`, redaction, the log-level environment helpers (`env.ts`: `LOG_LEVEL`, `SCRIBE_LOG_LEVEL`, `LOGGING_LEVEL`), and `testing/` with `CaptureAdapter`.
-- `scribe-pino/src`: `PinoAdapter`, the `withPino*` extensions (`scribe-pino.ts`), the recipes (`pino.recipe.ts`) and the transport guard.
+- `scribe-pino/src`: the `pino()` plugin (`pino.plugin.ts`), `PinoAdapter` (`pino.adapter.ts`), the transport targets for pretty lines and rolling files (`pino-targets.value.ts`) and the transport guard (`transport-guard.service.ts`).
 - `scribe-console/src`: `JsonConsoleAdapter`.
 
-The canonical suites ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)) are `scribe/tests/scribe.integration.spec.ts` for the facade, `scribe-pino/tests/scribe-pino.integration.spec.ts` for Pino, and `scribe-console/tests/json-console.adapter.integration.spec.ts` for the JSON console. Units cover the env helpers, console edge cases, recipe plan shapes and the transport guard. Specs are in each package's `tests/` today and move beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).
+The canonical suites ([testing](../../docs/contributing/testing/README.md#canonical-suite-ownership)) are `scribe/tests/scribe.integration.spec.ts` for the facade, `scribe-pino/src/scribe-pino.integration.spec.ts` for Pino, and `scribe-console/tests/json-console.adapter.integration.spec.ts` for the JSON console. Units cover the env helpers, console edge cases, the Pino targets and the transport guard. `scribe-pino` keeps its specs beside the code; `scribe` and `scribe-console` still keep theirs in `tests/` and move them beside the code ([ADR 0027](../../docs/contributing/adr/0027-code-design.md)).

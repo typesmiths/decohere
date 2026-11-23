@@ -148,7 +148,7 @@ function expectWebapiTree(root: string, projectName = basename(root)): void {
 	expect(apiManifest.dependencies).toHaveProperty("@decohere/http-fastify");
 	expect(app).toContain('.use(config(new YamlDataSource({ app: "api" }), EnvDataSource))');
 	expect(app).toContain(".use(health())");
-	expect(app).toContain("scribe.withPinoPretty().and.withPinoRoll");
+	expect(app).toContain("scribe.use(pino(development ? { pretty: true, roll: {");
 	expect(app).not.toContain("webApi");
 	const main = readFileSync(join(root, "projects/api/src/main.ts"), "utf8");
 	expect(main.trimEnd().split("\n").length, main).toBeLessThanOrEqual(5);

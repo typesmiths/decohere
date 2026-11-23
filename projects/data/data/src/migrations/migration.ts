@@ -9,6 +9,7 @@ export type MigrationContext<C = IContainer> = {
 	/**
 	 * The app's container, so a data migration can use the app's services: a policy, a clock, a
 	 * mapper. What they write through their own connections is outside this migration's transaction.
+	 * It is the root: a request-scoped service is resolved from a scope the migration begins.
 	 */
 	container: C;
 	/**

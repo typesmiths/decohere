@@ -355,4 +355,49 @@ export const cases: Case[] = [
 			expect((await uow.findById(p.model.Order, B)).note).toBe("kept");
 		},
 	},
+	{
+		name: "an entity added and not yet committed is found by its key, and committed once",
+		async run(p) {
+			await using uow = p.begin();
+			const order = new p.model.Order("ann");
+			uow.add(order);
+			expect(await uow.findById(p.model.Order, order.id)).toBe(order);
+			// "Find it, or add it": found, so not added again.
+			if (!(await uow.findById(p.model.Order, order.id))) uow.add(new p.model.Order("ann"));
+			await uow.commit();
+		},
+		async check(p) {
+			await using uow = p.begin();
+			expect(await uow.find(p.model.Order, { where: { customer: "ann" } })).toHaveLength(1);
+		},
+	},
+	{
+		name: "an added entity is found by its key with its children as added, and not after it is removed",
+		async run(p) {
+			await using uow = p.begin();
+			const order = new p.model.Order("ann");
+			order.addLine("apple", 1, ["stalk"]);
+			uow.add(order);
+			const found = await uow.findById(p.model.Order, order.id, ["lines.parts"]);
+			expect(found).toBe(order);
+			expect(skus(found)).toEqual(["apple"]);
+			uow.remove(order);
+			expect(await uow.findById(p.model.Order, order.id)).toBeNull();
+			await uow.commit();
+		},
+	},
+	{
+		name: "a query sees the database: an entity added and not yet committed is in it after commit",
+		seed: seedOrders,
+		async run(p) {
+			await using uow = p.begin();
+			const added = new p.model.Order("ann");
+			uow.add(added);
+			expect(await uow.find(p.model.Order, { where: { customer: "ann" } })).not.toContain(
+				added,
+			);
+			await uow.commit();
+			expect(await uow.find(p.model.Order, { where: { customer: "ann" } })).toContain(added);
+		},
+	},
 ];

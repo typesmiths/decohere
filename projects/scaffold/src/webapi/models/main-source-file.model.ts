@@ -140,12 +140,12 @@ export class MainSourceFile implements KeyedModel {
 	private renderApp(): string {
 		const provider = PROVIDER[this._orm];
 		const imports: string[] = [
-			'import "@decohere/scribe-pino";',
 			'import { config, EnvDataSource, YamlDataSource } from "@decohere/config";',
 			'import { Builder } from "@decohere/core/hosting";',
 			'import { ServiceContainerBuilder } from "@decohere/crucible";',
 			'import { FastifyProvider } from "@decohere/http-fastify";',
 			'import { scribe } from "@decohere/scribe";',
+			'import { pino } from "@decohere/scribe-pino";',
 			'import { SampleService } from "./services/sample.service.js";',
 		];
 
@@ -208,7 +208,9 @@ export class MainSourceFile implements KeyedModel {
 			"",
 			"/** Builds the app and starts nothing: main.ts starts it, and db.ts and tests use it as built. */",
 			"export function createApp() {",
-			`\tscribe.withPinoPretty().and.withPinoRoll({ file: "logs/${this.appName}.log" });`,
+			"\t// Pretty lines and rolling files on a developer's machine; JSON on stdout in production.",
+			'\tconst development = process.env.NODE_ENV !== "production";',
+			`\tscribe.use(pino(development ? { pretty: true, roll: { file: "logs/${this.appName}.log" } } : {}));`,
 			`\treturn Builder.create(new ServiceContainerBuilder(), { applicationName: "${this.appName}" })`,
 			...builderCalls,
 			`\t\t.build();`,

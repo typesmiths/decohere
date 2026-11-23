@@ -170,8 +170,21 @@ export class Container implements IContainer {
 			case Scopes.singleton:
 				return this.rootScope.getOrCreateInstance(registration, path);
 			case Scopes.request:
+				this.assertInAScope(registration);
 				return this.getOrCreateInstance(registration, path);
 		}
+	}
+
+	/**
+	 * The root lives as long as the process, so a request-scoped instance kept there would be shared
+	 * by every request, e.g. one unit of work for all of them. Its own lifetime scope is exempt: the
+	 * root asking for it gets itself.
+	 */
+	private assertInAScope(registration: ServiceRegistration) {
+		if (this !== this.rootScope || registration.key === LifetimeScopeToken) return;
+		throw new ResolveError(
+			`${describeKey(registration.key)} is request-scoped: resolve it from a scope (beginScope), or make it a singleton. Kept on the root, one instance would be shared by every request.`,
+		);
 	}
 
 	private assertNoCycle(registration: ServiceRegistration, path: ResolutionPath) {

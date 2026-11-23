@@ -1,0 +1,140 @@
+{
+  "ci-tools": {
+    "specsAway": 21
+  },
+  "cli": {
+    "looseFunctions": 1,
+    "namespaceObjects": 1,
+    "severalClasses": 1,
+    "noRole": 8,
+    "envReads": 1,
+    "specsAway": 24
+  },
+  "config": {
+    "looseFunctions": 6,
+    "noRole": 6,
+    "specsAway": 5
+  },
+  "core": {
+    "looseFunctions": 44,
+    "severalClasses": 1,
+    "bannedNames": 5,
+    "noRole": 44,
+    "envReads": 4,
+    "specsAway": 13
+  },
+  "create": {
+    "looseFunctions": 5,
+    "noRole": 5,
+    "envReads": 4,
+    "specsAway": 3
+  },
+  "crucible": {
+    "looseFunctions": 1,
+    "severalClasses": 1,
+    "noRole": 8,
+    "specsAway": 8
+  },
+  "data": {
+    "looseFunctions": 6,
+    "namespaceObjects": 5,
+    "severalClasses": 2,
+    "bannedNames": 2,
+    "noRole": 19,
+    "envReads": 6,
+    "specsAway": 7
+  },
+  "data-memory": {
+    "looseFunctions": 1,
+    "namespaceObjects": 1,
+    "severalClasses": 1,
+    "bannedNames": 1,
+    "noRole": 3,
+    "specsAway": 2
+  },
+  "data-mikro-orm": {
+    "looseFunctions": 2,
+    "noRole": 2,
+    "specsAway": 2
+  },
+  "data-postgres": {
+    "looseFunctions": 16,
+    "namespaceObjects": 2,
+    "severalClasses": 1,
+    "noRole": 4,
+    "envReads": 1,
+    "specsAway": 8
+  },
+  "data-typeorm": {
+    "looseFunctions": 3,
+    "severalClasses": 1,
+    "noRole": 6,
+    "specsAway": 4
+  },
+  "devcontainer": {},
+  "devkit": {
+    "looseFunctions": 14,
+    "namespaceObjects": 2,
+    "severalClasses": 2,
+    "bannedNames": 5,
+    "noRole": 24,
+    "envReads": 7,
+    "specsAway": 11
+  },
+  "flux": {
+    "looseFunctions": 10,
+    "namespaceObjects": 2,
+    "noRole": 8,
+    "specsAway": 8
+  },
+  "forge": {
+    "looseFunctions": 6,
+    "namespaceObjects": 6,
+    "severalClasses": 3,
+    "bannedNames": 1,
+    "noRole": 26,
+    "envReads": 5,
+    "specsAway": 45
+  },
+  "http": {
+    "looseFunctions": 34,
+    "namespaceObjects": 4,
+    "severalClasses": 3,
+    "bannedNames": 6,
+    "noRole": 35,
+    "envReads": 2,
+    "specsAway": 38
+  },
+  "http-fastify": {
+    "envReads": 1,
+    "specsAway": 2
+  },
+  "scaffold": {
+    "looseFunctions": 77,
+    "namespaceObjects": 4,
+    "severalClasses": 5,
+    "noRole": 23,
+    "envReads": 6,
+    "specsAway": 16
+  },
+  "scribe": {
+    "looseFunctions": 7,
+    "namespaceObjects": 2,
+    "noRole": 6,
+    "specsAway": 7
+  },
+  "scribe-console": {
+    "specsAway": 1
+  },
+  "scribe-pino": {},
+  "testing": {
+    "looseFunctions": 9,
+    "noRole": 5
+  },
+  "workspace": {
+    "looseFunctions": 1,
+    "namespaceObjects": 3,
+    "noRole": 10,
+    "specsAway": 7
+  }
+}
