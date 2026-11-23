@@ -39,3 +39,28 @@ describe("ci.yml and the merge queue", () => {
 		);
 	});
 });
+
+describe("the release build passed between jobs", () => {
+	const workflows = ["ci.yml", "publish.yml"].map((name) => ({
+		name,
+		yml: fs.readFileSync(
+			fileURLToPath(new URL(`../../../../.github/workflows/${name}`, import.meta.url)),
+			"utf8",
+		),
+	}));
+
+	// upload-artifact leaves hidden files out by default. The scaffolder's templates are mostly
+	// dot-files (.devcontainer, .github, .vscode), so without them every new app would lack them,
+	// and Publish ships what verify-release tested: the uploaded build.
+	it("keeps its hidden files, such as the scaffolder's .devcontainer templates", () => {
+		const uploads = workflows.flatMap(({ name, yml }) =>
+			[...yml.matchAll(/uses: actions\/upload-artifact@\S+\n {8}with:\n((?: {10}.*\n)+)/g)]
+				.map((match) => ({ name, step: match[1] }))
+				.filter(({ step }) => /path: dist\/release\//.test(step)),
+		);
+		expect(uploads.map(({ name }) => name).toSorted()).toEqual(["ci.yml", "publish.yml"]);
+		for (const { name, step } of uploads) {
+			expect(step, name).toMatch(/include-hidden-files: true/);
+		}
+	});
+});
