@@ -1,10 +1,10 @@
 import type { ConnectionInfo } from "@decohere/data";
-import type { Constructable } from "@decohere/core/reflection";
 import { DataSource, type DataSourceOptions, type Logger } from "typeorm";
+import type { Entity } from "./database-options.js";
 import { ProviderMap } from "./dialect-map.js";
 
 export type ConnectionOptions = ConnectionInfo & {
-	entities: Constructable[];
+	entities: Entity[];
 	applicationName?: string;
 };
 
