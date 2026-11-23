@@ -2,14 +2,15 @@
 
 TypeScript framework for Node.js backends: a fast SWC compiler (forge), a JIT runner with HMR (flux), dependency injection (crucible) and logging (scribe), on support libraries named for what they do: `core`, `http`, `config`, `data` and `workspace` ([ADR 0014](docs/contributing/adr/0014-package-names.md)), with `devkit` and `testing` for the tools and tests themselves ([ADR 0015](docs/contributing/adr/0015-core-devkit-testing.md)). Packages live in `projects/`.
 
-These are the instructions for every coding agent on this repo ([ADR 0009](docs/contributing/adr/0009-agent-instructions-in-agents-md.md)). `.claude/CLAUDE.md` only imports this file; keep agent-specific copies out.
+These are the instructions for every coding agent on this repo ([ADR 0009](docs/contributing/adr/0009-agent-instructions-in-agents-md.md)). `.claude/CLAUDE.md` only imports this file and the shared rules; keep agent-specific copies out.
 
-Before changing code, read in this order:
+Before changing code, run `pnpm install` and read in this order:
 
-1. [Style](docs/contributing/style/): how code is written, its do's and don'ts, and samples to copy. New code follows [ADR 0027](docs/contributing/adr/0027-code-design.md): one class per job, files named `<thing>.<role>.ts`, specs beside the code.
-2. [Architecture](docs/contributing/architecture/): the packages, what may import what, and §5 on how a package is shaped.
-3. [Testing](docs/contributing/testing/): which suite owns a behaviour, and where a spec goes.
-4. The `README.md` of each package you change: how to use it, then **Working on this package**, how it's laid out and tested. A change keeps to it or updates it in the same PR.
+1. The shared rules every Typesmiths project follows, from the installed `@decohere/standards`: `node_modules/@decohere/standards/rules/README.md` lists them, in the order to read them. What follows is particular to Decohere, and where it is silent the shared rules apply.
+2. [Style](docs/contributing/style/): how code is written, its do's and don'ts, and samples to copy. New code follows [ADR 0027](docs/contributing/adr/0027-code-design.md): one class per job, files named `<thing>.<role>.ts`, specs beside the code.
+3. [Architecture](docs/contributing/architecture/): the packages, what may import what, and §5 on how a package is shaped.
+4. [Testing](docs/contributing/testing/): which suite owns a behaviour, and where a spec goes.
+5. The `README.md` of each package you change: how to use it, then **Working on this package**, how it's laid out and tested. A change keeps to it or updates it in the same PR.
 
 [docs/](docs/README.md) has two folders, one per reader: [contributing/](docs/contributing/) is for you, with the [repo map](docs/contributing/README.md#repo-map) of where every file goes; [guide/](docs/guide/) is for developers using Decohere. A doc you write goes where its reader looks ([which folder](docs/README.md#where-a-new-page-goes)): what an app does with a package belongs in the guide or above **Working on this package**, never in contributor pages. The plan is the GitHub milestones. Much of the code doesn't follow ADR 0027 yet: copy the samples in [style](docs/contributing/style/), not the nearest file.
 

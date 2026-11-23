@@ -1,0 +1,9 @@
+# Proposes each new version of the shared rules as a pull request, so CI checks the code against them.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: daily
+    allow:
+      - dependency-name: "@decohere/standards"
