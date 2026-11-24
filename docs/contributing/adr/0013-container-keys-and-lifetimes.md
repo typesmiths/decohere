@@ -21,6 +21,7 @@ Crucible's container keyed every registration by a string: a class's `name`, a s
 - **Captive dependencies throw.** Resolving a request-scoped service while a singleton is being constructed (anywhere up the path) throws, naming both and the chain. `LifetimeScopeToken` is exempt: a singleton asking for its scope gets the root container and resolves request-scoped services from a scope it begins.
 - **The root holds no request-scoped instances.** Resolving a request-scoped service from the root throws, whoever asks: a test calling `resolve` on the container, or a singleton calling `resolve` on the root it was given. The root may still resolve its own `LifetimeScopeToken`.
 - **A scope looks up through its parent.** It holds only its own `LifetimeScopeToken`, so beginning one copies nothing.
+- **A factory is given the scope resolving it** (`registerRequestScoped(key, (scope) => …)`), the same scope `LifetimeScopeToken` gives a class, so a provider's per-request object can take the app's per-request services: a unit of work takes the app's transaction settings. The factory still declares no dependencies, and what it resolves is checked when it resolves it.
 - Checks run when a service is first resolved, not when the container is built.
 
 Rejected:
@@ -42,3 +43,4 @@ Rejected:
 
 - 2026-10-21: Decided.
 - 2026-11-23: A request-scoped service resolved from the root throws too. It was cached on the root and shared by every request, silently.
+- 2026-11-23: A factory is given the scope resolving it. Before, it was called with nothing, so a provider's factory couldn't reach the request's services without the app's container. Not chosen: a class per provider registered in place of the factory, to inject `LifetimeScopeToken`, which every provider would repeat for one argument.

@@ -18,7 +18,9 @@ import {
 	type OutboxMapper,
 	type SchemaDiff,
 	type StartingDataSource,
+	type TransactionSettingsSource,
 } from "@decohere/data";
+import type { ResolveRequest } from "@decohere/core/composition";
 import { scribe } from "@decohere/scribe";
 import { type Options, MikroORM } from "@mikro-orm/postgresql";
 import { mikroOrmToken } from "./inject-mikro-orm.js";
@@ -41,6 +43,12 @@ export type MikroOrmModuleConfig = {
 	migrations?: readonly Migration[];
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
 	outbox?: OutboxMapper;
+	/**
+	 * The app's service that gives the settings each transaction begins with, for a row-level
+	 * security policy, such as the request's tenant. While it names any, every read runs in a
+	 * transaction.
+	 */
+	settings?: ResolveRequest<TransactionSettingsSource>;
 	/** Runs when the app starts, after migrations, when the data source's `seed` is on. */
 	seed?: (orm: MikroORM) => Promise<void>;
 };
@@ -87,14 +95,17 @@ export class MikroOrmModule {
 			const orm = await this.create(applicationName, name, connectionInfo, module);
 			let connected = false;
 			containerBuilder.registerSingleton(mikroOrmToken(name), orm);
-			containerBuilder.registerRequestScoped(name, () => {
+			containerBuilder.registerRequestScoped(name, (scope) => {
 				if (!connected) {
 					throw new DependencyUnavailableError(
 						`data source "${String(name)}"`,
 						"not connected yet",
 					);
 				}
-				return new MikroOrmUnitOfWork(orm.em, { outbox: module.outbox });
+				return new MikroOrmUnitOfWork(orm.em, {
+					outbox: module.outbox,
+					settings: module.settings == null ? undefined : scope.resolve(module.settings),
+				});
 			});
 			containerBuilder.registerSingleton(ReadinessCheckToken, readinessCheck(name, orm));
 			for (const repository of module.repositories ?? []) {

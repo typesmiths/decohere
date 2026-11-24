@@ -83,6 +83,43 @@ A statement `Query<T>` can't express runs in a provider-side repository, on the 
 
 `IUnitOfWork` itself has no such method: SQL is written for one provider's API and dialect, and the memory provider has none. A repository that needs it is written per provider, injecting that provider's unit of work type.
 
+## Row-level security
+
+Postgres row-level security can back up an app's own checks: a policy on each tenant's table, so a query that forgets the tenant finds nothing rather than another tenant's rows. The policy reads a setting the unit of work makes at the start of each transaction:
+
+```sql
+alter table app.documents enable row level security;
+create policy tenant_only on app.documents
+	using (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)
+	with check (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
+```
+
+The settings come from a service of the app's, a `TransactionSettingsSource`, given to the provider as `settings`:
+
+```ts
+@injectable()
+export class TenantSettings implements TransactionSettingsSource {
+	public constructor(@inject(IPrincipalProviderToken) private readonly principal: IPrincipalProvider) {}
+
+	public transactionSettings() {
+		const tenant = this.principal.currentPrincipal?.tenantId;
+		return tenant == null ? {} : { "app.tenant_id": String(tenant) };
+	}
+}
+
+builder
+	.withServices((s) => s.registerRequestScoped(TenantSettings))
+	.use(mikroOrm({ entities, settings: TenantSettings })); // typeOrm() takes it too
+```
+
+- **Asked as each transaction begins**, not when the unit of work is made, so it can answer from what the request learned later, such as the signed-in principal.
+- **Every read and write runs in a transaction that begins with them** (`set_config(name, value, true)`). A read outside an open transaction runs in one of its own, so each such read costs a `begin` and a `commit` more. While the source names no settings, nothing is set and reads run as they do without one.
+- **The settings last only as long as the transaction**, so a pooled connection never carries one request's tenant into another's.
+- **Names are the app's own**, `prefix.name` like `app.tenant_id`. A built-in setting such as `search_path` or `role` throws `InvalidTransactionSettingError`.
+- **The table's owner skips its policies.** Migrations run as the data source's migrate role (`migrateUsername`) when it has one, which leaves the app role a non-owner the policies apply to. Without a migrate role the app owns its tables: add `alter table … force row level security`.
+- **Work outside a request**, such as a hosted service, begins a scope per piece of work and tells its settings source the tenant before it reads.
+- **The memory provider has no policies**, so it ignores the settings.
+
 ## Aggregates and children
 
 An aggregate's children are a `Children<T>` (`add`, `remove`, iteration, `length`). A new aggregate starts with a `ChildList`; a loaded one holds whatever its provider loads (MikroORM's `Collection`, or a `ChildList`). A collection that wasn't included throws when used, rather than looking empty. Moving a child to another parent's collection updates its reference; dropping it from every collection deletes it.
@@ -178,9 +215,9 @@ The canonical suite is the unit-of-work contract, the cases in `tests/contract/c
 
 ### Writing a provider
 
-A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction, and five row operations (`select`, `insert`, `insertIfAbsent`, `update`, `delete`) on plain rows. A field in the model's `lazy` is selected only when the row query names it in `load`; a row leaves out the ones it didn't select.
+A provider plugin pairs its modules with the config's data sources through `dataSources.resolve`, runs `dataSources.check` with the bootstrap from the `database` its caller passed, registers its data sources unconnected, and registers a start step that runs `dataSources.open` and then `dataSources.start` for each. Until that step has connected a data source, resolving its unit of work throws `DependencyUnavailableError`. For each data source given a `database`, it registers a `MigrationTarget` under `MigrationTargetToken`: the migration source, the migrator, `open()` (the same `dataSources.open`, for the db commands, which never start the app), and its ORM's schema diff, taken as the migrate role. Its unit of work either wraps an ORM's own unit of work (as `data-mikro-orm` does) or uses `TrackingUnitOfWork`, which does the tracking itself over a `RowStore`: the mapping as an `EntityModel`, the transaction (`begin(settings)` makes the [transaction settings](#row-level-security) for as long as it lasts), and five row operations (`select`, `insert`, `insertIfAbsent`, `update`, `delete`) on plain rows. A plugin that takes `settings` resolves the source from the scope its unit-of-work factory is given, and passes it to the unit of work. A field in the model's `lazy` is selected only when the row query names it in `load`; a row leaves out the ones it didn't select.
 
-MikroORM's unit of work is the reference. The cases are in `tests/contract/cases.ts`. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both SQL providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome. `tests/unit-of-work.contract.spec.ts` runs the same cases on the memory provider, in `pnpm test`, checking outcomes only, since it sends no SQL. The cases in `sqlCases` run SQL of their own, through the provider's `transaction()`, so it runs on the SQL providers only.
+MikroORM's unit of work is the reference. The cases are in `tests/contract/cases.ts`. `tests/unit-of-work.contract.docker.spec.ts` runs every case on both SQL providers against Postgres. It snapshots the writes MikroORM sends and checks the tracker sends the same writes. The comparison covers statements, order, tables, rows, the columns each update sets, and locking reads. Plain reads aren't compared, because the providers may batch them differently. It also checks each case's outcome. `tests/unit-of-work.contract.spec.ts` runs the same cases on the memory provider, in `pnpm test`, checking outcomes only, since it sends no SQL. The cases in `sqlCases` run SQL of their own, through the provider's `transaction()`, so it runs on the SQL providers only. The same docker spec checks transaction settings on both SQL providers, each opened through its plugin, as a role that doesn't own the table, against a row-level security policy: reads, writes, reads after a commit, and units of work sharing the pool's connections.
 
 ### Upgrading MikroORM
 

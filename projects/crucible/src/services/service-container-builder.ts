@@ -1,7 +1,12 @@
 import type { Constructable, FunctionType } from "@decohere/core/reflection";
 import { Scopes } from "../const.js";
 import type { ServiceRegistration } from "../models/service-registration.model.js";
-import type { ContainerBuilder, ContainerRegistrar, Scope } from "../types/types.js";
+import type {
+	ContainerBuilder,
+	ContainerRegistrar,
+	LifetimeScope,
+	Scope,
+} from "../types/types.js";
 import { Container } from "./container.js";
 import type { RegisterTypeOptions } from "./service-registry.js";
 import { ServiceRegistry } from "./service-registry.js";
@@ -60,8 +65,11 @@ export class ServiceContainerBuilder implements ContainerBuilder {
 		return this.register(false)(Scopes.singleton)(typeOrKey, typeOrInstance);
 	}
 
-	public registerRequestScoped<T>(type: () => T): ServiceRegistration;
-	public registerRequestScoped<T>(key: string | symbol, type: () => T): ServiceRegistration;
+	public registerRequestScoped<T>(type: (scope: LifetimeScope) => T): ServiceRegistration;
+	public registerRequestScoped<T>(
+		key: string | symbol,
+		type: (scope: LifetimeScope) => T,
+	): ServiceRegistration;
 	public registerRequestScoped(key: string | symbol, type: Constructable): ServiceRegistration;
 	public registerRequestScoped(type: Constructable): ServiceRegistration;
 	public registerRequestScoped(

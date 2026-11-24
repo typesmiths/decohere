@@ -44,6 +44,7 @@ Things to know:
 - **Version fields** need a database default (`version int not null default 1`). MikroORM leaves the column to it on insert.
 - **`addIfAbsent(entity)`** ([data](../data/README.md#add-unless-its-already-kept)) is the one write before `commit()`. MikroORM has no insert-if-absent for an entity, so it builds one with the query builder (`insert(…).onConflict().ignore().returning(…)`), in the unit of work's transaction, and on `true` sets the generated key and version and merges the entity (`em.merge`), so MikroORM tracks it as loaded, and persists its children, which the commit writes. An entity already in its identity map or persist stack is refused.
 - **SQL a query can't express** goes through `transaction()`, below.
+- **`settings`**, for row-level security ([data](../data/README.md#row-level-security)), uses MikroORM's own session context: before each read, write or `beginTransaction()` outside a transaction, the unit of work gives the source's settings to `em.setSessionContext()`, and MikroORM makes them at the start of each transaction it begins, running a read outside one in a transaction of its own.
 
 ## A repository's own SQL
 

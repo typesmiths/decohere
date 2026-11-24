@@ -1,5 +1,11 @@
+import type { ResolveRequest } from "@decohere/core/composition";
 import type { Constructable } from "@decohere/core/reflection";
-import type { DatabaseSupport, Migration, OutboxMapper } from "@decohere/data";
+import type {
+	DatabaseSupport,
+	Migration,
+	OutboxMapper,
+	TransactionSettingsSource,
+} from "@decohere/data";
 import type { DataSource, DataSourceOptions, EntitySchema } from "typeorm";
 
 /**
@@ -22,6 +28,11 @@ export type ModuleConfig = {
 	migrations?: readonly Migration[];
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
 	outbox?: OutboxMapper;
+	/**
+	 * The app's service that gives the settings each transaction begins with, for a row-level
+	 * security policy, such as the request's tenant. With one, every read runs in a transaction.
+	 */
+	settings?: ResolveRequest<TransactionSettingsSource>;
 	/**
 	 * TypeORM options given in code, for what config can't hold because it isn't plain data, such as
 	 * a `driver` (one pg pool shared by every data source). Spread over the options config gives, so

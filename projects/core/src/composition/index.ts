@@ -82,8 +82,9 @@ export interface ContainerRegistrar {
 	registerTransient(key: string | symbol, type: Constructable): unknown;
 	registerTransient(type: Constructable): unknown;
 
-	registerRequestScoped<T>(type: () => T): unknown;
-	registerRequestScoped<T>(key: string | symbol, type: () => T): unknown;
+	/** A factory is called with the scope resolving it, to resolve that scope's services. */
+	registerRequestScoped<T>(type: (scope: LifetimeScope) => T): unknown;
+	registerRequestScoped<T>(key: string | symbol, type: (scope: LifetimeScope) => T): unknown;
 	registerRequestScoped(key: string | symbol, type: Constructable): unknown;
 	registerRequestScoped(type: Constructable): unknown;
 

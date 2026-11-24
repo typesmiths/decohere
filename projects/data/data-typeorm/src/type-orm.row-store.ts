@@ -9,6 +9,7 @@ import {
 	type Row,
 	type RowQuery,
 	type RowStore,
+	TransactionSettings,
 } from "@decohere/data";
 import type { DataSource, EntityMetadata, QueryRunner, WhereExpressionBuilder } from "typeorm";
 
@@ -62,8 +63,15 @@ export class TypeOrmRowStore implements RowStore {
 		return this.map(type).model;
 	}
 
-	public begin() {
-		return this.runner.startTransaction();
+	public async begin(settings = TransactionSettings.none) {
+		await this.runner.startTransaction();
+		if (settings.isEmpty) {
+			return;
+		}
+		// One statement for them all; `true` makes each last only as long as this transaction.
+		const entries = settings.entries();
+		const calls = entries.map((_, i) => `set_config($${2 * i + 1}, $${2 * i + 2}, true)`);
+		await this.runner.query(`select ${calls.join(", ")}`, entries.flat());
 	}
 
 	public commit() {
