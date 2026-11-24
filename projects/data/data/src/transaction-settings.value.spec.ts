@@ -4,10 +4,10 @@ import { TransactionSettings } from "./transaction-settings.value.js";
 
 describe("TransactionSettings", () => {
 	it("keeps the app's own settings, named prefix.name, in the order given", () => {
-		const settings = TransactionSettings.of({ "app.club_id": "c1", "app.account_id": "a1" });
+		const settings = TransactionSettings.of({ "app.tenant_id": "t1", "app.user_id": "u1" });
 		expect(settings.entries()).toEqual([
-			["app.club_id", "c1"],
-			["app.account_id", "a1"],
+			["app.tenant_id", "t1"],
+			["app.user_id", "u1"],
 		]);
 		expect(settings.isEmpty).toBe(false);
 	});
@@ -22,9 +22,9 @@ describe("TransactionSettings", () => {
 		"role",
 		"app",
 		"app.",
-		".club_id",
-		"app.club-id",
-		"app.club_id; drop",
+		".tenant_id",
+		"app.tenant-id",
+		"app.tenant_id; drop",
 	])("refuses %j, which isn't a setting of the app's own", (name) => {
 		expect(() => TransactionSettings.of({ [name]: "x" })).toThrow(
 			InvalidTransactionSettingError,

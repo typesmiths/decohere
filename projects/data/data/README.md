@@ -88,34 +88,34 @@ A statement `Query<T>` can't express runs in a provider-side repository, on the 
 Postgres row-level security can back up an app's own checks: a policy on each tenant's table, so a query that forgets the tenant finds nothing rather than another tenant's rows. The policy reads a setting the unit of work makes at the start of each transaction:
 
 ```sql
-alter table clubs.members enable row level security;
-create policy club_only on clubs.members
-	using (club_id = nullif(current_setting('app.club_id', true), '')::uuid)
-	with check (club_id = nullif(current_setting('app.club_id', true), '')::uuid);
+alter table app.documents enable row level security;
+create policy tenant_only on app.documents
+	using (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid)
+	with check (tenant_id = nullif(current_setting('app.tenant_id', true), '')::uuid);
 ```
 
 The settings come from a service of the app's, a `TransactionSettingsSource`, given to the provider as `settings`:
 
 ```ts
 @injectable()
-export class ClubSettings implements TransactionSettingsSource {
+export class TenantSettings implements TransactionSettingsSource {
 	public constructor(@inject(IPrincipalProviderToken) private readonly principal: IPrincipalProvider) {}
 
 	public transactionSettings() {
-		const club = this.principal.currentPrincipal?.clubId;
-		return club == null ? {} : { "app.club_id": String(club) };
+		const tenant = this.principal.currentPrincipal?.tenantId;
+		return tenant == null ? {} : { "app.tenant_id": String(tenant) };
 	}
 }
 
 builder
-	.withServices((s) => s.registerRequestScoped(ClubSettings))
-	.use(mikroOrm({ entities, settings: ClubSettings })); // typeOrm() takes it too
+	.withServices((s) => s.registerRequestScoped(TenantSettings))
+	.use(mikroOrm({ entities, settings: TenantSettings })); // typeOrm() takes it too
 ```
 
 - **Asked as each transaction begins**, not when the unit of work is made, so it can answer from what the request learned later, such as the signed-in principal.
 - **Every read and write runs in a transaction that begins with them** (`set_config(name, value, true)`). A read outside an open transaction runs in one of its own, so each such read costs a `begin` and a `commit` more. While the source names no settings, nothing is set and reads run as they do without one.
 - **The settings last only as long as the transaction**, so a pooled connection never carries one request's tenant into another's.
-- **Names are the app's own**, `prefix.name` like `app.club_id`. A built-in setting such as `search_path` or `role` throws `InvalidTransactionSettingError`.
+- **Names are the app's own**, `prefix.name` like `app.tenant_id`. A built-in setting such as `search_path` or `role` throws `InvalidTransactionSettingError`.
 - **The table's owner skips its policies.** Migrations run as the data source's migrate role (`migrateUsername`) when it has one, which leaves the app role a non-owner the policies apply to. Without a migrate role the app owns its tables: add `alter table … force row level security`.
 - **Work outside a request**, such as a hosted service, begins a scope per piece of work and tells its settings source the tenant before it reads.
 - **The memory provider has no policies**, so it ignores the settings.
