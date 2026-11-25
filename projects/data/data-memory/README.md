@@ -23,11 +23,30 @@ builder.use(
 );
 ```
 
-Swapping it for `typeOrm(…)` or `mikroOrm(…)` changes this line and the mappings, not the repositories. It needs no `database` config, connects to nothing and has nothing to migrate, so the `db` commands find no data source on it. Each build of the app starts with empty stores, so two apps, or two tests, never share rows. With `seed`, the app's start step adds the rows, in a unit of work committed when it returns.
+Swapping it for `typeOrm(…)` or `mikroOrm(…)` changes this line, not the repositories. If the classes are already mapped for one of them, memory takes that mapping ([below](#taking-an-orms-mapping)), so the swap changes nothing else. It needs no `database` config, connects to nothing and has nothing to migrate, so the `db` commands find no data source on it. Each build of the app starts with empty stores, so two apps, or two tests, never share rows. With `seed`, the app's start step adds the rows, in a unit of work committed when it returns.
+
+## Taking an ORM's mapping
+
+An app that also runs on a database maps its classes once, for its ORM, and gives memory that mapping:
+
+```ts
+import { TypeOrmMapping } from "@decohere/data-typeorm";
+
+builder.use(
+	memory({
+		entities: new TypeOrmMapping([Order, Line]),
+		repositories: [OrderRepository],
+	}),
+);
+```
+
+`TypeOrmMapping` takes what `typeOrm()` takes as `entities`: classes with TypeORM's decorators, or `EntitySchema`s. `new MikroOrmMapping([OrderSchema, LineSchema])`, from `@decohere/data-mikro-orm`, takes what `mikroOrm()` takes. Each reads its ORM's mapping when the app is built, without connecting, so the keys, references, children, version and generated key are the ones the ORM has, and a change to the mapping needs no second edit. It is checked as `mapEntity`'s is, below.
+
+What memory keeps from a mapping is what it keeps from a database: a reference that deletes with the row it references is one mapped with `onDelete: "CASCADE"` (TypeORM) or `.deleteRule("cascade")` (MikroORM). A database's `on delete cascade` that the mapping doesn't say isn't seen here. Many-to-many relations and embedded columns aren't supported.
 
 ## Mapping
 
-There's no ORM to read a mapping from, so each class is mapped with `mapEntity(type, options)`:
+For classes no ORM maps, each one is mapped with `mapEntity(type, options)`:
 
 | Option | Means |
 | --- | --- |
@@ -57,6 +76,6 @@ What differs: strings compare and sort by code unit, not by the database's colla
 
 For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
-`data-memory` implements data's `RowStore` in the process, under data's `TrackingUnitOfWork`. `src/` is flat: `memory.plugin.ts` (`memory(...)`), `memory-entity.ts` (`mapEntity`, the mapping), `memory.row-store.ts` (`MemoryRowStore`) and `memory.store.ts` (`MemoryStore` and its transactions: keys, locks and copies).
+`data-memory` implements data's `RowStore` in the process, under data's `TrackingUnitOfWork`. `src/` is flat: `memory.plugin.ts` (`memory(...)`), `memory-entity.ts` (`mapEntity`, the mapping), `memory.row-store.ts` (`MemoryRowStore`) and `memory.store.ts` (`MemoryStore` and its transactions: keys, locks and copies). A mapping is data's `EntityModel`; `entities` takes those, or data's `EntityMapping`, which the ORM providers implement. The plugin makes each store in a post-build step, since an `EntityMapping` is read asynchronously.
 
-Its canonical suite is data's unit-of-work contract: the cases run on it in `projects/data/data/tests/unit-of-work.contract.spec.ts`, in `pnpm test` ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/memory.store.spec.ts` covers the store's keys, locks and copies, and `tests/memory.plugin.spec.ts` the plugin. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).
+Its canonical suite is data's unit-of-work contract: the cases run on it in `projects/data/data/tests/unit-of-work.contract.spec.ts`, in `pnpm test`, once on its own mapping and once on each ORM's mapping of the same model ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/memory.store.spec.ts` covers the store's keys, locks and copies, and `tests/memory.plugin.spec.ts` the plugin. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).

@@ -38,6 +38,8 @@ The container closes the instance when the app stops, after hosted services. Pos
 
 Map domain classes with `defineEntity({ class, … })` in infrastructure files, so the domain imports nothing from MikroORM. Map each child collection as a one-to-many with `orphanRemoval()`, so a child dropped from its aggregate is deleted. Map a field loaded only when asked for with `.lazy()`: `load` populates it, as `include` does a collection ([data](../data/README.md#fields-loaded-only-on-request)).
 
+`new MikroOrmMapping(entities)` reads MikroORM's mapping of `entities` (what `mikroOrm()` takes) without connecting, so the memory provider runs on it with nothing mapped twice: `memory({ entities: new MikroOrmMapping([OrderSchema, LineSchema]) })` ([data-memory](../data-memory/README.md#taking-an-orms-mapping)). It runs MikroORM's discovery on its own, which leaves the classes unchanged. Map on the relation what the database does on delete (`.deleteRule("cascade")`): memory knows only what the mapping says.
+
 Things to know:
 
 - **MikroORM changes the classes it maps** at run time: field accessors, `toJSON` and a `__helper`. A loaded child also carries its parent. Map HTTP responses to DTOs rather than serialising entities. Don't map one class with two providers in one process.
@@ -70,6 +72,6 @@ The entity manager runs with `flushMode: "commit"`, so a statement doesn't flush
 
 For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
-`data-mikro-orm` implements data's `IUnitOfWork` on MikroORM. `src/` is flat: `mikro-orm.module.ts` (the `mikroOrm(...)` plugin and `MikroOrmModule`, which opens the data sources), `mikro-orm.unit-of-work.ts` (`MikroOrmUnitOfWork`) and `inject-mikro-orm.ts` (`@injectMikroOrm()`).
+`data-mikro-orm` implements data's `IUnitOfWork` on MikroORM. `src/` is flat: `mikro-orm.module.ts` (the `mikroOrm(...)` plugin and `MikroOrmModule`, which opens the data sources), `mikro-orm.unit-of-work.ts` (`MikroOrmUnitOfWork`), `mikro-orm-mapping.provider.ts` (`MikroOrmMapping`, data's `EntityMapping`) and `inject-mikro-orm.ts` (`@injectMikroOrm()`).
 
-Its canonical suite is data's unit-of-work contract, `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, where MikroORM's writes are the snapshotted reference ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/mikro-orm.module.spec.ts` covers the plugin's wiring and `tests/mikro-orm.plugin.docker.spec.ts` runs it against Postgres. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).
+Its canonical suite is data's unit-of-work contract, `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, where MikroORM's writes are the snapshotted reference ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/mikro-orm.module.spec.ts` covers the plugin's wiring and `tests/mikro-orm.plugin.docker.spec.ts` runs it against Postgres. `src/mikro-orm-mapping.provider.spec.ts` covers the models `MikroOrmMapping` reads. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).

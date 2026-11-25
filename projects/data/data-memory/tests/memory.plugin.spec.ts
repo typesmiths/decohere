@@ -7,6 +7,8 @@ import { injectable } from "@decohere/crucible/decorators";
 import {
 	DataConfigurationError,
 	DEFAULT_DATA_SOURCE,
+	type EntityMapping,
+	type EntityModel,
 	type IUnitOfWork,
 	injectUnitOfWork,
 	Repository,
@@ -19,6 +21,15 @@ import { Book, book, entities, Shelf, shelf } from "./model.js";
 class ShelfRepository extends Repository<Shelf> {
 	public constructor(@injectUnitOfWork() unitOfWork: IUnitOfWork) {
 		super(unitOfWork, Shelf);
+	}
+}
+
+/** Another provider's mapping, as memory() sees it: models read when the app is built. */
+class ReadMapping implements EntityMapping {
+	public constructor(private readonly read: EntityModel[]) {}
+
+	public async models(): Promise<EntityModel[]> {
+		return this.read;
 	}
 }
 
@@ -90,6 +101,26 @@ describe("memory()", () => {
 				],
 			}),
 		).rejects.toThrow("Shelf.books: Book.shelf must be a reference to Shelf");
+	});
+
+	it("takes another provider's mapping in place of mapEntity", async () => {
+		await using app = await start({ entities: new ReadMapping(entities) });
+		{
+			await using scope = app.services.beginScope("a request");
+			const s = shelf("s1", "fiction");
+			s.books.add(book("b1", "Dune", s));
+			scope.resolve(ShelfRepository).add(s);
+			await scope.resolve<IUnitOfWork>(DEFAULT_DATA_SOURCE).commit();
+		}
+		await using scope = app.services.beginScope("a later request");
+		const found = await scope.resolve(ShelfRepository).findById("s1", ["books"]);
+		expect([...found.books].map((b) => b.title)).toEqual(["Dune"]);
+	});
+
+	it("fails the build when another provider's mapping doesn't fit", async () => {
+		await expect(build({ entities: new ReadMapping([entities[0]]) })).rejects.toThrow(
+			"Shelf.books points at Book, which isn't mapped: add it to entities",
+		);
 	});
 
 	it("needs a name for each data source when there are several", () => {

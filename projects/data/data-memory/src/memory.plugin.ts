@@ -1,8 +1,9 @@
-import type { BuilderPlugin } from "@decohere/core/hosting";
+import { type BuilderPlugin, DependencyUnavailableError } from "@decohere/core/hosting";
 import type { Constructable } from "@decohere/core/reflection";
 import {
 	DataConfigurationError,
 	DEFAULT_DATA_SOURCE,
+	type EntityMapping,
 	type IUnitOfWork,
 	type OutboxMapper,
 	TrackingUnitOfWork,
@@ -14,8 +15,11 @@ import { MemoryStore } from "./memory.store.js";
 export type MemoryModuleConfig = {
 	/** The data source's name, as `@injectUnitOfWork(name)` asks for it. Required when there are several. */
 	name?: string;
-	/** Each mapped class: `mapEntity(Order, { … })`. */
-	entities: MemoryEntity[];
+	/**
+	 * Each mapped class, `mapEntity(Order, { … })`, or another provider's mapping of them, read when
+	 * the app is built: `new TypeOrmMapping([Order, Line])` or `new MikroOrmMapping([…])`.
+	 */
+	entities: MemoryEntity[] | EntityMapping;
 	repositories?: Constructable[];
 	/** Writes the events aggregates raise to an outbox entity, in the same commit. */
 	outbox?: OutboxMapper;
@@ -34,17 +38,37 @@ export function memory(config: MemoryModuleConfig[] | MemoryModuleConfig): Build
 	}
 	return (builder) => {
 		const stores = new Map<MemoryModuleConfig, MemoryStore>();
+		const storeOf = (module: MemoryModuleConfig) => {
+			const store = stores.get(module);
+			if (store == null) {
+				throw new DependencyUnavailableError(
+					`data source "${String(module.name ?? DEFAULT_DATA_SOURCE)}"`,
+					"the app isn't built yet",
+				);
+			}
+			return store;
+		};
 		builder.withServices((containerBuilder) => {
 			for (const module of modules) {
-				const store = new MemoryStore(module.entities);
-				stores.set(module, store);
 				containerBuilder.registerRequestScoped(
 					module.name ?? DEFAULT_DATA_SOURCE,
-					() => new TrackingUnitOfWork(new MemoryRowStore(store), { outbox: module.outbox }),
+					() =>
+						new TrackingUnitOfWork(new MemoryRowStore(storeOf(module)), {
+							outbox: module.outbox,
+						}),
 				);
 				for (const repository of module.repositories ?? []) {
 					containerBuilder.registerRequestScoped(repository);
 				}
+			}
+		});
+		// Another provider's mapping is read asynchronously, so each store is made in a step after the
+		// container is built: still part of the build, so a mapping that doesn't fit fails it.
+		builder.registerPostBuildStep(async () => {
+			for (const module of modules) {
+				const { entities } = module;
+				const models = Array.isArray(entities) ? entities : await entities.models();
+				stores.set(module, new MemoryStore(models));
 			}
 		});
 		if (modules.every((m) => m.seed == null)) {
@@ -52,11 +76,10 @@ export function memory(config: MemoryModuleConfig[] | MemoryModuleConfig): Build
 		}
 		builder.registerStartStep(async () => {
 			for (const module of modules) {
-				const store = stores.get(module);
-				if (module.seed == null || store == null) {
+				if (module.seed == null) {
 					continue;
 				}
-				await using unitOfWork = new TrackingUnitOfWork(new MemoryRowStore(store), {
+				await using unitOfWork = new TrackingUnitOfWork(new MemoryRowStore(storeOf(module)), {
 					outbox: module.outbox,
 				});
 				await module.seed(unitOfWork);

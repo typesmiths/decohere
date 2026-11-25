@@ -37,6 +37,7 @@ Mapping rules for the tracker:
 
 - **Child collections** are mapped as one-to-many with `persistence: false`. The unit of work writes them, and TypeORM would otherwise refuse a class that starts them as a `ChildList`.
 - **References** are many-to-one (or owning one-to-one) with a single join column.
+- A **key that includes a reference** also declares it as a primary column, under the relation's property and its join column's name (`columns: { order: { type: "uuid", primary: true, name: "order_id" } }`, beside `relations: { order: … }`): TypeORM ignores `primary` on a relation.
 - **Embedded columns** aren't supported.
 - A **version column** (`version: true`) is checked and incremented on every update.
 - A column with **`select: false`** is loaded only when a query asks for it with `load` ([data](../data/README.md#fields-loaded-only-on-request)).
@@ -64,10 +65,14 @@ export class ReceiptRepository extends Repository<Receipt> {
 
 The query runner also builds queries: `queryRunner.manager.createQueryBuilder()`.
 
+## The same mapping on memory
+
+`new TypeOrmMapping(entities)` reads TypeORM's mapping of `entities` (what `typeOrm()` takes) without connecting, so the memory provider runs on it with nothing mapped twice: `memory({ entities: new TypeOrmMapping([ORDER, LINE]) })` ([data-memory](../data-memory/README.md#taking-an-orms-mapping)). Map on the relation what the database does on delete (`onDelete: "CASCADE"`): memory knows only what the mapping says.
+
 ## Working on this package
 
 For contributors to Decohere: how the package is laid out and tested. Using it needs nothing below.
 
-`data-typeorm` implements data's `RowStore` on TypeORM, under data's `TrackingUnitOfWork`. `src/` is flat: `typeorm.plugin.ts` (`typeOrm(...)`), `type-orm.module.ts` (`TypeOrmModule`, which opens the data sources), `data-source.factory.ts` and `database-options.ts`, `type-orm.row-store.ts` (`TypeOrmRowStore`), `inject-data-source.ts` (`@injectDataSource()`), and TypeORM's logging through Scribe (`typeorm-scribe.logger.ts`, `sql-pretty.transport.ts`).
+`data-typeorm` implements data's `RowStore` on TypeORM, under data's `TrackingUnitOfWork`. `src/` is flat: `typeorm.plugin.ts` (`typeOrm(...)`), `type-orm.module.ts` (`TypeOrmModule`, which opens the data sources), `data-source.factory.ts` and `database-options.ts`, `type-orm.row-store.ts` (`TypeOrmRowStore`), `type-orm-entity.model.ts` (`TypeOrmEntityModel`: one class's TypeORM metadata read as data's `EntityModel`, which the row store and `TypeOrmMapping` share), `type-orm-mapping.provider.ts` (`TypeOrmMapping`, data's `EntityMapping`) over `type-orm-metadata.factory.ts` (TypeORM's metadata built without connecting), `inject-data-source.ts` (`@injectDataSource()`), and TypeORM's logging through Scribe (`typeorm-scribe.logger.ts`, `sql-pretty.transport.ts`).
 
-Its canonical suite is data's unit-of-work contract, `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, which checks it sends the same writes as MikroORM ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/type-orm.module.spec.ts` and `tests/typeorm.lifecycle.spec.ts` cover the wiring and lifecycle, and `tests/tracked-entity.docker.spec.ts` runs against Postgres. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).
+Its canonical suite is data's unit-of-work contract, `projects/data/data/tests/unit-of-work.contract.docker.spec.ts`, which checks it sends the same writes as MikroORM ([testing](../../../docs/contributing/testing/README.md#canonical-suite-ownership)). Here, `tests/type-orm.module.spec.ts` and `tests/typeorm.lifecycle.spec.ts` cover the wiring and lifecycle, and `tests/tracked-entity.docker.spec.ts` runs against Postgres. `src/type-orm-mapping.provider.spec.ts` covers the models `TypeOrmMapping` reads, and `src/memory.contract.spec.ts` what the memory provider expects of it: an app of decorated classes on `memory()`. Specs are in `tests/` today and move beside the code ([ADR 0027](../../../docs/contributing/adr/0027-code-design.md)).

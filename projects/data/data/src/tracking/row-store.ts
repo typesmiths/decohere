@@ -8,6 +8,8 @@ export type ReferenceModel = {
 	target: EntityClass;
 	/** Whether the column may be null, so the reference can be written after the insert to break a cycle. */
 	nullable: boolean;
+	/** `"cascade"`: deleting the referenced row deletes this one, like `ON DELETE CASCADE`. */
+	onDelete?: "cascade";
 };
 
 export type ChildrenModel = {
@@ -31,6 +33,8 @@ export type EntityModel = {
 	children: ChildrenModel[];
 	/** The field checked and incremented on every update. */
 	version?: string;
+	/** The key field the database numbers 1, 2, 3… when an insert leaves it empty, like a serial column. */
+	generated?: string;
 	/** Fields, among {@link fields}, a select leaves out unless its query names them in `load`. */
 	lazy?: string[];
 };
