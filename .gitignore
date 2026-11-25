@@ -29,3 +29,6 @@ projects/cli/tests/.flux-bin-*/
 
 # Claude Code's agent worktrees (git worktree checkouts, never source)
 .claude/worktrees/
+
+# Worktrees for parallel work, inside the repo (never source)
+.worktrees/
