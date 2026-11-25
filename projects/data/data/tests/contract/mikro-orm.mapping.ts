@@ -64,7 +64,8 @@ export function mikroOrmEntities({
 		tableName: "approval",
 		schema,
 		properties: {
-			order: () => p.manyToOne(OrderSchema).fieldName("order_id").primary(),
+			order: () =>
+				p.manyToOne(OrderSchema).fieldName("order_id").primary().deleteRule("cascade"),
 			by: p.text().primary(),
 			note: p.text().nullable(),
 		},

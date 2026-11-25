@@ -5,23 +5,14 @@ import {
 	type EntityClass,
 	type TrackingUnitOfWork,
 	type EntityModel,
-	type ReferenceModel,
 	type Row,
 	type RowQuery,
 	type RowStore,
 } from "@decohere/data";
 import type { DataSource, EntityMetadata, QueryRunner, WhereExpressionBuilder } from "typeorm";
+import { TypeOrmEntityModel } from "./type-orm-entity.model.js";
 
 type ColumnMetadata = EntityMetadata["columns"][number];
-
-type Mapped = {
-	model: EntityModel;
-	meta: EntityMetadata;
-	/** The column each field or reference is stored in. */
-	columns: Map<string, ColumnMetadata>;
-	/** For each reference, the key property of the class it points at. */
-	targetKeys: Map<string, string>;
-};
 
 const SQL_OPERATORS: Record<string, string> = {
 	gt: ">",
@@ -44,7 +35,7 @@ export type TypeOrmUnitOfWork = TrackingUnitOfWork<TypeOrmRowStore>;
  */
 export class TypeOrmRowStore implements RowStore {
 	private readonly runner: QueryRunner;
-	private readonly mapped = new Map<EntityClass, Mapped>();
+	private readonly mapped = new Map<EntityClass, TypeOrmEntityModel>();
 
 	public constructor(private readonly dataSource: DataSource) {
 		this.runner = dataSource.createQueryRunner();
@@ -85,19 +76,22 @@ export class TypeOrmRowStore implements RowStore {
 	}
 
 	public async select(type: EntityClass, query: RowQuery): Promise<Row[]> {
-		const { model, meta, columns } = this.map(type);
+		const entity = this.map(type);
+		const { model, metadata: meta } = entity;
 		const fields = model.fields.filter(
 			(field) => !model.lazy?.includes(field) || query.load?.includes(field),
 		);
 		const props = [...fields, ...model.references.map((r) => r.prop)];
 		const qb = this.runner.manager.createQueryBuilder().from(meta.target, "e");
 		qb.select(
-			props.map((prop) => `${this.column("e", columns.get(prop))} AS ${this.escape(prop)}`),
+			props.map(
+				(prop) => `${this.column("e", entity.columnOf(prop))} AS ${this.escape(prop)}`,
+			),
 		);
-		this.where(qb, columns, query.where ?? {});
+		this.where(qb, entity, query.where ?? {});
 		for (const [prop, direction] of Object.entries(query.orderBy ?? {})) {
 			qb.addOrderBy(
-				this.column("e", this.columnOf(meta, columns, prop)),
+				this.column("e", this.requiredColumn(entity, prop)),
 				direction === "desc" ? "DESC" : "ASC",
 			);
 		}
@@ -113,14 +107,14 @@ export class TypeOrmRowStore implements RowStore {
 			Object.fromEntries(
 				props.map((prop) => [
 					prop,
-					r[prop] == null ? null : driver.prepareHydratedValue(r[prop], columns.get(prop)),
+					r[prop] == null ? null : driver.prepareHydratedValue(r[prop], entity.columnOf(prop)),
 				]),
 			),
 		);
 	}
 
 	public async insert(type: EntityClass, rows: Row[]): Promise<Row[]> {
-		const { meta } = this.map(type);
+		const meta = this.map(type).metadata;
 		const result = await this.runner.manager
 			.createQueryBuilder()
 			.insert()
@@ -131,7 +125,7 @@ export class TypeOrmRowStore implements RowStore {
 	}
 
 	public async insertIfAbsent(type: EntityClass, row: Row): Promise<Row | null> {
-		const { meta, model } = this.map(type);
+		const { metadata: meta, model } = this.map(type);
 		// The key says whether a row came back; generated fields are what the entity takes from it.
 		const generated = meta.columns.filter(
 			(c) => c.isGenerated && model.fields.includes(c.propertyName),
@@ -165,36 +159,33 @@ export class TypeOrmRowStore implements RowStore {
 		changes: Row,
 		version?: { prop: string; expected: unknown },
 	): Promise<number> {
-		const { meta, columns } = this.map(type);
+		const entity = this.map(type);
 		const qb = this.runner.manager
 			.createQueryBuilder()
-			.update(meta.target)
+			.update(entity.metadata.target)
 			.set(this.entityShaped(type, changes));
-		this.where(qb, columns, key, "");
+		this.where(qb, entity, key, "");
 		if (version) {
-			this.where(qb, columns, { [version.prop]: version.expected }, "");
+			this.where(qb, entity, { [version.prop]: version.expected }, "");
 		}
 		const result = await qb.execute();
 		return result.affected ?? 0;
 	}
 
 	public async delete(type: EntityClass, keys: Row[]) {
-		const { meta, columns, model } = this.map(type);
-		const qb = this.runner.manager.createQueryBuilder().delete().from(meta.target);
+		const entity = this.map(type);
+		const { model } = entity;
+		const qb = this.runner.manager.createQueryBuilder().delete().from(entity.metadata.target);
 		if (model.key.length === 1) {
-			this.where(
-				qb,
-				columns,
-				{ [model.key[0]]: { in: keys.map((k) => k[model.key[0]]) } },
-				"",
-			);
+			this.where(qb, entity, { [model.key[0]]: { in: keys.map((k) => k[model.key[0]]) } }, "");
 		} else {
 			const parts = keys.map((key, i) =>
 				model.key
 					.map((prop) => {
 						const name = `k${i}_${prop}`;
-						qb.setParameter(name, this.persistent(columns.get(prop), key[prop]));
-						return `${this.escape(columns.get(prop).databaseName)} = :${name}`;
+						const column = entity.columnOf(prop);
+						qb.setParameter(name, this.persistent(column, key[prop]));
+						return `${this.escape(column.databaseName)} = :${name}`;
 					})
 					.join(" AND "),
 			);
@@ -205,96 +196,32 @@ export class TypeOrmRowStore implements RowStore {
 
 	// ── Mapping ────────────────────────────────────────────────────────────
 
-	private map(type: EntityClass): Mapped {
+	private map(type: EntityClass): TypeOrmEntityModel {
 		const known = this.mapped.get(type);
 		if (known) {
 			return known;
 		}
-		const meta = this.dataSource.getMetadata(type);
-		if (typeof meta.target !== "function") {
-			throw new DataConfigurationError(`${meta.name} must be mapped to a class to be tracked`);
-		}
-		const columns = new Map<string, ColumnMetadata>();
-		const targetKeys = new Map<string, string>();
-		const relations = [...meta.manyToOneRelations, ...meta.ownerOneToOneRelations];
-		const references: ReferenceModel[] = relations.map((relation) => {
-			if (relation.joinColumns.length !== 1) {
-				throw new DataConfigurationError(
-					`${meta.name}.${relation.propertyName} references a composite key, which the unit of work can't track`,
-				);
-			}
-			const [join] = relation.joinColumns;
-			columns.set(relation.propertyName, join);
-			targetKeys.set(relation.propertyName, join.referencedColumn?.propertyName ?? "id");
-			return {
-				prop: relation.propertyName,
-				target: relation.inverseEntityMetadata.target as EntityClass,
-				nullable: relation.isNullable,
-			};
-		});
-		const referenceFor = (column: ColumnMetadata) =>
-			column.relationMetadata?.propertyName ??
-			references.find((r) => columns.get(r.prop)?.databaseName === column.databaseName)?.prop;
-		const fields: string[] = [];
-		const lazy: string[] = [];
-		for (const column of meta.columns) {
-			if (column.embeddedMetadata) {
-				throw new DataConfigurationError(
-					`${meta.name}.${column.propertyPath}: embedded columns aren't supported`,
-				);
-			}
-			if (referenceFor(column) || column.isVirtual) {
-				continue;
-			}
-			fields.push(column.propertyName);
-			// `select: false`: loaded only when a query asks for it.
-			if (!column.isSelect) {
-				lazy.push(column.propertyName);
-			}
-			columns.set(column.propertyName, column);
-		}
-		const model: EntityModel = {
-			type,
-			name: meta.name,
-			key: meta.primaryColumns.map((c) => referenceFor(c) ?? c.propertyName),
-			fields,
-			references,
-			children: meta.oneToManyRelations.map((relation) => {
-				if (relation.persistenceEnabled) {
-					throw new DataConfigurationError(
-						`${meta.name}.${relation.propertyName}: map child collections with persistence: false; the unit of work writes them`,
-					);
-				}
-				return {
-					prop: relation.propertyName,
-					target: relation.inverseEntityMetadata.target as EntityClass,
-					parentRef: relation.inverseRelation?.propertyName,
-				};
-			}),
-			version: meta.versionColumn?.propertyName,
-			lazy,
-		};
-		const mapped = { model, meta, columns, targetKeys };
+		const mapped = new TypeOrmEntityModel(this.dataSource.getMetadata(type));
 		this.mapped.set(type, mapped);
 		return mapped;
 	}
 
 	/** A row as TypeORM's query builders take it: a reference as `{ key: value }`. */
 	private entityShaped(type: EntityClass, row: Row): Row {
-		const { targetKeys } = this.map(type);
+		const entity = this.map(type);
 		return Object.fromEntries(
 			Object.entries(row).map(([prop, value]) => {
-				const key = targetKeys.get(prop);
+				const key = entity.targetKeyOf(prop);
 				return [prop, key && value != null ? { [key]: value } : value];
 			}),
 		);
 	}
 
 	private fromEntityShaped(type: EntityClass, generated: Row): Row {
-		const { targetKeys } = this.map(type);
+		const entity = this.map(type);
 		return Object.fromEntries(
 			Object.entries(generated).map(([prop, value]) => {
-				const key = targetKeys.get(prop);
+				const key = entity.targetKeyOf(prop);
 				return [
 					prop,
 					key && value !== null && typeof value === "object" ? (value as Row)[key] : value,
@@ -305,12 +232,12 @@ export class TypeOrmRowStore implements RowStore {
 
 	private where(
 		qb: WhereExpressionBuilder & { setParameter(k: string, v: unknown): unknown },
-		columns: Map<string, ColumnMetadata>,
+		entity: TypeOrmEntityModel,
 		where: RowQuery["where"],
 		alias = "e",
 	) {
 		for (const [prop, condition] of Object.entries(where ?? {})) {
-			const column = columns.get(prop);
+			const column = entity.columnOf(prop);
 			if (!column) {
 				throw new DataConfigurationError(`Unknown field "${prop}"`);
 			}
@@ -359,10 +286,10 @@ export class TypeOrmRowStore implements RowStore {
 		return this.dataSource.driver.preparePersistentValue(value, column);
 	}
 
-	private columnOf(meta: EntityMetadata, columns: Map<string, ColumnMetadata>, prop: string) {
-		const column = columns.get(prop);
+	private requiredColumn(entity: TypeOrmEntityModel, prop: string) {
+		const column = entity.columnOf(prop);
 		if (!column) {
-			throw new DataConfigurationError(`${meta.name} has no field "${prop}"`);
+			throw new DataConfigurationError(`${entity.model.name} has no field "${prop}"`);
 		}
 		return column;
 	}

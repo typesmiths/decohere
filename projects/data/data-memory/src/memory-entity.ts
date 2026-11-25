@@ -43,22 +43,20 @@ export type MemoryEntityOptions<T> = {
 	lazy?: FieldKeys<T>[];
 };
 
-/** One class's mapping, as {@link mapEntity} makes it. */
-export type MemoryEntity = EntityModel & {
-	references: (ReferenceModel & { onDelete?: "cascade" })[];
-	generated?: string;
-};
+/** One class's mapping: what {@link mapEntity} makes, or a model read from another provider's mapping. */
+export type MemoryEntity = EntityModel;
 
 /**
- * Map a class for the memory provider. With no ORM to read metadata from, the mapping is written
- * out: which properties are stored, which reference another class, and which hold children.
+ * Map a class for the memory provider, written out: which properties are stored, which reference
+ * another class, and which hold children. For classes an ORM already maps, `memory()` takes that
+ * mapping instead (an `EntityMapping`, such as `TypeOrmMapping`).
  */
 export function mapEntity<T extends object>(
 	type: EntityClass<T>,
 	options: MemoryEntityOptions<T>,
 ): MemoryEntity {
 	const key: string[] = options.key ?? ["id"];
-	const references = (options.references ?? []).map((r) => ({
+	const references = (options.references ?? []).map((r): ReferenceModel => ({
 		prop: r.prop,
 		target: r.target,
 		nullable: r.nullable ?? false,

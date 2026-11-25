@@ -90,14 +90,20 @@ export function typeOrmEntities({
 			target: Approval,
 			tableName: "approval",
 			schema,
-			columns: { by: { type: "text", primary: true }, note: { type: "text", nullable: true } },
+			// TypeORM doesn't take `primary` on a relation: the key's column is declared as a column
+			// too, and the relation shares it.
+			columns: {
+				order: { type: "uuid", primary: true, name: "order_id" },
+				by: { type: "text", primary: true },
+				note: { type: "text", nullable: true },
+			},
 			relations: {
 				order: {
 					type: "many-to-one",
 					target: "Order",
 					joinColumn: { name: "order_id" },
 					nullable: false,
-					primary: true,
+					onDelete: "CASCADE",
 				},
 			},
 		}),

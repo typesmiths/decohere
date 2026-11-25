@@ -9,6 +9,7 @@ export * from "./query.types.js";
 export * from "./repository.js";
 export * from "./unit-of-work.js";
 export * from "./comparison.js";
+export * from "./tracking/entity-mapping.contract.js";
 export * from "./tracking/row-store.js";
 export * from "./tracking/tracking-unit-of-work.js";
 export * from "./data-source-policy.js";
